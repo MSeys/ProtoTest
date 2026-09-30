@@ -1,4 +1,4 @@
-import type {CSSProperties, ReactNode} from 'react';
+import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
 
 import Frame from '@site/src/components/Frame';
@@ -103,7 +103,7 @@ function Card({capability}: {capability: Capability}): ReactNode {
 export default function CapabilityIndex(): ReactNode {
   const count = depths.reduce((sum, depth) => sum + depth.capabilities.length, 0);
   return (
-    <Frame
+    <Frame surface="page"
       head={
         <>
           <code className={styles.context}>ProtoExecutionContext</code>
@@ -112,8 +112,8 @@ export default function CapabilityIndex(): ReactNode {
       }
       foot={<>Every package is ProtoTest.*; compose the ones your suite needs.</>}>
       <ol className={styles.depths}>
-        {depths.map((depth, index) => (
-          <li key={depth.label} className={styles.depth} style={{'--level': index} as CSSProperties}>
+        {depths.map((depth) => (
+          <li key={depth.label} className={styles.depth}>
             <div className={styles.label}>
               <i className={styles.node} aria-hidden="true" />
               <strong>{depth.label}</strong>

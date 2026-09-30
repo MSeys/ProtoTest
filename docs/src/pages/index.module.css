@@ -1,17 +1,13 @@
 /* The home page: the prototype claim beside the test itself, then the commands, what the run
    records, one failure explained, the protocols, and the measured proof. Every value is a token;
-   the hero opts into the blueprint surface in the markup, and every visual sits in a Frame. */
+   the page follows the reader theme, with blueprint reserved for the test excerpt. */
 
 .hero {
   position: relative;
   overflow: hidden;
   padding: calc(var(--space-7) * 1.75) 0;
   border-bottom: 1px solid var(--border-strong);
-  background:
-    radial-gradient(circle at 38% 0%, color-mix(in srgb, var(--pt-cyan) 14%, transparent), transparent 46%),
-    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
-    var(--pt-navy-deep);
+  background: var(--bg);
   color: var(--text);
 }
 
@@ -28,7 +24,7 @@
 
 .eyebrow {
   margin-bottom: var(--space-4);
-  color: var(--pt-cyan);
+  color: var(--blueprint);
   font: var(--weight-semibold) var(--text-meta) var(--font-mono);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
@@ -37,17 +33,19 @@
 .heroTitle {
   margin: 0;
   max-width: 20ch;
-  color: var(--pt-white);
-  font-size: clamp(1.9rem, 3.4vw, 3rem);
+  color: var(--text);
+  font-size: calc(var(--text-display) * 1.85);
   line-height: 1.05;
   letter-spacing: var(--tracking-display);
 }
+
+.heroAccent { color: var(--blueprint); }
 
 .heroLead {
   max-width: 52ch;
   margin: var(--space-4) 0 0;
   color: var(--muted);
-  font-size: clamp(1rem, 1.1vw, 1.08rem);
+  font-size: var(--text-body);
   line-height: 1.6;
 }
 
@@ -63,7 +61,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
+  min-height: calc(var(--control-height) + var(--space-2));
   padding: 0 var(--space-6);
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -75,8 +73,8 @@
 
 .btnPrimary { background: var(--blueprint); color: var(--bg); font-weight: var(--weight-bold); }
 .btnPrimary:hover { background: color-mix(in srgb, var(--blueprint) 85%, white); color: var(--bg); }
-.btnGhost { border-color: color-mix(in srgb, var(--pt-white) 32%, transparent); color: var(--pt-white); }
-.btnGhost:hover { border-color: var(--pt-white); color: var(--pt-white); }
+.btnGhost { background: var(--surface); border-color: var(--border-strong); color: var(--text); }
+.btnGhost:hover { border-color: var(--blueprint); background: var(--hover); color: var(--text); }
 
 .heroNote {
   max-width: 48ch;
@@ -158,11 +156,11 @@
 .sectionHead h2 {
   margin: 0;
   color: var(--text);
-  font-size: clamp(1.5rem, 2.2vw, 1.9rem);
+  font-size: calc(var(--text-heading) * 1.4);
   letter-spacing: var(--tracking-display);
 }
 
-.sectionLead { margin: var(--space-3) 0 0; color: var(--muted); font-size: clamp(1rem, 1.1vw, 1.05rem); line-height: 1.6; }
+.sectionLead { margin: var(--space-3) 0 0; color: var(--muted); font-size: var(--text-body); line-height: 1.6; }
 
 /* The one-line claim under a section's visual, with its links at the end. */
 .line {
@@ -194,7 +192,7 @@
 
 .card:hover { border-color: var(--blueprint-line); color: var(--text); }
 .card strong { font-size: var(--text-title); }
-.cardPackages { color: var(--blueprint); font: var(--text-micro)/1.6 var(--font-mono); overflow-wrap: anywhere; }
+.cardPackages { color: var(--blueprint); font: var(--text-meta)/1.6 var(--font-mono); overflow-wrap: anywhere; }
 .card span { color: var(--muted); font-size: var(--text-body); line-height: 1.55; }
 
 .failureInner { max-width: 60rem; }
@@ -243,3 +241,10 @@
 }
 
 .closeLine { margin: var(--space-5) 0 0; max-width: 52ch; color: var(--muted); line-height: 1.6; }
+
+@media (max-width: 600px) {
+  .hero { padding: var(--space-7) 0; }
+  .heroTitle { font-size: calc(var(--text-display) * 1.5); }
+  .section { padding: var(--space-7) 0; }
+  .sectionHead { margin-bottom: var(--space-5); }
+}

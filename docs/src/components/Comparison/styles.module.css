@@ -26,7 +26,7 @@
 .figure { display: flex; align-items: baseline; gap: var(--space-2); }
 .figure strong {
   color: var(--text);
-  font: var(--weight-bold) clamp(28px, 3.4vw, 40px) / 1 var(--font-display);
+  font: var(--weight-bold) var(--text-display) / var(--leading-tight) var(--font-display);
   letter-spacing: var(--tracking-display);
   font-variant-numeric: tabular-nums;
 }

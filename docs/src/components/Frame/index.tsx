@@ -9,16 +9,16 @@ interface FrameProps {
   foot?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Product previews use blueprint; explanatory panels follow the reader's theme. */
+  surface?: 'blueprint' | 'page';
 }
 
 /**
- * The frame every home-page visual sits in: the viewer's Panel on the blueprint surface. It opts into the
- * blueprint with data-surface, so the product screens it holds look like ProtoTest does, whichever theme the
- * page is in, and everything inside can use the ordinary tokens.
+ * Shared panel chrome. Product previews opt into blueprint; explanatory panels follow the page theme.
  */
-export default function Frame({head, foot, children, className}: FrameProps): ReactNode {
+export default function Frame({head, foot, children, className, surface = 'blueprint'}: FrameProps): ReactNode {
   return (
-    <div data-surface="blueprint" className={`${styles.frame} ${className ?? ''}`}>
+    <div data-surface={surface === 'blueprint' ? 'blueprint' : undefined} className={`${styles.frame} ${className ?? ''}`}>
       {head && <div className={styles.head}>{head}</div>}
       {children}
       {foot && <div className={styles.foot}>{foot}</div>}

@@ -16,7 +16,7 @@
 .tab {
   flex: none;
   height: 100%;
-  min-height: 36px;
+  min-height: var(--control-height);
   padding: 0 var(--space-3);
   border: 0;
   border-bottom: 2px solid transparent;
@@ -32,16 +32,19 @@
 .tab:hover { background: var(--hover); color: var(--text); }
 .tabActive { border-bottom-color: var(--blueprint); color: var(--text); font-weight: var(--weight-bold); }
 
-/* Every snippet gets the same height, so switching tabs never makes the hero jump: a longer one scrolls inside
-   its own box, both ways. */
-.body { height: 460px; display: flex; flex-direction: column; background: var(--surface-sunken); }
-.body pre { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* The whole excerpt stays visible; only long lines scroll inside the code block. */
+.body { display: flex; flex-direction: column; background: var(--surface-sunken); }
+.body pre { min-height: 0; }
+.title { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
+.copy { flex: none; min-height: var(--control-height); padding: var(--space-1) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-2); color: var(--text); font: var(--weight-medium) var(--text-meta) var(--font-ui); cursor: pointer; }
+.copy:hover { background: var(--hover); border-color: var(--blueprint-line); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The file name on its own bar, the way an editor labels a buffer. */
 .filename {
   padding: var(--space-2) var(--space-5) 0;
-  color: var(--code-comment);
-  font: var(--text-micro) var(--font-mono);
+  color: var(--muted);
+  font: var(--text-meta) var(--font-mono);
   overflow-wrap: anywhere;
 }
 

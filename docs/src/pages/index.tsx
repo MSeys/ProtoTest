@@ -5,7 +5,8 @@ import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
 import CommandBox, {type CommandBoxRunner} from '@site/src/components/CommandBox';
-import CodeSnippet from '@site/src/components/CodeSnippet';
+import TabbedCode from '@site/src/components/TabbedCode';
+import StartPaths from '@site/src/components/StartPaths';
 import Frame from '@site/src/components/Frame';
 import styles from './index.module.css';
 
@@ -57,13 +58,10 @@ const platformJourney = `[ProtoTest]
 [SignedInAs]
 public async Task RestWritesAreVisibleThroughGraphQL()
 {
-    // Arrange: write through the public REST surface.
     using var created = await Proto.Context.Rest()
         .Body(new CreateProjectRequest("atlas"))
         .PostAsync("/api/v1/projects");
     created.Should.HaveHttpStatus(HttpStatusCode.Created);
-
-    // Act
     using var projects = await Proto.Context.GraphQL()
         .Query("projects", new { first = 10 })
         .ExpectAsync(new
@@ -71,8 +69,6 @@ public async Task RestWritesAreVisibleThroughGraphQL()
             totalCount = 1,
             nodes = new[] { new { name = "atlas", status = ProjectStatuses.Active } }
         });
-
-    // Assert
     projects.Should.HaveNoErrors();
 }`;
 
@@ -189,18 +185,17 @@ const proof = [
  */
 function Hero(): ReactNode {
   return (
-    <header data-surface="blueprint" className={styles.hero}>
+    <header className={styles.hero}>
       <div className="container">
         <div className={styles.heroSplit}>
           <div className={styles.heroCopy}>
             <div className={styles.eyebrow}>Integration testing for .NET</div>
             <Heading as="h1" className={styles.heroTitle}>
-              Integration tests as readable as a prototype.
+              Integration tests.<br />One context.<br /><span className={styles.heroAccent}>One trace.</span>
             </Heading>
             <p className={styles.heroLead}>
-              ProtoTest is prototype testing for .NET: one host, one lifecycle and one trace across
-              REST, GraphQL, gRPC, SQL, browsers and brokers. The setup lives in the host; the test
-              stays the scenario.
+              Test across APIs, browsers, databases and events with a shared host, lifecycle and
+              trace. Compose the integrations your suite needs; keep the test focused on the scenario.
             </p>
             <div className={styles.heroButtons}>
               <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
@@ -216,17 +211,13 @@ function Hero(): ReactNode {
             </p>
           </div>
 
-          <Frame
-            className={styles.heroFrame}
-            head={
-              <>
-                <strong>PlatformJourney.cs</strong>
-                <span className={styles.frameMeta}>samples/Northstar.ProtoTest</span>
-              </>
-            }
-            foot="RestWritesAreVisibleThroughGraphQL: a REST write read back over GraphQL.">
-            <CodeSnippet code={platformJourney} language="csharp" showLineNumbers />
-          </Frame>
+          <div className={styles.heroFrame}>
+            <TabbedCode tabs={[{
+              id: 'journey', label: 'The test', filename: 'PlatformJourney.cs · Northstar sample',
+              code: platformJourney,
+              footnote: 'A REST write read back over GraphQL. Setup lives in the host.',
+            }]} />
+          </div>
         </div>
       </div>
     </header>
@@ -265,6 +256,7 @@ function RecordSection(): ReactNode {
         </header>
         <div className={styles.failureInner}>
           <Frame
+            surface="page"
             head={
               <>
                 <strong>What the run recorded</strong>
@@ -322,6 +314,7 @@ function FailureSection(): ReactNode {
         </header>
         <div className={styles.failureInner}>
           <Frame
+            surface="page"
             head={
               <>
                 <strong>FailureDrills.ABareStatusHidesWhatTheApplicationSaid</strong>
@@ -404,7 +397,7 @@ function Close(): ReactNode {
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="Integration tests as readable as a prototype."
+      title="Integration tests. One context. One trace."
       description="ProtoTest is prototype testing for .NET: one host, one lifecycle and one trace across REST, GraphQL, gRPC, SQL, browsers and brokers.">
       <Head>
         <script type="application/ld+json">
@@ -427,10 +420,11 @@ export default function Home(): ReactNode {
       </Head>
       <Hero />
       <main>
+        <div className="container"><StartPaths /></div>
         <CommandsSection />
         <RecordSection />
-        <ProtocolsSection />
         <FailureSection />
+        <ProtocolsSection />
         <ProofSection />
         <Close />
       </main>

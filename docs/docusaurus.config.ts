@@ -182,13 +182,6 @@ export default async function createConfig(): Promise<Config> {
     },
     footer: {
       style: 'dark',
-      logo: {
-        alt: 'ProtoTest',
-        src: 'img/brand/prototest-mark-white.svg',
-        width: 40,
-        height: 40,
-        href: '/',
-      },
       // Four groups: learning it, looking it up, the project around it, and the community.
       links: [
         {

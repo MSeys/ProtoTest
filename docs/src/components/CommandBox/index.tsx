@@ -42,7 +42,7 @@ export default function CommandBox({title, commands, runners}: CommandBoxProps):
   }
 
   return (
-    <div className={styles.box}>
+    <div className={styles.box} data-surface="blueprint">
       <div className={styles.head}>
         <span className={styles.title}>{title}</span>
         <button type="button" className={styles.copy} onClick={copy}>
@@ -74,7 +74,7 @@ export default function CommandBox({title, commands, runners}: CommandBoxProps):
           ))}
         </div>
       ) : null}
-      <pre className={styles.commands}>
+      <pre className={styles.commands} tabIndex={0} aria-label="Starter commands">
         <code>{lines.join('\n')}</code>
       </pre>
     </div>

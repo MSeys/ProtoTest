@@ -16,8 +16,8 @@
 
 .facts { margin: 0; display: grid; gap: var(--space-3); }
 .facts > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: var(--space-3); }
-.facts dt { color: var(--dim); font-size: var(--text-micro); }
-.facts dd { margin: 0; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.facts dt { color: var(--muted); font-size: var(--text-meta); }
+.facts dd { margin: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); }
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); font-weight: var(--weight-regular); }
 .capability { padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-chip); line-height: 1.8; }

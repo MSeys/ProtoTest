@@ -1,7 +1,7 @@
 .context { padding: 0; background: none; border: 0; color: var(--text); font: var(--weight-semibold) var(--text-meta) var(--font-mono); }
 .meta { color: var(--muted); font-size: var(--text-micro); }
 
-/* The cross-section: one stratum per depth, each a step more solid than the one above it. */
+/* One context spine connects the integration groups on the page's surface. */
 .depths {
   margin: 0;
   padding: 0;
@@ -16,7 +16,7 @@
   grid-template-columns: minmax(140px, 190px) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-2) var(--space-4);
-  background: color-mix(in srgb, var(--blueprint) calc(var(--level) * 3.5%), transparent);
+  background: var(--surface);
 }
 
 .depth + .depth { border-top: 1px solid var(--border); }
@@ -36,8 +36,8 @@
 .depth:last-child::before { bottom: auto; height: calc(var(--space-3) + 7px); }
 
 .label { position: relative; min-width: 0; display: grid; gap: 2px; }
-.label strong { font-size: var(--text-strong); font-weight: var(--weight-bold); line-height: var(--leading-tight); }
-.label span { color: var(--muted); font-size: var(--text-micro); }
+.label strong { font-size: var(--text-title); font-weight: var(--weight-bold); line-height: var(--leading-tight); }
+.label span { color: var(--muted); font-size: var(--text-body); }
 
 .node {
   position: absolute;
@@ -54,31 +54,29 @@
 
 .card {
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-4);
   display: grid;
-  gap: 2px;
+  gap: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text);
   text-decoration: none;
   transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
 
 a.card:hover { border-color: var(--blueprint); background: var(--surface-2); color: var(--text); text-decoration: none; }
-.card strong { font-size: var(--text-body); font-weight: var(--weight-semibold); }
-.does { color: var(--muted); font-size: var(--text-micro); line-height: var(--leading-tight); }
+.card strong { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
+.does { color: var(--muted); font-size: var(--text-body); line-height: var(--leading); }
 
 .packages {
-  margin-top: 2px;
+  margin-top: var(--space-1);
   padding: 0;
-  overflow: hidden;
+  overflow-wrap: anywhere;
   border: 0;
   background: none;
   color: var(--dim);
-  font: var(--text-micro) var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font: var(--text-meta) var(--font-mono);
 }
 
 @container (max-width: 480px) {

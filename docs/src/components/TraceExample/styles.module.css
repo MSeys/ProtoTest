@@ -7,11 +7,7 @@
   align-items: end;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-panel);
-  background:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-    var(--surface);
-  background-size: var(--grid-size) var(--grid-size);
+  background: var(--surface);
   color: var(--text);
 }
 
@@ -20,4 +16,5 @@
 .example strong { font-size: var(--text-title); }
 .example code { width: fit-content; max-width: 100%; padding: 0; border: 0; background: none; color: var(--dim); overflow-wrap: anywhere; }
 /* The link keeps its own cell on wide frames and drops under the text on narrow ones. */
-.link { justify-self: start; font-weight: var(--weight-semibold); }
+.link { justify-self: start; color: var(--blueprint); font-size: var(--text-strong); font-weight: var(--weight-semibold); }
+.link:hover { color: var(--text); }

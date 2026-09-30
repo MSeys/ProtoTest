@@ -136,6 +136,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 ### Fixes
 
+- Docs: the home and shared components follow the reader theme, with clearer start paths and code copying; the API reference uses the same design tokens. [Home](https://prototest.dev/)
+
 - Core: assertion messages across GraphQL, gRPC, messaging, REST and Sheets use a plain hyphen separator. [Assertions](https://prototest.dev/docs/foundation/assertions)
 - Core: ambient-context errors name the fix (`FindTraceWriter`, `SetContext`, the runner setup). [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
 - Core: `ReplaceClient` with the already-registered instance keeps its owner instead of double-disposing. [Clients](https://prototest.dev/docs/foundation/clients)

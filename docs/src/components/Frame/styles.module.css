@@ -16,7 +16,7 @@
 
 .head {
   min-height: var(--panel-head-height);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -29,7 +29,7 @@
 .head > * { min-width: 0; }
 
 .foot {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--muted);

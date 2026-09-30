@@ -41,7 +41,7 @@ Everything in this level runs against the Northstar.ProtoTest sample suite: one 
     ),
     reveal: (
       <>
-        <code>BrokerJourney</code> declares <code>[RequiresCapability(ProtoCapabilityKinds.Broker)]</code>, and the composition registers the reason with <code>AddCapabilityReason</code>: "No broker is configured; set ProtoTest:Messaging:Broker=container." A capability the run cannot serve is absent, and the gated journey skips before its lifecycle starts. Level 2 adds the broker and watches the same journey run.
+        <code>BrokerJourney</code> declares <code>[RequiresCapability(ProtoCapabilityKinds.Broker)]</code>, and the composition registers the reason with <code>AddCapabilityReason</code>: "No broker is configured; set ProtoTest:Messaging:Broker=container." A capability the run cannot serve is absent, and the gated journey skips before its lifecycle starts. Level 2 adds the broker and watches the same journey run (<Link to="/learn/compose-dont-glue/add-and-remove-an-integration">Level 2, lesson 3</Link> teaches <code>AddCapabilityReason</code>).
       </>
     ),
   }}

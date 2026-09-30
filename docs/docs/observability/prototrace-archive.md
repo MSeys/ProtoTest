@@ -42,6 +42,8 @@ Test artifacts, every [attachment](../foundation/attachments.md), live under the
 
 The library reads manifest and spans **2.x** and state documents **1.x**; anything else fails with a message naming the version rather than guessing. A state bump the viewer can already read still needs a library release before the CLI opens it. A reader only opens an archive from its own era.
 
+The machine-readable wire facts live in [`design/prototrace-wire.contract.json`](https://github.com/MSeys/ProtoTest/blob/main/design/prototrace-wire.contract.json): the archive, spans and state versions both test suites assert against. Changing a value there is a format change.
+
 ### If the process dies
 
 The archive is written once, at the end of the run, after the gates and the reports. A process killed mid-run writes no `.prototrace`. What survives instead is the runner's own output and anything the run already released. An incremental flush (spans per completed test) is not implemented, so if you need evidence from a process that dies, keep the runner's console output and any artifacts the run had already published.

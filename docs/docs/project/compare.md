@@ -37,6 +37,8 @@ The established .NET combination: host the application with `WebApplicationFacto
 - There is no lifecycle to learn beyond the primitives themselves; a team that knows `WebApplicationFactory` is productive on day one.
 - You assemble the diagnostics you need, library by library: container logs here, a snapshot there, a browser trace when a browser is involved.
 
+What adopting ProtoTest costs: one setup class per test project, one package per integration, and three ideas to learn (the host, the lifecycle, the trace). Tests swap `[Test]` or `[Fact]` for `[ProtoTest]`, select the application with `[Application]`, and reach clients through `Proto.Context`. One test beside your existing suite costs five minutes ([your first test](../getting-started/first-test.md)); a suite pays that learning cost once, then per test only the attribute and accessor lines.
+
 **Where ProtoTest wins**
 
 - One host, one [execution context](../foundation/execution-context.md) and one [lifecycle](../foundation/lifecycle.md) across every integration a test uses, so the API, the database, the broker and the browser share the setup that already ran.
@@ -117,6 +119,17 @@ Some teams build their own integration-testing layer instead. [I did too](./why-
 
 A framework you own completely is the right answer when the problem is truly yours alone. When it is the same problem everybody has, sharing the foundation is cheaper.
 
+## Support and maintenance
+
+| Project | Maintained by | Issues and help | Fix line |
+| --- | --- | --- | --- |
+| ProtoTest | One person, in personal time. No company, no team, no sponsors. | Bugs go to GitHub Issues, questions to Discussions. Best effort, with no response time guarantee. | Fixes land on the newest released line. Older lines get security or critical fixes case by case, never promised. There is no LTS line. |
+| ASP.NET Core, Playwright, Aspire testing | Microsoft teams behind the .NET stack. | Vendor backed channels plus large public trackers. | LTS releases on the .NET schedule. |
+| Alba | The JasperFx community and the Critter Stack, with over a decade of releases. | A public tracker with a long history of answered questions. | A stable public API with a long track record. |
+| Testcontainers | The Testcontainers organization, with a commercial offering beside the open source libraries. | A public tracker plus vendor backed channels. | Maintained release lines. |
+
+The full ProtoTest story is on the [support and sustainability page](./sustainability.md).
+
 ## When ProtoTest is not the right choice
 
 - **You only test HTTP endpoints.** `WebApplicationFactory` plus an assertion library is smaller and has no lifecycle to learn.
@@ -128,4 +141,4 @@ A framework you own completely is the right answer when the problem is truly you
 
 And the honest caveat in the other direction: ProtoTest is young. The alternatives have larger ecosystems, longer track records and more answers on the internet. If community size decides it for you, that is a fair reason to choose them.
 
-If you want to judge it with your own problem, one test beside your existing suite costs five minutes: [your first test](../getting-started/first-test.md). The packages are per-integration, and they do not replace the libraries underneath them.
+If you want to judge it with your own problem, one test beside your existing suite costs five minutes: [your first test](../getting-started/first-test.md). The packages are per-integration, and they do not replace the libraries underneath them. If you adopt and later change your mind, [Leaving ProtoTest](./leaving.md) removes it one test at a time.

@@ -7,6 +7,8 @@ This file is the operating contract for contributors and coding agents working i
 
 ## Read before you act
 
+> Without the records checkout, work from `CONTRIBUTING.md` and the issue instead. Skip the plan, facts, and handoff updates, and say so in the pull request.
+
 1. `assets/internal/records/plan-6.md` — the plan of record for the consolidation phases (C0–C4); its
    final phase hands back to `plan-5.md`/`plan-4.md` for features. Work only from its next unchecked
    item. The process records — plans, audits, handoffs, reviews — live in the private `records`
@@ -92,12 +94,13 @@ When a controller session runs workers:
 
 | Command | When |
 | --- | --- |
-| `eng/test.ps1` | every code stage (full suite; use its filters only while iterating) |
+| `eng/test.ps1` | every code stage (full suite; `-Include` with semicolon-separated project dirs only while iterating) |
 | `eng/lint.ps1` | every stage |
 | `eng/check-docs.ps1` | docs, README or site changes |
 | `eng/pack.ps1` | packaging, csproj, version or new-project changes |
 | `eng/verify.ps1 -Stage <name>` | every stage; scopes to the working-tree change, or the HEAD commit on a clean tree; a docs-only stage records `docs-only`, a viewer-only stage records `viewer` and runs the viewer gate (`npm ci`, `npm test`, `npm run build` in `viewer/`), a stage that only touched gate scripts/workflows records `tooling` and runs the gate fixtures, and a code stage whose lint/tests were skipped records `incomplete` (non-green) unless `-AllowSkippedCodeGates` names the exception; `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
 | `eng/test-gates.ps1` | the gate scripts' own fixtures; runs inside `verify.ps1` when `eng/**.ps1` or workflows changed, and in CI |
+| `npm run typecheck` in `docs/` | docs site changes |
 | `npm run build` in `docs/` | docs site content or navigation changes |
 
 Do not commit with a red gate, and do not describe a gate as green without the command output.

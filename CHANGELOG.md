@@ -151,7 +151,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - opt-in low-ceremony mode (`[assembly: ProtoTestAutoWrap]`) wraps plain tests in the lifecycle. [Runners](https://prototest.dev/docs/runners/overview)
 - one outcome classifier (`ProtoTestResult`) and row-name helper (`ProtoTestName.ForRow`). [Runners](https://prototest.dev/docs/runners/overview)
 - xUnit v3 and TUnit pass their per-test cancellation token into the lifecycle; MSTest's 4.0.2 floor exposes none. [Execution context](https://prototest.dev/docs/foundation/execution-context#cancellation)
-- `dotnet new prototest --runner nunit|xunit|xunit3|tunit|mstest` writes a suite per runner. [Overview](https://prototest.dev/docs/integrations/overview)
+- `dotnet new prototest --runner <name>` (nunit, xunit, xunit3, tunit or mstest) writes a suite per runner. [Overview](https://prototest.dev/docs/integrations/overview)
 - `ProtoTest.Analyzers` reports `PT0001` and `PT0002` for intent the runtime cannot check. [Analyzers](https://prototest.dev/docs/project/analyzers)
 
 #### Agent workflows
@@ -183,9 +183,9 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - one test list on every screen, led by the run, with one filter for every list and a path from the run to the open operation; each test is a link. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - a test's Steps open on the test body: setup and teardown fold into one line that says what they did, time with no recorded operation gets its own row, and the verdict names the failure with the rule `prototest summary` uses (`#/test/<id>/story` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - the Timeline replaces Spans: every operation on the test's clock, zoomed per phase, with framework machinery dimmed or hidden, moments and evidence marked on their bars, and untraced time drawn through the rows (`#/test/<id>/spans` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the viewer stays responsive at 1,000+ tests; search, filter and open times drop. [Benchmarks](https://prototest.dev/docs/project/benchmarks)
-- skipped ticks read as planned, focus states and hit targets are restored, and the run header's outcome pill drops under the title on narrow screens. [Trace viewer](https://trace.prototest.dev)
-- each screen answers its question in order: failing rows name their reason, the failure card states the phase and offset, story rows read stated observations inline, and an empty file list separates no files from no match. [Trace viewer](https://trace.prototest.dev)
+- the viewer stays responsive on a 1,000-test run; the benchmark page states the open and search times. [Benchmarks](https://prototest.dev/docs/project/benchmarks)
+- a skipped test reads as planned in the run strip, keyboard focus and touch targets work across the viewer, and the run header's outcome pill moves under the title on narrow screens. [Trace viewer](https://trace.prototest.dev)
+- each screen answers its question in order: failing rows name their reason, the failure names where in the test it started, step rows read stated observations inline, and an empty evidence list separates no files from no match. [Trace viewer](https://trace.prototest.dev)
 
 #### Docs and samples
 
@@ -252,11 +252,11 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 - a client bound to a configured or published address gets its own handler and cookie jar per test. [Clients](https://prototest.dev/docs/foundation/clients)
 - response and attachment defaults bind `ProtoTest:Http:Responses`; attachments stay opt-in. [Attachments](https://prototest.dev/docs/integrations/rest/attachments)
-- binary request and response bodies are traced as bytes with their media type; a binary response records no JSON body block, no decoded body in its observation, and no decoded text in a failed status assertion. [Responses](https://prototest.dev/docs/integrations/rest/responses)
+- binary request and response bodies are traced as bytes with their media type. A binary response records its media type and length; it stores no decoded body, no JSON body block and no decoded text in a status assertion. [Responses](https://prototest.dev/docs/integrations/rest/responses)
 
 #### GraphQL
 
-- a null execution is tolerated like REST, and subscription events are disposed as they advance. [Subscriptions](https://prototest.dev/docs/integrations/graphql/subscriptions)
+- a null GraphQL execution result is tolerated, and subscription events are disposed as they advance. [Subscriptions](https://prototest.dev/docs/integrations/graphql/subscriptions)
 - a rejected subscription names the server's errors. [Subscriptions](https://prototest.dev/docs/integrations/graphql/subscriptions)
 - a fluent upload argument fails when the document is built instead of rendering as a literal. [GraphQL](https://prototest.dev/docs/integrations/graphql)
 
@@ -272,7 +272,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - a MassTransit consumer re-baselines when a substituting test replaces the harness. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit)
 - awaiting two destinations no longer misses the second destination's first delivery. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - awaits serialize and an unmatched delivery is kept for a later await, across brokers. [Messaging](https://prototest.dev/docs/integrations/messaging/)
-- `UseRabbitMq` declares the Broker capability only when the address is provided or declared. [Messaging](https://prototest.dev/docs/integrations/messaging/)
+- `UseRabbitMq` declares the Broker capability only when a connection string is available. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - `AddMessaging` declares Broker with `UseBrokerWhenInProcess`, replacing `UseBrokerUnlessConfigured`, and MassTransit's Broker follows its application's chain. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit)
 - a missing or non-amqp RabbitMQ connection string fails naming the configuration key. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - `UseRabbitMq` runs its options callback once per registration. [Messaging](https://prototest.dev/docs/integrations/messaging/)
@@ -390,7 +390,6 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - every package packs again (44), verified in one `eng/pack.ps1` run. [Installation](https://prototest.dev/docs/getting-started/installation)
 
 ### Breaking changes
-
 
 These are the 1.0 to 1.1 migration changes; from 1.1 onward the 1.x surface stays additive.
 

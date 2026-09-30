@@ -1,5 +1,5 @@
-/* The home page: the prototype claim and the real failure first, then the commands, the test, the
-   machinery, the protocols, one failure explained and the measured proof. Every value is a token;
+/* The home page: the prototype claim beside the test itself, then the commands, what the run
+   records, one failure explained, the protocols, and the measured proof. Every value is a token;
    the hero opts into the blueprint surface in the markup, and every visual sits in a Frame. */
 
 .hero {
@@ -176,33 +176,6 @@
 .line a { font-weight: var(--weight-semibold); }
 
 .commandsInner { max-width: 36rem; }
-
-/* Two panels side by side: the test and what it recorded. */
-.split {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 27rem), 1fr));
-  gap: var(--space-6);
-  align-items: start;
-}
-
-/* The machinery: four specific rows, one line and a link each. */
-.machinery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--space-4); }
-
-.machineryItem {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color var(--motion-fast) var(--motion-ease);
-}
-
-.machineryItem:hover { border-color: var(--blueprint-line); color: var(--text); }
-.machineryItem strong { font-size: var(--text-title); }
-.machineryItem span { color: var(--muted); font-size: var(--text-body); line-height: 1.55; }
 
 /* The protocols: cards with the real package names, one line each. */
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--space-4); }

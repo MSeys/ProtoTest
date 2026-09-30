@@ -120,7 +120,7 @@ dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~MyFirstJour
 The filter runs one test. The run is green, and it writes the same three files as the full suite, under the sample's output folder:
 
 ```
-bin/Debug/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace
+bin/Debug/net8.0/TestResults/prototest-{runId}.prototrace
 ```
 
 The next lesson walks `l1-first-journey.prototrace`, the sample's own version of this journey. It is not the same recording: the archive's test is `ProjectsJourney`, its name starts with `atlas-` instead of `first-`, and it asserts more of the response. Compare the shape, not the values: both traces hold the four layers, one REST create, the request and response artifacts and a shape check.

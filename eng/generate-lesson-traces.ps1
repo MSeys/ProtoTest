@@ -7,7 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repository = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repository "samples/Northstar.ProtoTest/Northstar.ProtoTest.csproj"
-$trace = Join-Path $repository "samples/Northstar.ProtoTest/bin/$Configuration/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace"
+$traceDir = Join-Path $repository "samples/Northstar.ProtoTest/bin/$Configuration/net8.0/TestResults"
+$traceFilter = "prototest-*.prototrace"
 $destination = Join-Path $repository "docs/static/lessons"
 
 # One filtered run per lesson trace, so the file a lesson embeds holds exactly the test the lesson
@@ -76,7 +77,8 @@ foreach ($item in $traces) {
     # never pass the copy, and the source is deleted so a run that writes no trace fails instead of
     # reusing one. A filter that matches no test fails loudly (the guard eng/test.ps1 uses).
     $destinationFile = Join-Path $destination "$($item.Name).prototrace"
-    Remove-Item -LiteralPath $destinationFile, $trace -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $destinationFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path (Join-Path $traceDir $traceFilter) -Force -ErrorAction SilentlyContinue
 
     $previousDrills = $env:ProtoTest__Sample__Drills
     if ($item.Drills) { $env:ProtoTest__Sample__Drills = "true" }
@@ -110,7 +112,9 @@ foreach ($item in $traces) {
         throw "The run for $($item.Name) did not $($item.Expect.ToLowerInvariant()) its one test (exit $exitCode)."
     }
 
-    if (-not (Test-Path -LiteralPath $trace)) { throw "ProtoTest did not write the expected trace: $trace" }
+    $traceFiles = @(Get-ChildItem -Path $traceDir -Filter $traceFilter -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending)
+    if ($traceFiles.Count -eq 0) { throw "ProtoTest did not write the expected trace: $(Join-Path $traceDir $traceFilter)" }
+    $trace = $traceFiles[0].FullName
 
     Copy-Item -LiteralPath $trace -Destination $destinationFile -Force
     Write-Host "Wrote $($item.Name).prototrace ($($item.Expect.ToLowerInvariant())): $($summary.Value.Trim())"

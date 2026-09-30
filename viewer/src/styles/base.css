@@ -50,3 +50,10 @@ html, body { height: 100%; margin: 0; }
 .drop-zone h1 { margin-top: var(--space-3); font-size: var(--text-display); }
 .drop-zone p { margin-bottom: var(--space-4); color: var(--muted); }
 .drop-zone small { margin-top: var(--space-3); color: var(--muted); }
+
+/* A strip that scrolls sideways (v-strip): no scrollbar of its own, and a fade on each side that has more. */
+[data-strip] { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+[data-strip]::-webkit-scrollbar { display: none; }
+[data-strip][data-more="end"] { mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more="start"] { mask-image: linear-gradient(to left, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more="both"] { mask-image: linear-gradient(to right, transparent, black var(--space-6), black calc(100% - var(--space-6)), transparent); }

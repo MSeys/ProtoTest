@@ -1,5 +1,6 @@
 import {useState, type ReactNode} from 'react';
 
+import useStrip from '@site/src/hooks/useStrip';
 import styles from './styles.module.css';
 
 /*
@@ -116,6 +117,7 @@ const runTabs: [RunTab, string][] = [['overview', 'Overview'], ['timeline', 'Tim
 
 export default function RunView(): ReactNode {
   const [tab, setTab] = useState<RunTab>('overview');
+  const strip = useStrip<HTMLDivElement>(tab);
   return (
     <div className={styles.run}>
       <p className={styles.outcomeLine}>
@@ -134,7 +136,7 @@ export default function RunView(): ReactNode {
         ))}
       </div>
 
-      <div className={styles.runTabs} role="group" aria-label="Views of the run">
+      <div ref={strip} data-strip="" className={styles.runTabs} role="group" aria-label="Views of the run">
         {runTabs.map(([id, label]) => (
           <button key={id} type="button" aria-pressed={tab === id} className={`${styles.tab} ${tab === id ? styles.tabActive : ''}`} onClick={() => setTab(id)}>
             {label}

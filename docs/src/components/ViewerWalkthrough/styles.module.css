@@ -36,7 +36,7 @@
 
 /* The tabs follow the viewer's own nav: underline, no pills. */
 /* The run's own views, under its strip, as the viewer draws them. */
-.runTabs { display: flex; gap: 2px; margin: var(--space-2) 0 var(--space-3); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.runTabs { display: flex; gap: 2px; margin: var(--space-2) 0 var(--space-3); border-bottom: 1px solid var(--border); }
 
 .tabs {
   display: flex;
@@ -44,7 +44,6 @@
   gap: 2px;
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
 }
 
 .tab {

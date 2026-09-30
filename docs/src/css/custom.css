@@ -441,3 +441,11 @@ div[class*='codeBlockTitle'] {
 @media (min-width: 997px) and (max-width: 1199px) {
   :root { --doc-sidebar-width: 260px; }
 }
+
+/* ── Sideways strips ──────────────────────────────────────────────────────────────────────────
+   Tabs that scroll (useStrip): no scrollbar of their own, and a fade on each side that still has more. */
+[data-strip] { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+[data-strip]::-webkit-scrollbar { display: none; }
+[data-strip][data-more='end'] { mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more='start'] { mask-image: linear-gradient(to left, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more='both'] { mask-image: linear-gradient(to right, transparent, black var(--space-6), black calc(100% - var(--space-6)), transparent); }

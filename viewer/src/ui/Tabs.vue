@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vStrip } from "./strip";
 import { computed, ref } from "vue";
 
 const props = defineProps<{
@@ -33,7 +34,7 @@ function move(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div ref="list" class="tabs" :class="variant ?? 'underline'"
+  <div ref="list" v-strip class="tabs" :class="variant ?? 'underline'"
        :role="isTabs ? 'tablist' : 'group'" :aria-label="label" @keydown="move">
     <template v-for="item in items" :key="item.id">
       <a v-if="item.href" :id="panel ? `${panel}-tab-${item.id}` : undefined" :href="item.href"
@@ -51,7 +52,7 @@ function move(event: KeyboardEvent) {
 
 <style scoped>
 /* Underline navigates between views; pill filters a list. One component, so they cannot drift apart. */
-.tabs { display: flex; align-items: center; gap: 2px; overflow-x: auto; }
+.tabs { display: flex; align-items: center; gap: 2px; }
 .tabs > a, .tabs > button {
   flex: none;
   border: 0;

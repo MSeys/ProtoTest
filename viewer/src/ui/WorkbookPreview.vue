@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vStrip } from "./strip";
 import { computed, ref, watch } from "vue";
 import { columnName, readWorkbook } from "../artifacts/workbook";
 import type { WorkbookPreview } from "../artifacts/workbook";
@@ -35,7 +36,7 @@ watch(() => props.blob, async blob => {
   <div v-else-if="error" class="failure"><strong>Workbook preview unavailable</strong><p>{{ error }}</p></div>
   <div v-else-if="workbook && sheet" class="workbook">
     <div class="workbook-bar">
-      <div class="tabs" role="tablist" aria-label="Workbook sheets">
+      <div v-strip class="tabs" role="tablist" aria-label="Workbook sheets">
         <button v-for="(candidate, index) in workbook.sheets" :key="candidate.name" type="button" role="tab"
                 :aria-selected="selected === index" :class="{ active: selected === index }" @click="selected = index">
           {{ candidate.name }}<span v-if="candidate.hidden">hidden</span>
@@ -67,7 +68,7 @@ watch(() => props.blob, async blob => {
 <style scoped>
 .workbook { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); overflow: hidden; }
 .workbook-bar { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); background: var(--surface-2); }
-.tabs { min-width: 0; display: flex; gap: var(--space-1); overflow-x: auto; }
+.tabs { min-width: 0; display: flex; gap: var(--space-1); }
 .tabs button { flex: none; min-height: var(--control-height); padding: 0 var(--space-3); border: 1px solid transparent; border-radius: var(--radius-chip); background: transparent; color: var(--muted); font: var(--weight-medium) var(--text-meta)/1 var(--font-ui); cursor: pointer; }
 .tabs button:hover { background: var(--hover); color: var(--text); }
 .tabs button.active { border-color: var(--blueprint-line); background: var(--blueprint-soft); color: var(--blueprint); }

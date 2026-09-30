@@ -11,6 +11,7 @@ import SourceView from "./SourceView.vue";
 import { isJsonLike } from "./json";
 import { sourceLocation } from "../trace/sources";
 import PropertyList from "../ui/PropertyList.vue";
+import { vStrip } from "../ui/strip";
 
 const pairs = (record: Record<string, string | null>) => Object.entries(record).map(([key, value]) => ({ key, value }));
 
@@ -96,7 +97,7 @@ function jump(id: string) {
 
 <template>
   <div ref="root" class="span-inspector">
-    <nav v-if="index.length > 2" class="index" aria-label="Parts of this operation">
+    <nav v-if="index.length > 2" v-strip class="index" aria-label="Parts of this operation">
       <button v-for="entry in index" :key="entry.id" type="button" :class="{ hot: entry.hot }" @click="jump(entry.id)">{{ entry.label }}</button>
     </nav>
     <!-- An error on its own is the headline. Beside a comparison it only repeats it, so it waits at the end. -->
@@ -281,9 +282,6 @@ h3 { color: var(--muted); font-family: var(--font-ui); font-size: var(--text-met
   padding: var(--space-2) var(--space-4);
   display: flex;
   gap: var(--space-1);
-  overflow-x: auto;
-  scrollbar-width: none;
-  mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }

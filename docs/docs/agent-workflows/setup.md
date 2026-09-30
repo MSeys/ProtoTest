@@ -156,6 +156,8 @@ The skill is optional. The MCP server's tool descriptions are the contract, so a
 
 ## What the agent can see
 
+The tools read your traces and return their content, including expected and actual values, to the connected agent, so run the server as an identity that may see them.
+
 Every tool is read-only and returns a compact JSON document. `list_runs` over a folder holding one failing run:
 
 ```json

@@ -100,7 +100,7 @@ The workflow, the artifact folder and the `with:` block are on the [CI page](../
 ## Limits
 
 - The digest is built after the run from the written archive. An in-run sink cannot post it. The archive is written last, and a failed assertion is not a report item.
-- The comment posts only when the digest carries a failure or a failed run gate. The webhook posts every digest, because a machine consumer decides what to do with it.
+- The comment posts only when the digest carries a failure or a failed run gate. The webhook posts every digest, because a machine consumer decides what to do with it (`Feedback_ShouldPostTheWebhookForAGreenRun` in `tests/ProtoTest.Feedback.Tests` pins the green-run half).
 - A missing target skips its channel with a named reason. A target that is reached and refuses fails its channel, and the CLI exits `1`.
 - A pull request from a fork gets a read-only token, so the comment channel cannot post and fails with its reason. The annotations and the artifact upload still work.
 - Nothing leaves the machine unless you configure a target.

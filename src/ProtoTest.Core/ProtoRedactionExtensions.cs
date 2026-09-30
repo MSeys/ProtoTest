@@ -11,13 +11,17 @@ public static class ProtoRedactionExtensions
     /// <summary>
     /// The one <see cref="ProtoRedactionOptions"/> instance for a builder: every redaction consumer
     /// of the host resolves through it, so one list governs state values and finding metadata.
+    /// A name added here reaches state values and finding metadata, while attachment and
+    /// diagnostic JSON keeps each protocol's <c>SensitiveJsonProperties</c> list.
     /// </summary>
     internal static ProtoRedactionOptions ResolveOptions(IProtoHostBuilder builder)
         => Options.GetValue(builder, static _ => new ProtoRedactionOptions());
 
     /// <summary>
     /// Names property values the run redacts on top of the defaults, such as a domain token the
-    /// shared list does not know. The names travel with the host, so a second host in the same
+    /// shared list does not know. A name added here reaches state values and finding metadata,
+    /// while attachment and diagnostic JSON keeps each protocol's <c>SensitiveJsonProperties</c>
+    /// list. The names travel with the host, so a second host in the same
     /// process keeps the defaults only. The section <c>ProtoTest:Redaction</c> binds over the code
     /// values when the host is built.
     /// </summary>

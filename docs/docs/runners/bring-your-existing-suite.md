@@ -29,7 +29,7 @@ A converted v2 class without `[Collection(ProtoTestCollection.Name)]` that reach
 :::
 
 :::warning[Step 4 on SDK 10 with v3: the MTP opt-in comes first]
-An xUnit v3 project on .NET SDK 10 needs the Microsoft.Testing.Platform opt-in in `global.json` before `dotnet test` runs it. [xUnit v3](./xunit3.md) shows the file and the working commands.
+An xUnit v3 project on .NET SDK 10 needs the Microsoft.Testing.Platform opt-in in `global.json` before `dotnet test` runs it, and the command runs from that directory or names the project from at or under it; from outside the `global.json` folder, `cd` there first. [xUnit v3](./xunit3.md) shows the file and the working commands.
 :::
 
 ## Before and after, per version
@@ -208,7 +208,7 @@ The same five steps, with TUnit's executor instead of an attribute swap:
 - [ ] **1. Add the package** (`ProtoTest.TUnit`) plus the integration packages the tests use. Gate: the solution builds.
 - [ ] **2. Write the host once**: register `[assembly: TestExecutor<ProtoTestExecutor>()]` for the assembly, and initialize the host from a class deriving from `ProtoTestAssembly` with `[Before(Assembly)]` calling `InitializeAsync` and `[After(Assembly)]` calling `CleanupAsync`. Gate: plain tests still pass (wrapped).
 - [ ] **3. Convert one class**: keep TUnit's `[Test]`; the executor wraps every test in the assembly, so there is no attribute to swap. Move the arrangement into the host and read `Proto.Context` in the body. Gate: converted tests get a trace.
-- [ ] **4. Run `dotnet test`.** On .NET SDK 10 the project needs the Microsoft.Testing.Platform opt-in in `global.json` first, and the command runs from that directory or names the project (see [TUnit](./tunit.md)). Gate: green.
+- [ ] **4. Run `dotnet test`.** On .NET SDK 10 the project needs the Microsoft.Testing.Platform opt-in in `global.json` first, and the command runs from that directory or names the project from at or under it (see [TUnit](./tunit.md)). Gate: green.
 - [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
 
 Per-class pitfalls: the executor applies to every test in the assembly, so plain tests run wrapped rather than untouched. A source-generated test with no reflection `MethodInfo` runs unwrapped, with no context. The live `TestContext.CancellationToken` feeds the lifecycle, so the test and its hooks observe TUnit's per-test token.

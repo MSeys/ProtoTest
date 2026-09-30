@@ -9,6 +9,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Features
 
+- Viewer: the walkthrough, ProtoTrace guide and viewer README describe Steps, Timeline, State and Evidence, diagnosis rules, untraced gaps and run selections, with updated demo excerpts. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
 - Viewer: State uses the same test clock and phase marks as Timeline, shades the selected operation's time across the lifelines, and highlights the items and changes it touched. The ruler stays visible on phones. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 
 - Viewer: the run names attention with the diagnosis rules, marks untraced gaps on its timeline, lists every environment value and the run id, and opens run operations and tracked items in the inspector. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)

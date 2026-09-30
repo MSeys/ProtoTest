@@ -4,20 +4,22 @@ import Link from '@docusaurus/Link';
 import Frame from '@site/src/components/Frame';
 import CheckView from './CheckView';
 import RunView from './RunView';
-import StoryView from './StoryView';
+import StepsView from './StepsView';
+import TestViews from './TestViews';
 import styles from './styles.module.css';
 
 /*
- * The demo trace, drawn the way the viewer draws it, with the three views a failure is read in: the run,
- * the failed test's story, and the failing check's inspector. Every name, value and duration is copied
- * from viewer/public/demos/prototest-demo.prototrace, not invented.
+ * Selected views of test 12 and its run, using values from the committed demo archive.
  */
 
-type ViewId = 'run' | 'story' | 'check';
+type ViewId = 'run' | 'steps' | 'timeline' | 'state' | 'evidence' | 'check';
 
 const views: {id: ViewId; label: string}[] = [
   {id: 'run', label: 'Run'},
-  {id: 'story', label: 'Story'},
+  {id: 'steps', label: 'Steps'},
+  {id: 'timeline', label: 'Timeline'},
+  {id: 'state', label: 'State'},
+  {id: 'evidence', label: 'Evidence'},
   {id: 'check', label: 'Check'},
 ];
 
@@ -34,7 +36,10 @@ export default function ViewerWalkthrough(): ReactNode {
       : event.key === 'ArrowLeft' ? views[(index + views.length - 1) % views.length]
       : event.key === 'Home' ? views[0]
       : views[views.length - 1];
-    if (next) setView(next.id);
+    if (next) {
+      setView(next.id);
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[views.indexOf(next)]?.focus();
+    }
   };
 
   return (
@@ -47,15 +52,14 @@ export default function ViewerWalkthrough(): ReactNode {
       }
       foot={
         <>
-          <Link href="https://trace.prototest.dev/?demo=1">Open this exact run in the viewer →</Link>{' '}
-          Copied from <span className={styles.archive}>prototest-demo.prototrace</span>, shown as the viewer
-          shows it.
+          <Link href="https://trace.prototest.dev/?demo=1">Open this run in the viewer</Link>{' '}
+          Selected excerpts from <span className={styles.archive}>prototest-demo.prototrace</span>.
         </>
       }>
       <p className={styles.pointer}>
         4 failed, 1 partial. Start with test 08, then 10.
-        <button type="button" className={styles.jump} onClick={() => setView('story')}>
-          See test 12&rsquo;s story
+        <button type="button" className={styles.jump} onClick={() => setView('steps')}>
+          See test 12&rsquo;s Steps
         </button>
         <button type="button" className={styles.jump} onClick={() => setView('check')}>
           See the failing check
@@ -79,7 +83,8 @@ export default function ViewerWalkthrough(): ReactNode {
       </div>
       <div className={styles.view} id={`${baseId}-panel`} role="tabpanel" aria-labelledby={`${baseId}-${view}`}>
         {view === 'run' && <RunView />}
-        {view === 'story' && <StoryView />}
+        {view === 'steps' && <StepsView />}
+        {(view === 'timeline' || view === 'state' || view === 'evidence') && <TestViews view={view} />}
         {view === 'check' && <CheckView />}
       </div>
     </Frame>

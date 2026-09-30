@@ -10,6 +10,7 @@ All ProtoTest packages share one version; breaking API changes are called out be
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
 CLI), the devices family (WebSocket and MQTT), the topology integrations (Aspire, WireMock,
 Testcontainers), the extended runner surface, and a rewritten documentation site with the Learn track.
+It ships 44 packages, 16 more than 1.0; the breaking changes are listed at the end.
 See [Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0) for the renames
 and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the rest.
 
@@ -199,6 +200,10 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the home explains the integration testing foundation through a connected composition, test and recorded run; the starter includes the working directory and runner options; the integration pages open with a shown test and keep reference detail below the tasks. [Docs](https://prototest.dev/docs/)
 - the READMEs follow one shape per kind, from the root to the package pages. [Docs](https://prototest.dev/docs/)
 - Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
+
+#### Packaging
+
+- 44 packages pack in one version, 16 more than 1.0; the installation page lists the supported and preview tiers. [Installation](https://prototest.dev/docs/getting-started/installation)
 
 ### Fixes
 
@@ -393,39 +398,55 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 These are the 1.0 to 1.1 migration changes; from 1.1 onward the 1.x surface stays additive.
 
-- Core: `AddClientFrom` is removed from the REST and GraphQL builders.
-  - Register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver ([Clients](https://prototest.dev/docs/foundation/clients)).
-- Core: registration, observation and runner implementation types are internal; use the public APIs.
-- Core: `ProtoHost` can no longer be constructed from a service provider; use `ProtoHostBuilder` ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
-- Core: `ProtoFlow` steps declare their operation; unused retry and timeout options are gone.
-- Core: `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token.
-  - Pass one to `StartTestAsync`, or use a run hook as the cancellable extension point ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
-- Core: `ProtoExecutionContext.RegisterClient<T>` takes `ProtoClientOwnership` instead of a `bool`.
-  - `ProtoClientOwnership.Context` is a client the test owns; `ProtoClientOwnership.Caller` is one the caller owns ([Clients](https://prototest.dev/docs/foundation/clients)).
-- Core: `ProtoDocumentSource.LoadText` is one method with optional parameters; the explicit overload is gone ([Extending](https://prototest.dev/docs/advanced/extending)).
-- Core: shape mismatches throw the protocol's assertion exception, with `JsonShapeMismatchException` as the inner.
-  - Code that caught `JsonShapeMismatchException` catches `ProtoAssertionException` ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
-- Core: `ProtoTest.OpenTelemetry` is retired.
-  - Subscribe to the `ProtoTest` source with `.AddSource("ProtoTest")` ([OpenTelemetry](https://prototest.dev/docs/observability/opentelemetry)).
-- HTTP: `ProtoHttpAuthLifecycleHook` is sealed and takes a `ProtoProtocol` instead of a string.
-  - `ProtoHttpClientResolution` is a positional record with `SourceName`, `SourceClientName` and `Deconstruct` gone, and `ProtoHttpClientResolver.Resolve` takes the client name as an optional third argument ([Extending](https://prototest.dev/docs/advanced/extending)).
-- REST: object request bodies serialize camelCase by default, matching GraphQL variables.
-  - Pass explicit `JsonSerializerOptions` to keep another naming policy ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
-- gRPC: `GrpcAttachmentOptions` no longer derives from the HTTP attachment options, so `SensitiveHeaders` and `SensitiveQueryParameters` are gone.
-  - Metadata redaction uses the gRPC client's `SensitiveMetadataKeys` ([gRPC](https://prototest.dev/docs/integrations/grpc/)).
-- gRPC: `ProtoGrpcClient.ServerStreaming` and `DuplexStreaming` moved to the blocking facade, `client.Blocking` ([gRPC](https://prototest.dev/docs/integrations/grpc/)).
-- Messaging: a publish records the `messaging.published` observation; the operation stays `messaging.publish`.
-  - Update a collector that filtered the old observation kind ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
-- Messaging: `RabbitMqOptions.PollInterval` is removed; awaits are event-driven and `MessagingOptions.DefaultTimeout` bounds them ([Messaging](https://prototest.dev/docs/integrations/messaging/)).
-- Web: `ProtoTest:Web:Sessions:{name}` settings no longer configure sessions.
-  - Put addresses under `ProtoTest:Applications:{application}` and select with `[WebSession]` or `Web()` ([Web](https://prototest.dev/docs/integrations/web/)).
-- Web: the reshape removed `IWebBackend.CurrentAddress`, the old `Web()` overload and Selenium's download surface.
-  - The web pages describe the replacements; `CompatibilitySuppressions.xml` records the removals.
-- Web: `PlaywrightWebOptions.Context` is removed; configure the browser context with `ConfigureContext` ([Web](https://prototest.dev/docs/integrations/web/)).
-- Web: `RequiresPlaywrightBrowserAttribute.Session` is removed; the condition probes the configured browser or channel ([Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)).
-- Web: `WebOperationContext.Result` is no longer public ([Web](https://prototest.dev/docs/integrations/web/)).
-- ASP.NET Core: the package now depends on `ProtoTest.Web.Pages` instead of the full `ProtoTest.Web`.
+#### Core
 
+- `AddClientFrom` is removed from the REST and GraphQL builders.
+  - Register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver ([Clients](https://prototest.dev/docs/foundation/clients)).
+- registration, observation and runner implementation types are internal; use the public APIs.
+- `ProtoHost` can no longer be constructed from a service provider; use `ProtoHostBuilder` ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
+- `ProtoFlow` steps declare their operation; unused retry and timeout options are gone.
+- `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token.
+  - Pass one to `StartTestAsync`, or use a run hook as the cancellable extension point ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
+- `ProtoExecutionContext.RegisterClient<T>` takes `ProtoClientOwnership` instead of a `bool`.
+  - `ProtoClientOwnership.Context` is a client the test owns; `ProtoClientOwnership.Caller` is one the caller owns ([Clients](https://prototest.dev/docs/foundation/clients)).
+- `ProtoDocumentSource.LoadText` is one method with optional parameters; the explicit overload is gone ([Extending](https://prototest.dev/docs/advanced/extending)).
+- shape mismatches throw the protocol's assertion exception, with `JsonShapeMismatchException` as the inner.
+  - Code that caught `JsonShapeMismatchException` catches `ProtoAssertionException` ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
+- `ProtoTest.OpenTelemetry` is retired.
+  - Subscribe to the `ProtoTest` source with `.AddSource("ProtoTest")` ([OpenTelemetry](https://prototest.dev/docs/observability/opentelemetry)).
+
+#### ASP.NET Core
+
+- the package now depends on `ProtoTest.Web.Pages` instead of the full `ProtoTest.Web`.
+
+#### REST and HTTP
+
+- `ProtoHttpAuthLifecycleHook` is sealed and takes a `ProtoProtocol` instead of a string.
+  - `ProtoHttpClientResolution` is a positional record with `SourceName`, `SourceClientName` and `Deconstruct` gone, and `ProtoHttpClientResolver.Resolve` takes the client name as an optional third argument ([Extending](https://prototest.dev/docs/advanced/extending)).
+- object request bodies serialize camelCase by default, matching GraphQL variables.
+  - Pass explicit `JsonSerializerOptions` to keep another naming policy ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
+
+#### gRPC
+
+- `GrpcAttachmentOptions` no longer derives from the HTTP attachment options, so `SensitiveHeaders` and `SensitiveQueryParameters` are gone.
+  - Metadata redaction uses the gRPC client's `SensitiveMetadataKeys` ([gRPC](https://prototest.dev/docs/integrations/grpc/)).
+- `ProtoGrpcClient.ServerStreaming` and `DuplexStreaming` moved to the blocking facade, `client.Blocking` ([gRPC](https://prototest.dev/docs/integrations/grpc/)).
+
+#### Messaging
+
+- a publish records the `messaging.published` observation; the operation stays `messaging.publish`.
+  - Update a collector that filtered the old observation kind ([Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0)).
+- `RabbitMqOptions.PollInterval` is removed; awaits are event-driven and `MessagingOptions.DefaultTimeout` bounds them ([Messaging](https://prototest.dev/docs/integrations/messaging/)).
+
+#### Web
+
+- `ProtoTest:Web:Sessions:{name}` settings no longer configure sessions.
+  - Put addresses under `ProtoTest:Applications:{application}` and select with `[WebSession]` or `Web()` ([Web](https://prototest.dev/docs/integrations/web/)).
+- the reshape removed `IWebBackend.CurrentAddress`, the old `Web()` overload and Selenium's download surface.
+  - The web pages describe the replacements; `CompatibilitySuppressions.xml` records the removals.
+- `PlaywrightWebOptions.Context` is removed; configure the browser context with `ConfigureContext` ([Web](https://prototest.dev/docs/integrations/web/)).
+- `RequiresPlaywrightBrowserAttribute.Session` is removed; the condition probes the configured browser or channel ([Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)).
+- `WebOperationContext.Result` is no longer public ([Web](https://prototest.dev/docs/integrations/web/)).
 ## [1.0.1] - 2026-09-20
 
 ### Fixed

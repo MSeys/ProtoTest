@@ -81,6 +81,39 @@ describe("SpanInspector shape comparison", () => {
     expect(host.querySelector(".card header strong")?.textContent).toBe("Validated document");
     unmount();
   });
+
+  // Beside a comparison, the exception and the check verdicts say the same thing again: they step back.
+  it("leads with the comparison and folds what repeats it", async () => {
+    const check = span({
+      kind: "assert.json.shape", name: "Assert response shape", status: "failed",
+      error: { type: "ProtoTest.Json.JsonShapeMismatchException", message: "Shape mismatch failed with 1 error(s)" },
+      sections: [{ label: "Result", kind: "checks", language: null, content: null, items: [{ label: "shape", value: "1 mismatch", detail: null, tone: "error" }] }],
+      attributes: {
+        "shape.result": "mismatched",
+        "shape.actual": '{"code":"forbidden","message":"No."}',
+        "shape.mismatches": '[{"propertyPath":"$.message","reason":"was not expected","expected":"missing","actual":"No."}]'
+      }
+    });
+    const { host, unmount } = mount(h(SpanInspector, { span: check, test: testTrace([check]) }));
+    await nextTick();
+
+    expect(host.querySelector("section.error")).toBeNull();
+    expect(headings(host)).not.toContain("Result");
+    const folds = [...host.querySelectorAll("details.fold > summary")].map(entry => entry.textContent?.replace(/\s+/g, " ").trim());
+    expect(folds).toEqual(["The response it judged", "Exception JsonShapeMismatchException", "Attributes 3"]);
+    expect(host.querySelector<HTMLDetailsElement>("details.attributes")?.open).toBe(false);
+    unmount();
+  });
+
+  it("keeps an error with nothing to compare as the headline", async () => {
+    const call = span({ status: "failed", error: { type: "System.Net.Http.HttpRequestException", message: "Connection refused" } });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+
+    expect(host.querySelector("section.error h3")?.textContent).toBe("HttpRequestException");
+    expect(host.querySelector("section.error pre")?.textContent).toBe("Connection refused");
+    unmount();
+  });
 });
 
 // Every check on a call keeps its outcome dot and opens the check itself.

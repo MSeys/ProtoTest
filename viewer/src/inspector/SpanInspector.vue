@@ -27,6 +27,11 @@ const shapeTree = computed(() => shapeTreeOf(props.span));
 /** The response a shape check judged, with the mismatched properties marked in it. */
 const actual = computed(() => props.span.attributes["shape.actual"] ?? null);
 const markedPaths = computed(() => mismatches.value.map(mismatch => mismatch.path));
+/** A comparison says what went wrong in the reader's terms; the exception and the check verdicts then repeat it. */
+const compared = computed(() => Boolean(shapeTree.value) || mismatches.value.length > 0);
+const sections = computed(() => props.span.sections
+  .map((section, number) => ({ section, number }))
+  .filter(({ section }) => !(compared.value && section.kind === "checks")));
 
 /**
  * Every attribute, grouped by its namespace (http, auth, shape, ...) so a long list reads as a few short ones.
@@ -46,7 +51,8 @@ const attributeGroups = computed(() => {
 const location = computed(() => sourceLocation(props.span.attributes));
 const attributeCount = computed(() => Object.keys(props.span.attributes).length);
 /** A short list reads inline; past a few groups or a handful of values it folds, one click away. */
-const attributesOpen = computed(() => attributeGroups.value.length <= 3 && attributeCount.value <= 8);
+const attributesOpen = computed(() => attributeGroups.value.length <= 3 && attributeCount.value <= 8
+  && !compared.value && !checks.value.length && !sections.value.length);
 
 type Finding = Extract<Span["evidence"][number], { type: "finding" }>;
 /** A finding's own facts: how it is filed, where it points, and what it carried. */
@@ -65,11 +71,11 @@ function findingFacts(item: Finding): [string, string][] {
  */
 const index = computed(() => {
   const entries: { id: string; label: string; hot?: boolean }[] = [];
-  if (props.span.error) entries.push({ id: "error", label: "Error", hot: true });
+  if (props.span.error && !compared.value) entries.push({ id: "error", label: "Error", hot: true });
+  if (compared.value) entries.push({ id: "comparison", label: "Comparison", hot: props.span.status === "failed" });
   if (location.value) entries.push({ id: "source", label: "Source" });
-  if (shapeTree.value || mismatches.value.length) entries.push({ id: "comparison", label: "Comparison", hot: props.span.status === "failed" });
   if (checks.value.length) entries.push({ id: "checks", label: "Checks" });
-  props.span.sections.forEach((section, number) => entries.push({ id: `section-${number}`, label: section.label }));
+  sections.value.forEach(({ section, number }) => entries.push({ id: `section-${number}`, label: section.label }));
   if (props.span.changes.length || props.span.item) entries.push({ id: "changes", label: "Changed" });
   if (props.span.evidence.length) entries.push({ id: "evidence", label: "Evidence" });
   if (props.span.moments.length) entries.push({ id: "moments", label: "Moments" });
@@ -90,22 +96,19 @@ function jump(id: string) {
     <nav v-if="index.length > 2" class="index" aria-label="Parts of this operation">
       <button v-for="entry in index" :key="entry.id" type="button" :class="{ hot: entry.hot }" @click="jump(entry.id)">{{ entry.label }}</button>
     </nav>
-    <!-- With a shape tree or table below, the exception's message repeats it; it stays one click away. -->
-    <section v-if="span.error" class="error" data-block="error">
+    <!-- An error on its own is the headline. Beside a comparison it only repeats it, so it waits at the end. -->
+    <section v-if="span.error && !compared" class="error" data-block="error">
       <h3>{{ shortType(span.error.type) }}</h3>
-      <details v-if="mismatches.length">
-        <summary>Exception message</summary>
-        <pre>{{ span.error.message }}</pre>
-      </details>
-      <pre v-else>{{ span.error.message }}</pre>
+      <pre>{{ span.error.message }}</pre>
     </section>
-
-    <SourceView v-if="location" :location="location" data-block="source" />
 
     <!-- The tree carries its own head (the validated document and its legend), so no second title above it. -->
     <section v-if="shapeTree" class="block" data-block="comparison">
       <ShapeResultTree :nodes="shapeTree" />
-      <JsonView v-if="actual" :value="actual" label="The response it judged" :open-depth="1" :marks="markedPaths" />
+      <details v-if="actual" class="fold">
+        <summary>The response it judged</summary>
+        <JsonView :value="actual" label="Response" :open-depth="1" :marks="markedPaths" />
+      </details>
     </section>
 
     <section v-else-if="mismatches.length" class="block" data-block="comparison">
@@ -120,6 +123,9 @@ function jump(id: string) {
       </table>
     </section>
 
+    <!-- The difference first, then the line that asserted it. -->
+    <SourceView v-if="location" :location="location" data-block="source" />
+
     <section v-if="checks.length" class="block" data-block="checks">
       <h3>Checks on this call</h3>
       <button v-for="check in checks" :key="check.id" type="button" class="link-row" :class="tone(check.status)" @click="emit('select', check)">
@@ -129,7 +135,7 @@ function jump(id: string) {
       </button>
     </section>
 
-    <SectionView v-for="(section, number) in span.sections" :key="section.label" :section="section" :brief="Boolean(shapeTree)" :data-block="`section-${number}`" />
+    <SectionView v-for="{ section, number } in sections" :key="section.label" :section="section" :brief="compared" :data-block="`section-${number}`" />
 
     <section v-if="span.changes.length" class="block" data-block="changes">
       <h3>What this changed</h3>
@@ -201,7 +207,12 @@ function jump(id: string) {
       </button>
     </section>
 
-    <details v-if="attributeCount" class="attributes" :open="attributesOpen" data-block="attributes">
+    <details v-if="span.error && compared" class="fold">
+      <summary>Exception <small>{{ shortType(span.error.type) }}</small></summary>
+      <pre class="exception">{{ span.error.message }}</pre>
+    </details>
+
+    <details v-if="attributeCount" class="attributes fold" :open="attributesOpen" data-block="attributes">
       <summary>Attributes <small>{{ attributeCount }}</small></summary>
       <section v-for="[group, entries] in attributeGroups" :key="group" class="attribute-group">
         <h4>{{ group }}</h4>
@@ -223,13 +234,12 @@ function jump(id: string) {
 <style scoped>
 .span-inspector { min-width: 0; display: grid; gap: var(--space-5); }
 
-h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(--weight-bold); letter-spacing: 0; }
+/* Headings label the blocks and step back from them: the content is what the reader came for. */
+h3 { color: var(--muted); font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(--weight-semibold); letter-spacing: 0; }
 .block { min-width: 0; display: grid; gap: var(--space-2); }
 
 .error { padding: var(--space-3); display: grid; gap: var(--space-2); border-left: 2px solid var(--danger); border-radius: 0 var(--radius-chip) var(--radius-chip) 0; background: var(--danger-soft); }
 .error h3 { color: var(--danger); }
-.error summary { color: var(--muted); font-size: var(--text-micro); cursor: pointer; }
-.error details pre { margin-top: var(--space-2); }
 .error pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: var(--text-micro)/var(--leading) var(--font-mono); }
 
 .mismatches { width: 100%; border-collapse: collapse; font-size: var(--text-meta); }
@@ -246,14 +256,14 @@ h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-2);
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius-chip);
-  background: var(--surface-2);
+  background: transparent;
   text-align: left;
   font-size: var(--text-meta);
-  transition: border-color var(--motion-fast) var(--motion-ease);
+  transition: background var(--motion-fast) var(--motion-ease);
 }
-.link-row:hover { border-color: var(--blueprint); }
+.link-row:hover { background: var(--hover); }
 .link-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-row small { color: var(--muted); font-size: var(--text-micro); }
 .link-row small.applicationside { color: var(--blueprint); font-weight: var(--weight-semibold); }
@@ -262,7 +272,7 @@ h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(
 .evidence { min-width: 0; display: grid; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); }
 .evidence p { font-size: var(--text-meta); overflow-wrap: anywhere; }
 .link-row:disabled { cursor: not-allowed; opacity: .6; }
-.link-row:disabled:hover { border-color: transparent; }
+.link-row:disabled:hover { background: transparent; }
 .moment { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: var(--space-2); font-size: var(--text-meta); }
 .moment .offset, .moment small { color: var(--muted); font-size: var(--text-micro); }
 /* A moment that went wrong reads as such; an informational one stays quiet. */
@@ -284,17 +294,24 @@ h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.index button { flex: none; height: 22px; padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-pill); background: transparent; color: var(--muted); font-size: var(--text-meta); }
-.index button:hover { border-color: var(--blueprint); color: var(--text); }
-.index button.hot { border-color: var(--danger); color: var(--danger); }
+.index button { flex: none; height: 22px; padding: 0 var(--space-1); border: 0; background: transparent; color: var(--muted); font-size: var(--text-meta); }
+.index button:hover { color: var(--text); text-decoration: underline; }
+.index button.hot { color: var(--danger); }
 .facts-list { margin: 0; display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 0 var(--space-3); }
 .facts-list dt, .facts-list dd { min-width: 0; margin: 0; padding: 2px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; font: var(--text-meta)/var(--leading) var(--font-mono); }
 .facts-list dt { color: var(--muted); }
 .moment-detail { grid-column: 2 / -1; display: grid; gap: var(--space-2); padding-bottom: var(--space-2); }
 .moment-error { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--danger); font: var(--text-meta)/var(--leading) var(--font-mono); }
+/* What a reader rarely needs sits folded at the end, one quiet line each. */
+.fold > summary { display: flex; align-items: center; gap: var(--space-2); color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); cursor: pointer; list-style: none; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::before { content: ""; width: 5px; height: 5px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform var(--motion-fast) var(--motion-ease); }
+.fold[open] > summary::before { transform: rotate(45deg); }
+.fold > summary:hover { color: var(--text); }
+.fold > summary small { color: var(--dim); font-weight: var(--weight-regular); }
+.fold[open] > summary { margin-bottom: var(--space-2); }
+.exception { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); font: var(--text-micro)/var(--leading) var(--font-mono); }
 .attributes { padding-top: var(--space-3); border-top: 1px solid var(--border); }
-.attributes > summary { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-meta); font-weight: var(--weight-bold); cursor: pointer; }
-.attributes > summary small { color: var(--muted); font-weight: var(--weight-regular); }
 .attribute-group { margin-top: var(--space-3); }
 .attribute-group h4 { margin: 0 0 var(--space-1); color: var(--muted); font-family: var(--font-ui); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 .attribute-group dl { margin: 0; display: grid; grid-template-columns: minmax(88px, 34%) minmax(0, 1fr); gap: 0 var(--space-3); }

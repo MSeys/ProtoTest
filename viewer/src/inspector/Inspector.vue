@@ -75,7 +75,8 @@ const itemOrigin = computed(() => {
       </div>
 
       <template v-if="span">
-        <div class="title">
+        <!-- Two lines: what it is, and how it went. The raw kind and its source are a hover away, not a third line. -->
+        <div class="title" :title="`${span.kind} from ${span.source}, ${span.phase} phase`">
           <KindChip :type="kindLabel(span.kind)" />
           <h2>{{ span.name }}</h2>
         </div>
@@ -83,10 +84,8 @@ const itemOrigin = computed(() => {
           <OutcomePill :outcome="span.status" />
           <span>{{ formatDuration(span.duration) }}</span>
           <span>{{ formatOffset(span.start - test.start) }} into the {{ scope }}</span>
-          <span class="phase" :style="{ '--phase-color': `var(--phase-${span.phase})` }"><i />{{ span.phase }}</span>
           <span v-if="span.count > 1">ran {{ span.count }} times</span>
         </p>
-        <p class="origin" :title="`${span.kind} from ${span.source}`"><code>{{ span.kind }}</code> from {{ span.source }}</p>
       </template>
 
       <template v-else-if="item">
@@ -121,7 +120,7 @@ const itemOrigin = computed(() => {
   background: var(--surface);
   overflow: hidden;
 }
-.head { padding: var(--space-2) var(--space-4) var(--space-4); display: grid; gap: var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface); }
+.head { padding: var(--space-2) var(--space-4) var(--space-3); display: grid; gap: var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface); }
 .top { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .actions { flex: none; display: flex; align-items: center; gap: var(--space-1); }
 .actions :deep(.close) { width: 28px; height: 28px; }
@@ -139,8 +138,6 @@ const itemOrigin = computed(() => {
 .title :deep(.chip) { flex: none; margin-top: var(--space-1); }
 h2 { min-width: 0; font-size: var(--text-heading); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; text-wrap: balance; }
 .facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); color: var(--muted); font-size: var(--text-meta); }
-.phase { display: inline-flex; align-items: center; gap: var(--space-1); text-transform: capitalize; }
-.phase i { width: 7px; height: 7px; border-radius: var(--radius-hairline); background: var(--phase-color); }
 .source { padding: 0 var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 .source.applicationside { background: var(--blueprint-soft); color: var(--blueprint); }
 /* One line: where it came from is context, not content; the whole of it is in the tooltip. */

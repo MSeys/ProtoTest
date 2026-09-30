@@ -205,7 +205,7 @@ The reason is handed to the runner's skip mechanism:
 
 | Runner | How the skip is raised | Reason reported |
 | --- | --- | --- |
-| [NUnit](../runners/nunit.md) | `Assert.Ignore(reason)` | yes |
+| [NUnit](../runners/nunit.md) | an ignored result (`ResultState.Ignored`) | yes |
 | [xUnit v2](../runners/xunit.md) with `[ProtoTestFact]` and `[ProtoTestTheory]` | the discovered test case's `SkipReason` | yes |
 | [xUnit v3](../runners/xunit3.md) | `Assert.Skip(reason)` | yes |
 | [TUnit](../runners/tunit.md) | `TUnit.Core.Skip.Test(reason)` | yes |

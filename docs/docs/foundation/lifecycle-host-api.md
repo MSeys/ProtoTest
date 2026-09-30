@@ -38,6 +38,8 @@ public sealed class ProtoHost : IAsyncDisposable
     IConfiguration Configuration { get; }
     IProtoTraceSource Trace { get; }
     bool HasCapability(string kind, string? name = null);
+    bool HasCapability(string kind, string? name, string? instance);
+    bool HasApplication(string name);
 
     Task StartAsync(CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);

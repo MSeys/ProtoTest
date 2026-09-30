@@ -52,7 +52,7 @@ The number is a per-test sequence, so the second request in a test is `rest-02-â
 | `SensitiveQueryParameters` | `List<string>` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
 | `RedactSensitiveData` (inherited) | `bool` | `true` |
 | `MaxDiagnosticBodyLength` (inherited) | `int` | `65536` |
-| `SensitiveJsonProperties` (inherited) | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret` |
+| `SensitiveJsonProperties` (inherited) | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
 
 `RedactSensitiveData`, `MaxDiagnosticBodyLength` and `SensitiveJsonProperties` come from `JsonDiagnosticOptions`, shared with GraphQL, gRPC and messaging diagnostics.
 

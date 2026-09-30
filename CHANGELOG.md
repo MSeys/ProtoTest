@@ -126,7 +126,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Docs: the web pages make the backend choice explicit (Playwright or Selenium), and the conversion order covers NUnit, MSTest and TUnit suites. [Web](https://prototest.dev/docs/integrations/web)
 - Docs: the agent workflows document the feedback webhook payload, the configuration page lists every section's keys, and the template page shows what the scaffold creates. [CLI](https://prototest.dev/docs/agent-workflows/cli)
 - Docs: the reference pages gain the recorded trace walks, the decision figures and the triage tables; the longest pages split into child pages (web page coverage, messaging adapters, gRPC calls, the ProtoTrace archive, the CI providers). [Docs](https://prototest.dev/docs/)
-- Docs: the home leads with the failure story, the command as the first action and the proof in the hero; the integration pages open with a shown test and keep reference detail below the tasks. [Docs](https://prototest.dev/docs/)
+- Docs: the home leads with prototype testing: a real failure from the demo trace, the three commands, the test beside what the run recorded, and the measured proof; the integration pages open with a shown test and keep reference detail below the tasks. [Docs](https://prototest.dev/docs/)
 - Docs: the READMEs follow one shape per kind, from the root to the package pages. [Docs](https://prototest.dev/docs/)
 - Samples: Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
 - Core: suites name their own sensitive values (`ConfigureRedaction`, `ProtoTest:Redaction`); state and findings redact them like the defaults. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)

@@ -158,7 +158,7 @@ The sample registers one gate over its findings:
 
 ## The records a failed run leaves
 
-Run the broken teardown once more and the same story appears in the archive and the report. This is one such run:
+Run the broken teardown once more and the same story appears in the archive and the report. This is one such run; its durations are its own, so compare the names, the states and the messages, not the milliseconds:
 
 | Record | Reading |
 | --- | --- |

@@ -110,7 +110,7 @@ The two rows read like this in `report.json` (from <a href="pathname:///lessons/
   "Children": ["$.id", "$.name", "$.slug", "$.status", "$.environmentCount", "$.createdAtUtc"] }
 ```
 
-The first row is the covered claim: the endpoint and the status the write asserted. The second row is the gap: six fields the response carried that no shape assertion mentioned. A covered row says what the suite checked; a traffic row says what it only saw.
+The first row is the covered claim: the endpoint and the status the write asserted. The second row is the gap: six fields the response carried that no shape assertion mentioned. The children are shown by their identifiers; each child in the file is a full traffic row with its own status. A covered row says what the suite checked; a traffic row says what it only saw.
 
 ## What claims a field
 

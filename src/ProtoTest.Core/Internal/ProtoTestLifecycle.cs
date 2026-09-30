@@ -79,6 +79,7 @@ internal sealed class ProtoTestLifecycle
         // caller's execution context; awaiting here would scope the change to this state machine.
         var scope = _rootServiceProvider.CreateScope();
         ProtoTestLifecycleState state;
+        ProtoClock? addedClock = null;
         try
         {
             var testTrace = _trace.StartTest(testName, testId, testMethod);
@@ -90,6 +91,7 @@ internal sealed class ProtoTestLifecycle
             // The registration happens inside the same guard as the rest of the start: a start that
             // fails below removes its own clock instead of leaking an entry no context will dispose.
             _clockRegistry.Add(testId.Value, clock);
+            addedClock = clock;
             state = new ProtoTestLifecycleState(
                 _host,
                 context,
@@ -98,8 +100,14 @@ internal sealed class ProtoTestLifecycle
         }
         catch
         {
-            // Execution has not begun, so no teardown will dispose the scope: release it here.
-            _clockRegistry.Remove(testId.Value);
+            // Execution has not begun, so no teardown will dispose the scope: release it here. Only a
+            // clock this start registered is removed: a start that failed before registering (a
+            // duplicate test id fails in StartTest) must not evict the running test that owns the id.
+            if (addedClock is not null && ReferenceEquals(_clockRegistry.Find(testId.Value), addedClock))
+            {
+                _clockRegistry.Remove(testId.Value);
+            }
+
             LifecycleExceptionHelper.DisposeOrSync(scope);
             throw;
         }

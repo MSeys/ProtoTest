@@ -10,16 +10,12 @@ public static class ProtoUriSanitizer
     /// <summary>The value sensitive parameters are replaced with.</summary>
     public const string RedactedValue = "[REDACTED]";
 
-    /// <summary>The query parameter names redacted when an integration has no rule of its own.</summary>
+    /// <summary>
+    /// The query parameter names redacted when an integration has no rule of its own. The shared
+    /// redaction defaults, plus <c>key</c>, so traced URLs redact what state values redact.
+    /// </summary>
     public static IReadOnlyList<string> DefaultSensitiveQueryParameters { get; } =
-    [
-        "access_token",
-        "refresh_token",
-        "token",
-        "apiKey",
-        "api_key",
-        "key"
-    ];
+        [.. ProtoRedactionDefaults.SensitivePropertyNames, "key"];
 
     /// <summary>Removes <c>user:password@</c> from an address, leaving everything else untouched.</summary>
     public static string WithoutUserInfo(string address)

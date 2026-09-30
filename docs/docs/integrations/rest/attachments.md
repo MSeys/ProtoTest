@@ -49,7 +49,7 @@ The number is a per-test sequence, so the second request in a test is `rest-02-â
 | `CaptureResponses` | `bool` | `true` |
 | `CaptureExpectedShapes` | `bool` | `true` |
 | `SensitiveHeaders` | `List<string>` | `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key` |
-| `SensitiveQueryParameters` | `List<string>` | `access_token`, `refresh_token`, `token`, `apiKey`, `api_key`, `key` |
+| `SensitiveQueryParameters` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token`, `key` |
 | `RedactSensitiveData` (inherited) | `bool` | `true` |
 | `MaxDiagnosticBodyLength` (inherited) | `int` | `65536` |
 | `SensitiveJsonProperties` (inherited) | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
@@ -81,6 +81,7 @@ With `RedactSensitiveData` on (the default):
 - Sensitive **query parameter values** in URLs are replaced with `[REDACTED]`; URI user-info (`user:password@`) is **always** removed, even when redaction is off.
 - Sensitive **JSON properties** in bodies are redacted by name, at any depth, tolerating duplicate keys.
 - Bodies that aren't JSON are scanned for the same keys: form-urlencoded, multipart (`Content-Disposition` `name=`) and XML (element text of sensitive tags and attributes) are all covered.
+- A body that starts like JSON but does not parse is redacted by a text fallback that covers quoted string values only; numbers, booleans and nulls in such a body pass through.
 - Every body is truncated at `MaxDiagnosticBodyLength` with a `â€¦ [N characters truncated]` marker.
 
 The same sanitizer is used for the response body included in `RestStatusAssertionException` messages and for captured attachment content. GraphQL additionally redacts inline literals in documents; see [Queries and mutations](../graphql/operations.md#transport-details).

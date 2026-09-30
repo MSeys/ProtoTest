@@ -7,6 +7,7 @@ param(
     [switch]$SkipLint,
     [switch]$SkipDocs,
     [switch]$SkipTests,
+    [switch]$SkipViewer,
     [switch]$NoRestore,
     [switch]$Full,
 
@@ -18,8 +19,9 @@ param(
 # One gate command per stage: it runs the checks CI runs, in the cheapest-first order, and writes a
 # machine-readable record to artifacts/gates/<stage>.json so a plan row can quote evidence instead of
 # prose. The scope follows the stage: uncommitted changes while the tree is dirty, the HEAD commit
-# when it is not. A docs-only stage pays only the docs check, a tooling stage runs the gate fixtures,
-# and a code stage runs dotnet format over the projects it touched plus the test projects those
+# when it is not. A docs-only stage pays only the docs check, a viewer-only stage pays only
+# the viewer gate (install, unit tests and build in viewer/), a tooling stage runs the gate
+# fixtures, and a code stage runs dotnet format over the projects it touched plus the test projects those
 # projects reach, falling back to the full solution and suite when the change is wide or unmappable.
 # A code change whose code gates were skipped (it is already committed, or -SkipLint/-SkipTests was
 # passed) records `incomplete` and is not green unless -AllowSkippedCodeGates names the exception.
@@ -146,8 +148,10 @@ $stageChanged = if ($dirty) { $changed } else { Get-CommittedPath }
 
 $codePattern = '\.(cs|csproj|props|targets|slnx)$|^global\.json$'
 $scriptPattern = '^eng/.*\.(ps1|psm1)$|^\.github/workflows/.*\.ya?ml$'
+$viewerPattern = '^viewer/'
 $codeChanges = @($stageChanged | Where-Object { $_ -match $codePattern })
 $scriptChanges = @($stageChanged | Where-Object { $_ -match $scriptPattern })
+$viewerChanges = @($stageChanged | Where-Object { $_ -match $viewerPattern })
 
 # The code gates apply to a code change no matter where it lives; they can run it only while the
 # change is uncommitted (the working-tree scope they are computed over is gone once committed) or
@@ -259,8 +263,14 @@ $runDocs = -not $SkipDocs
 $runTests = -not ($SkipTests -or -not $canRunCodeGates)
 $runScripts = $Full -or $scriptChanges.Count -gt 0
 
+# The viewer gate shares nothing with the .NET build, so it runs in a child process while lint or
+# the suite runs, mirroring the docs gate. A viewer-only stage has no such next gate, so it runs
+# directly below. Unlike the code gates it needs no scoping, so it also runs on a clean tree.
+$runViewer = (-not $SkipViewer) -and ($viewerChanges.Count -gt 0)
+
 # The documentation check reads files only, so it runs in a child process while lint builds.
 $docsPending = if ($runDocs -and $runLint) { Start-GateJob -Name "docs" -Script "eng/check-docs.ps1" } else { $null }
+$viewerPending = if ($runViewer -and ($runLint -or $runTests)) { Start-GateJob -Name "viewer" -Script "eng/test-viewer.ps1" } else { $null }
 
 if (-not $runLint) {
     $reason = if ($SkipLint) { "requested" } else { $codeSkipReason }
@@ -292,6 +302,18 @@ else {
     Invoke-Gate -Name "test" -Script "eng/test.ps1" -ScriptArguments $testArguments
 }
 
+if (-not $runViewer) {
+    if ($SkipViewer -and $viewerChanges.Count -gt 0) {
+        $skipped.Add([pscustomobject]@{ name = "viewer"; reason = "requested" })
+    }
+}
+elseif ($null -ne $viewerPending) {
+    Complete-GateJob -Pending $viewerPending
+}
+else {
+    Invoke-Gate -Name "viewer" -Script "eng/test-viewer.ps1"
+}
+
 # The gate scripts are themselves under test; a stage that touches them (or -Full) proves them.
 if ($runScripts) {
     # The fixtures execute the real MTP test binaries in this repository, so running them next to the
@@ -308,7 +330,7 @@ if ($Pack) {
 }
 
 $incomplete = $skippedCodeGates.Count -gt 0
-$classification = if ($incomplete) { "incomplete" } elseif ($expectsCodeGates) { "code" } elseif ($scriptChanges.Count -gt 0) { "tooling" } else { "docs-only" }
+$classification = if ($incomplete) { "incomplete" } elseif ($expectsCodeGates) { "code" } elseif ($scriptChanges.Count -gt 0) { "tooling" } elseif ($viewerChanges.Count -gt 0) { "viewer" } else { "docs-only" }
 $green = -not ($gates | Where-Object { $_.exitCode -ne 0 }) -and ((-not $incomplete) -or $AllowSkippedCodeGates)
 $record = [pscustomobject]@{
     stage                 = $stageName
@@ -325,6 +347,7 @@ $record = [pscustomobject]@{
     changed               = $codeChanges.Count
     codeChanges           = $codeChanges.Count
     scriptChanges         = $scriptChanges.Count
+    viewerChanges         = $viewerChanges.Count
     scopedTests           = $testInclude
     gates                 = $gates
     skipped               = $skipped

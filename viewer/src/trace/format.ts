@@ -285,3 +285,15 @@ export function phaseSummary(lifecycle: Span): string {
   if (work.length > 2) parts.push(`and ${work.length - 2} more`);
   return parts.join(", ");
 }
+
+/** Round ruler marks between two times: about `target` of them, on 1, 2 or 5 times a power of ten. */
+export function rulerTicks(from: number, to: number, target = 6): number[] {
+  const range = Math.max(to - from, 1e-3);
+  const raw = range / target;
+  const power = Math.pow(10, Math.floor(Math.log10(raw)));
+  const scaled = raw / power;
+  const step = (scaled < 1.5 ? 1 : scaled < 3.5 ? 2 : scaled < 7.5 ? 5 : 10) * power;
+  const ticks: number[] = [];
+  for (let value = Math.ceil(from / step) * step; value <= to + step * 1e-6; value += step) ticks.push(Number(value.toPrecision(12)));
+  return ticks;
+}

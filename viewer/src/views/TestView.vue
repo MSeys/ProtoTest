@@ -5,7 +5,7 @@ import { formatDuration, pad, testCodeName, testGroup, testTitle } from "../trac
 import type { TestView as TestViewId } from "../router";
 import StepsView from "./StepsView.vue";
 import StateView from "./StateView.vue";
-import SpansView from "./SpansView.vue";
+import TimelineView from "./TimelineView.vue";
 import Tabs from "../ui/Tabs.vue";
 import VerdictBar from "../ui/VerdictBar.vue";
 import PhaseBand from "../ui/PhaseBand.vue";
@@ -71,7 +71,7 @@ const explains = computed(() => props.test.outcome !== "succeeded" && props.test
       <Panel v-else-if="view === 'files'" title="Files" subtitle="Everything this test attached, in the order it produced them." pad="none">
         <FileList :entries="files" @open="emit('artifact', $event)" />
       </Panel>
-      <SpansView v-else :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
+      <TimelineView v-else :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
     </div>
   </div>
 </template>

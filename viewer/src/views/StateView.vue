@@ -91,7 +91,7 @@ watch(() => props.selectedSpan, () => {
           <i class="life" :style="lifeline(item)" />
           <button v-for="(change, index) in item.changes" :key="index" type="button" class="tick" :class="[change.source, { active: change.span?.id === selectedSpan, inferred: change.inferred }]"
                   :style="{ left: position(change.at) }" :title="tickTitle(change)" :aria-label="tickTitle(change)"
-                  :disabled="!change.span" @click="change.span && emit('selectSpan', change.span)" />
+                  :disabled="!change.span" @click="change.span && emit('selectSpan', change.span)" :aria-current="change.span && change.span.id === selectedSpan ? 'true' : undefined" />
         </span>
         <p v-if="causes.get(item)" class="cause">{{ causes.get(item)!.change }} by {{ causes.get(item)!.span!.name }}</p>
       </div>

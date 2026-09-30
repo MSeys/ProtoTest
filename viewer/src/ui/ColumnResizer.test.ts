@@ -3,16 +3,25 @@ import { createApp, h } from "vue";
 import ColumnResizer from "./ColumnResizer.vue";
 
 // A focusable separator invites the keyboard, so the arrow keys resize and Enter resets.
+// It reports its position like the window-splitter pattern: a value always accompanies the label.
 describe("ColumnResizer", () => {
-  it("nudges with the arrow keys and resets with Enter", () => {
+  function mount(extra: Record<string, unknown> = {}) {
     const host = document.createElement("div");
     document.body.append(host);
     const nudge = vi.fn();
     const reset = vi.fn();
     const app = createApp({
-      render: () => h(ColumnResizer, { label: "Resize the test list", onNudge: nudge, onReset: reset })
+      render: () => h(ColumnResizer, {
+        label: "Resize the test list", min: 200, max: 460, edge: "leading",
+        onNudge: nudge, onReset: reset, ...extra
+      })
     });
     app.mount(host);
+    return { host, app, nudge, reset };
+  }
+
+  it("nudges with the arrow keys and resets with Enter", () => {
+    const { host, app, nudge, reset } = mount();
 
     const resizer = host.querySelector<HTMLElement>("[role='separator']")!;
     expect(resizer.tabIndex).toBe(0);
@@ -28,6 +37,25 @@ describe("ColumnResizer", () => {
     resizer.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     expect(reset).toHaveBeenCalledTimes(1);
 
+    app.unmount();
+    host.remove();
+  });
+
+  it("names its range and current width for assistive technology", () => {
+    const { host, app } = mount({ now: 250 });
+    const resizer = host.querySelector<HTMLElement>("[role='separator']")!;
+    expect(resizer.getAttribute("aria-orientation")).toBe("vertical");
+    expect(resizer.getAttribute("aria-valuemin")).toBe("200");
+    expect(resizer.getAttribute("aria-valuemax")).toBe("460");
+    expect(resizer.getAttribute("aria-valuenow")).toBe("250");
+    expect(resizer.getAttribute("aria-valuetext")).toBe("250 pixels wide");
+    app.unmount();
+    host.remove();
+  });
+
+  it("reports a value even before a width was set", () => {
+    const { host, app } = mount();
+    expect(host.querySelector("[role='separator']")!.getAttribute("aria-valuenow")).toBeTruthy();
     app.unmount();
     host.remove();
   });

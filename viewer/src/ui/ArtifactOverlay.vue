@@ -19,7 +19,7 @@ watch(() => props.artifact?.id, id => {
 </script>
 
 <template>
-  <dialog ref="dialog" class="overlay" aria-label="Artifact" @close="emit('close')" @click.self="emit('close')">
+  <dialog ref="dialog" class="overlay" :aria-label="artifact ? artifact.name : 'Artifact'" @close="emit('close')" @click.self="emit('close')">
     <!-- One header, one scroller: the artifact's own title and actions head the sheet, and the preview under
          them is the only thing that scrolls. -->
     <div v-if="artifact" class="sheet">

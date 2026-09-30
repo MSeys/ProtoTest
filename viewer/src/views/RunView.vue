@@ -182,7 +182,8 @@ function bars(test: TestTrace) {
                :style="{ left: `${segment.left}%`, width: `${segment.width}%`, background: `var(--phase-${segment.phase})` }" />
           </span>
           <small class="duration">{{ formatDuration(test.duration) }}</small>
-          <i class="status" :class="tone(test.outcome)" />
+          <i class="status" :class="tone(test.outcome)" aria-hidden="true" />
+          <span class="visually-hidden">{{ outcomeLabel(test.outcome) }}</span>
         </button>
       </div>
       <EmptyState v-else message="No test matches this filter.">
@@ -288,6 +289,7 @@ button.issue:hover { background: var(--hover); }
 .bar { position: relative; height: 6px; border-radius: var(--radius-hairline); background: var(--surface-2); }
 .bar i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-hairline); }
 .duration { color: var(--muted); font-size: var(--text-micro); text-align: right; font-variant-numeric: tabular-nums; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
 @container (max-width: 640px) {
   .test-row { grid-template-columns: 22px minmax(0, 1fr) 52px 7px; }

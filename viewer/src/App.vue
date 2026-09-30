@@ -379,8 +379,7 @@ const problemTitle = computed(() => ({
           <Icon name="sidebar" />
         </AppButton>
 
-        <div class="drop-zone" :class="{ dragging }" role="button" tabindex="0" aria-label="Open a ProtoTrace file"
-             @click="openPicker" @keydown.enter.prevent="openPicker" @keydown.space.prevent="openPicker"
+        <div class="drop-zone" :class="{ dragging }" @click="openPicker"
              @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="dropped">
           <BrandMark :size="72" />
           <template v-if="loading">
@@ -433,6 +432,7 @@ const problemTitle = computed(() => ({
               @click="railOpen = false" />
       <TestRail v-if="selectedTest && railOpen" :tests="run.tests" :selected="selectedTest" @select="showTest" />
       <ColumnResizer v-if="selectedTest && railOpen" class="rail-resizer" label="Resize the test list"
+                     :min="railResize.min" :max="railResize.max" :now="railResize.width.value" edge="leading"
                      @start="railResize.start" @nudge="railResize.nudge" @reset="railResize.reset" />
 
       <div ref="viewHost" class="view-host" id="workspace-view" role="tabpanel" tabindex="-1" :aria-labelledby="`workspace-view-tab-${view}`">
@@ -473,6 +473,7 @@ const problemTitle = computed(() => ({
       </div>
 
       <ColumnResizer v-if="inspecting" class="inspector-resizer" label="Resize the details"
+                     :min="inspectorResize.min" :max="inspectorResize.max" :now="inspectorResize.width.value" edge="trailing"
                      @start="inspectorResize.start" @nudge="inspectorResize.nudge" @reset="inspectorResize.reset" />
       <Inspector v-if="selectedTest && inspecting" :test="selectedTest" :span="selectedSpan" :item="selectedItem"
                  @select="selectSpan" @item="selectItem" @artifact="openArtifact = $event" @close="selectSpan(undefined)" />

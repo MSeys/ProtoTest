@@ -3,7 +3,8 @@ param()
 
 # Fixtures for the gate scripts themselves. Each fixture runs a real gate - verify.ps1, check-docs.ps1,
 # lint.ps1 or release.ps1 - in a throwaway repository (or reads a workflow) and asserts the claim the
-# gate makes: a docs-only stage cannot record code-green, a committed code stage without -Full is
+# gate makes: a docs-only stage cannot record code-green, a viewer-only stage runs the viewer
+# gate and records viewer while a docs-only stage does not, a committed code stage without -Full is
 # incomplete, a renamed helper is still caught, docs keys are cross-checked without the private fact
 # sheets, publishing from a branch fails before any push, and the MTP zero-test guards fail on zero.
 # verify.ps1 runs this script as its `scripts` gate when eng/**.ps1 or .github/workflows/** changed,
@@ -61,7 +62,7 @@ New-Item -ItemType Directory -Path $markers -Force | Out-Null
 Add-Content -LiteralPath (Join-Path $markers "$name.txt") -Value ("Include=$Include;NoRestore=$NoRestore")
 exit 0
 '@
-    foreach ($gate in @("lint", "test", "check-docs", "pack", "test-gates")) {
+    foreach ($gate in @("lint", "test", "check-docs", "pack", "test-gates", "test-viewer")) {
         Set-Content -LiteralPath (Join-Path $root "eng/$gate.ps1") -Value $gateStub -Encoding utf8
     }
 
@@ -128,7 +129,27 @@ try {
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "check-docs") -ne "") "the docs gate did not run"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "lint") -eq "") "lint ran for a docs-only stage"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -eq "") "the tests ran for a docs-only stage"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test-viewer") -eq "") "the viewer gate ran for a docs-only stage"
         Assert-Fixture (@($record.skippedCodeGates).Count -eq 0) "a docs-only stage skipped no applicable code gate"
+    }
+
+    # A viewer-only stage runs the viewer gate and records viewer, never docs-only: the viewer's
+    # own tests and build are the evidence, and the .NET gates stay out of it.
+    Invoke-Fixture "verify-viewer-only" {
+        $root = New-FixtureRepository "verify-viewer-only"
+        Add-FixtureFile -Root $root -RelativePath "viewer/src/widgets.ts" -Content "// stage change" | Out-Null
+
+        $run = Invoke-FixtureVerify -Root $root -Arguments @("-Stage", "t-viewer")
+        Assert-Fixture ($run.ExitCode -eq 0) "expected exit 0, got $($run.ExitCode): $($run.Text)"
+        $record = Get-FixtureRecord -Root $root -Stage "t-viewer"
+        Assert-Fixture ($record.classification -eq "viewer") "expected classification viewer, got '$($record.classification)'"
+        Assert-Fixture ([bool]$record.green) "expected green"
+        Assert-Fixture (-not [bool]$record.incomplete) "a viewer-only stage is not incomplete"
+        Assert-Fixture ($record.viewerChanges -eq 1) "the record must count the viewer change"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test-viewer") -ne "") "the viewer gate did not run for a viewer-only stage"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "lint") -eq "") "lint ran for a viewer-only stage"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -eq "") "the tests ran for a viewer-only stage"
+        Assert-Fixture (@($record.skippedCodeGates).Count -eq 0) "a viewer-only stage skipped no applicable code gate"
     }
 
     # One changed project runs its tests; lint always runs over the solution because a scoped format

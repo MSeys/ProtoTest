@@ -6,7 +6,7 @@
     "docusaurus": "docusaurus",
     "generate:changelog": "node scripts/generate-changelog.mjs",
     "start": "npm run generate:changelog && docusaurus start",
-    "build": "npm run generate:changelog && npm run lint:css && npm run test:outline && docusaurus build",
+    "build": "npm run generate:changelog && npm run lint:css && npm run test:outline && npm run test:catalog && docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
@@ -15,7 +15,8 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
-    "test:outline": "node --test plugins/remark-learn-outline.test.cjs"
+    "test:outline": "node --test plugins/remark-learn-outline.test.cjs",
+    "test:catalog": "node --test scripts/integrations-catalog.test.mjs"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",

@@ -593,6 +593,79 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
         Assert-Fixture ($LASTEXITCODE -eq 0) "live anchors must pass: $text"
     }
 
+    # The committed evidence carries application data, so the docs gate scans the lesson
+    # archives and the viewer demos for credential-shaped content: a planted secret fails naming
+    # file, entry and pattern, while redacted and synthetic values pass.
+    Invoke-Fixture "check-docs-secret-scan" {
+        if (-not (Get-Command node -ErrorAction SilentlyContinue)) { return "skip" }
+
+        function New-SecretScanFixture {
+            param([string]$Name)
+
+            $root = Join-Path $fixtureRoot $Name
+            New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "docs/static/lessons"), (Join-Path $root "viewer/public/demos"), (Join-Path $root "src") -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+            Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
+            Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public sealed class Fixture { }' -Encoding utf8
+            return $root
+        }
+
+        function New-SecretScanArchive {
+            param([string]$Path, [hashtable]$Entries)
+
+            $stage = Join-Path ([IO.Path]::GetTempPath()) ("prototest-secret-stage-" + [Guid]::NewGuid().ToString("N").Substring(0, 8))
+            New-Item -ItemType Directory -Path $stage -Force | Out-Null
+            foreach ($name in $Entries.Keys) {
+                $entryPath = Join-Path $stage ($name -replace '/', [IO.Path]::DirectorySeparatorChar)
+                New-Item -ItemType Directory -Path (Split-Path -Parent $entryPath) -Force | Out-Null
+                Set-Content -LiteralPath $entryPath -Value $Entries[$name] -Encoding utf8
+            }
+            if (Test-Path -LiteralPath $Path) { Remove-Item -LiteralPath $Path -Force }
+            Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $Path -Force
+            Remove-Item -LiteralPath $stage -Recurse -Force
+        }
+
+        # A redacted archive with synthetic identifiers and a code fragment passes.
+        $clean = New-SecretScanFixture "check-docs-secrets-clean"
+        New-SecretScanArchive -Path (Join-Path $clean "docs/static/lessons/lesson-clean.prototrace") -Entries @{
+            "spans.json" = '{"spans":[{"attributes":{"Password":"[REDACTED]","ApiKey":"[REDACTED]","project.id":"prj_02a121aee60a444289894c3fd082ea70"}}]}';
+            "state.json" = '{"broker":"amqp://guest:guest@localhost/","OwnerToken":"[REDACTED]"}';
+            "sources/1/Widget.cs" = 'public sealed class Widget { public string Password = Proto.Context.UniqueName("user"); }'
+        }
+        $output = & pwsh -NoProfile -File (Join-Path $clean "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -eq 0) "a redacted archive with synthetic values must pass: $text"
+        Assert-Fixture ($text.Contains("covered 1 archive(s)")) "the scan must cover the archive: $text"
+
+        # A planted secret in each shape fails naming file, entry and pattern.
+        $tainted = New-SecretScanFixture "check-docs-secrets-tainted"
+        New-SecretScanArchive -Path (Join-Path $tainted "docs/static/lessons/lesson-tainted.prototrace") -Entries @{
+            "spans.json" = '{"connection":"Host=db;Password=RealSecret123;Database=app"}';
+            "state.json" = '{"auth":{"secret": "real-secret-value"}}';
+            "manifest.json" = '{"broker":"amqp://svc:RealSecret123@broker:5672/"}';
+            "report.json" = '{"headers":{"Authorization":"Bearer RealTokenValue123456"}}';
+            "token.json" = '{"key":"ghp_abcdefghijklmnopqrstuvwxyz1234567890"}';
+            "key.pem" = '-----BEGIN RSA PRIVATE KEY-----'
+        }
+        $output = & pwsh -NoProfile -File (Join-Path $tainted "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "a planted secret must fail: $text"
+        Assert-Fixture ($text.Contains("lesson-tainted.prototrace -> spans.json -> connection-string-password")) "the connection-string hit must read 'file -> entry -> pattern': $text"
+        Assert-Fixture ($text.Contains("lesson-tainted.prototrace -> state.json -> json-secret-value")) "the JSON secret hit must name its entry and pattern: $text"
+        Assert-Fixture ($text.Contains("lesson-tainted.prototrace -> manifest.json -> uri-credentials")) "the URI credential hit must name its entry and pattern: $text"
+        Assert-Fixture ($text.Contains("lesson-tainted.prototrace -> report.json -> bearer-token")) "the bearer hit must name its entry and pattern: $text"
+        Assert-Fixture ($text.Contains("lesson-tainted.prototrace -> token.json -> provider-token")) "the provider token hit must name its entry and pattern: $text"
+        Assert-Fixture ($text.Contains("lesson-tainted.prototrace -> key.pem -> private-key")) "the private-key hit must name its entry and pattern: $text"
+
+        # A loose JSON fixture beside the archives is scanned too.
+        Set-Content -LiteralPath (Join-Path $tainted "viewer/public/demos/evidence.json") -Value '{"password": "RealSecret123"}' -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $tainted "eng/check-docs.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "a secret in a loose JSON fixture must fail: $text"
+        Assert-Fixture ($text.Contains("evidence.json -> (file) -> json-secret-value")) "the loose JSON hit must name its file and pattern: $text"
+    }
+
     # The workflow's template smoke step stays on the shared script, so CI and the local fixture test
     # the same five runners instead of drifting apart.
     Invoke-Fixture "template-workflow-script" {

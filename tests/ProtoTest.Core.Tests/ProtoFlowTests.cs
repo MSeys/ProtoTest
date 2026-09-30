@@ -90,6 +90,30 @@ public sealed class ProtoFlowTests
     }
 
     [Test]
+    public async Task RunAsync_InCollectMode_ShouldCollectACancelledStepAndRunTheRest()
+    {
+        await using var host = new ProtoHostBuilder().Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("flow collect cancelled", TestMethods.Placeholder);
+
+        var ran = new List<string>();
+        using var stepCancellation = new CancellationTokenSource();
+        await stepCancellation.CancelAsync();
+        var result = await new ProtoFlow("teardown", Source, ProtoFlowFailureMode.Collect)
+            .Step("cancelled", _ => { ran.Add("cancelled"); return ValueTask.FromCanceled(stepCancellation.Token); })
+            .Step("after", _ => { ran.Add("after"); return ValueTask.CompletedTask; })
+            .RunAsync(context.Trace);
+
+        await host.CompleteTestAsync(ProtoTestResult.Failed(result.Failures[0]));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Failures, Has.Count.EqualTo(1));
+            Assert.That(result.Failures[0], Is.InstanceOf<OperationCanceledException>());
+            Assert.That(ran, Is.EqualTo(new[] { "cancelled", "after" }));
+        });
+    }
+
+    [Test]
     public async Task RunAsync_WithADescriptor_ShouldRecordTheDeclaredOperationAndEntity()
     {
         await using var host = new ProtoHostBuilder().Build();

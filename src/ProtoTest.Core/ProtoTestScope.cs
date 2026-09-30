@@ -92,6 +92,17 @@ public sealed class ProtoTestScope : IAsyncDisposable
                 category: "Lifecycle",
                 targetName: Context.TestName,
                 tags: [nameof(ProtoTestScope)]);
+            try
+            {
+                // The orphaned test never completes, but its clock entry, resources and scope must not
+                // leak with it: release what can be released before reporting the mismatch.
+                await Context.DisposeAsync();
+            }
+            catch (Exception)
+            {
+                // Best effort only; the off-flow mismatch below stays the reported failure.
+            }
+
             throw new InvalidOperationException(message);
         }
 

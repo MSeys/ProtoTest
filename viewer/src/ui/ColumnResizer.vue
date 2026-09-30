@@ -1,5 +1,16 @@
 <script setup lang="ts">
-defineProps<{ label: string }>();
+import { computed, onMounted, ref } from "vue";
+import { visibleSibling } from "./useColumnResize";
+
+const props = defineProps<{
+  label: string;
+  min: number;
+  max: number;
+  /** The width the column has now, when the reader set one; otherwise the rendered width is measured. */
+  now?: number;
+  /** Which side the column sits on: the rail leads, the inspector trails. */
+  edge: "leading" | "trailing";
+}>();
 const emit = defineEmits<{ start: [event: PointerEvent]; reset: []; nudge: [event: KeyboardEvent, pixels: number] }>();
 
 // The arrow keys resize by one step, positive to the right, and the parent maps that onto its column.
@@ -8,11 +19,24 @@ function keydown(event: KeyboardEvent) {
   else if (event.key === "ArrowRight") { event.preventDefault(); emit("nudge", event, 16); }
   else if (event.key === "Enter") { event.preventDefault(); emit("reset"); }
 }
+
+// A focused splitter reports its position like the window-splitter pattern: the set width, or the width
+// the column actually rendered at before the reader ever dragged it.
+const root = ref<HTMLElement>();
+const measured = ref<number | null>(null);
+function measure() {
+  const column = root.value ? visibleSibling(root.value, props.edge === "leading" ? "previous" : "next") : null;
+  const width = column?.getBoundingClientRect().width;
+  if (width) measured.value = width;
+}
+onMounted(measure);
+const value = computed(() => Math.round(props.now ?? measured.value ?? props.min));
 </script>
 
 <template>
-  <div class="resizer" role="separator" aria-orientation="vertical" :aria-label="label" tabindex="0"
-       @pointerdown="emit('start', $event)" @dblclick="emit('reset')" @keydown="keydown">
+  <div ref="root" class="resizer" role="separator" aria-orientation="vertical" :aria-label="label"
+       :aria-valuemin="min" :aria-valuemax="max" :aria-valuenow="value" :aria-valuetext="`${value} pixels wide`"
+       tabindex="0" @pointerdown="emit('start', $event)" @dblclick="emit('reset')" @keydown="keydown" @focus="measure">
     <i aria-hidden="true" />
   </div>
 </template>

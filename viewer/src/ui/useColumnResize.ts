@@ -2,10 +2,21 @@ import { onBeforeUnmount, ref } from "vue";
 
 export interface ColumnResize {
   width: ReturnType<typeof ref<number | undefined>>;
+  min: number;
+  max: number;
   start(event: PointerEvent): void;
   /** Arrow-key resize: the pixels move toward the pointer side, from the width the column has right now. */
   nudge(event: KeyboardEvent, pixels: number): void;
   reset(): void;
+}
+
+/** The column beside a resizer, skipping controls that take up no room, so a drag never starts from zero. */
+export function visibleSibling(element: HTMLElement, direction: "previous" | "next"): HTMLElement | null {
+  let sibling = direction === "previous" ? element.previousElementSibling : element.nextElementSibling;
+  while (sibling && (sibling as HTMLElement).getBoundingClientRect().width === 0) {
+    sibling = direction === "previous" ? sibling.previousElementSibling : sibling.nextElementSibling;
+  }
+  return sibling as HTMLElement | null;
 }
 
 /**
@@ -29,12 +40,8 @@ export function useColumnResize(
 
   // The column is the nearest sibling that takes up room: a hidden control between them (the sheet's grabber
   // on a wide screen) must not be measured as the column, or the drag starts from zero and jumps.
-  function visibleSibling(element: HTMLElement, direction: "previous" | "next"): HTMLElement | null {
-    let sibling = direction === "previous" ? element.previousElementSibling : element.nextElementSibling;
-    while (sibling && (sibling as HTMLElement).getBoundingClientRect().width === 0) {
-      sibling = direction === "previous" ? sibling.previousElementSibling : sibling.nextElementSibling;
-    }
-    return sibling as HTMLElement | null;
+  function neighbour(element: HTMLElement): HTMLElement | null {
+    return visibleSibling(element, options.edge === "leading" ? "previous" : "next");
   }
 
   function clamp(value: number): number {
@@ -61,9 +68,9 @@ export function useColumnResize(
   }
 
   function start(event: PointerEvent) {
-    const neighbour = visibleSibling(event.currentTarget as HTMLElement, options.edge === "leading" ? "previous" : "next");
+    const column = neighbour(event.currentTarget as HTMLElement);
     origin = event.clientX;
-    originWidth = neighbour?.getBoundingClientRect().width ?? options.min;
+    originWidth = column?.getBoundingClientRect().width ?? options.min;
     document.body.classList.add("is-resizing");
     addEventListener("pointermove", move);
     addEventListener("pointerup", stop);
@@ -72,8 +79,8 @@ export function useColumnResize(
   }
 
   function nudge(event: KeyboardEvent, pixels: number) {
-    const neighbour = visibleSibling(event.currentTarget as HTMLElement, options.edge === "leading" ? "previous" : "next");
-    const current = width.value ?? neighbour?.getBoundingClientRect().width ?? options.min;
+    const column = neighbour(event.currentTarget as HTMLElement);
+    const current = width.value ?? column?.getBoundingClientRect().width ?? options.min;
     width.value = clamp(current + (options.edge === "leading" ? pixels : -pixels));
     persist();
   }
@@ -84,5 +91,5 @@ export function useColumnResize(
   }
 
   onBeforeUnmount(() => { cancelAnimationFrame(frame); stop(); });
-  return { width, start, nudge, reset };
+  return { width, min: options.min, max: options.max, start, nudge, reset };
 }

@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import type { Span, TestTrace } from "../trace/model";
 import type { StoryRow } from "../trace/story";
-import { formatDuration, itemKindLabel, kindLabel, plural, spanFacts, timelinePercent, tone } from "../trace/format";
+import { formatDuration, itemKindLabel, kindLabel, outcomeLabel, plural, spanFacts, timelinePercent, tone } from "../trace/format";
 import KindChip from "./KindChip.vue";
 
 const props = defineProps<{
@@ -60,6 +60,9 @@ const artifacts = computed(() => evidence.value.filter(item => item.type === "at
 const observations = computed(() => evidence.value.filter(item => item.type === "observation").length);
 const applicationSide = computed(() => props.row.type === "step" && props.row.span.changes.some(change => change.source === "applicationside"));
 
+/** What the fold button folds: the step's name, or the framework group's label. */
+const foldName = computed(() => props.row.type === "step" ? props.row.span.name : props.row.label);
+
 function pick() {
   if (props.row.type === "group") emit("toggle", id.value);
   else emit("select", props.row.span);
@@ -70,7 +73,7 @@ function pick() {
   <div class="row" :class="{ nested: depth > 0 }">
     <div class="line" :class="[row.type === 'step' ? tone(row.span.status) : 'group', { active: row.type === 'step' && row.span.id === selected }]">
       <button v-if="children.length" type="button" class="expand" :aria-expanded="isOpen"
-              :aria-label="isOpen ? 'Fold' : 'Unfold'" @click="emit('toggle', id)">
+              :aria-label="`${isOpen ? 'Fold' : 'Unfold'} ${foldName}`" @click="emit('toggle', id)">
         <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
           <path d="M1.6 5H8.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
           <path class="stem" d="M5 1.6V8.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -79,9 +82,10 @@ function pick() {
       <span v-else class="node" aria-hidden="true"
             :style="{ '--node-color': `var(--type-${kindLabel(row.type === 'step' ? row.span.kind : 'hook.').id}, var(--type-custom))` }" />
 
-      <button type="button" class="pick" :data-span="row.type === 'step' ? row.span.id : undefined" :title="row.type === 'step' ? row.span.kind : row.spans.map(span => span.name).join('\n')" @click="pick">
+      <button type="button" class="pick" :data-span="row.type === 'step' ? row.span.id : undefined" :title="row.type === 'step' ? row.span.kind : row.spans.map(span => span.name).join('\n')" :aria-current="row.type === 'step' && row.span.id === selected ? 'true' : undefined" @click="pick">
         <KindChip :type="row.type === 'step' ? kindLabel(row.span.kind) : { id: 'extension', label: 'Framework' }" />
         <span class="title" :class="{ quiet: row.type === 'group' }">{{ row.type === "step" ? row.span.name : row.label }}</span>
+        <span v-if="row.type === 'step'" class="visually-hidden">{{ outcomeLabel(row.span.status) }}</span>
         <span class="facts">
           <span v-if="applicationSide" class="app" title="Reported by the application itself">app</span>
           {{ facts }}
@@ -90,7 +94,7 @@ function pick() {
 
       <span v-if="row.type === 'step' && row.checks.length" class="checks">
         <button v-for="check in row.checks" :key="check.id" type="button" class="check" :data-span="check.id" :class="[tone(check.status), { active: check.id === selected }]"
-                :title="check.name" @click="emit('select', check)">
+                :title="check.name" :aria-current="check.id === selected ? 'true' : undefined" @click="emit('select', check)">
           <svg v-if="check.status === 'succeeded'" viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2 5.3 4.1 7.4 8 2.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
           <svg v-else viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2.6 2.6 7.4 7.4M7.4 2.6 2.6 7.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
           {{ check.name.replace(/^Assert\s+/i, "") }}
@@ -165,6 +169,7 @@ function pick() {
 }
 .title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-body); }
 .title.quiet { color: var(--muted); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .facts { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-micro); }
 /* Application-reported work is the deepest visibility a trace can have; it is marked where it happens. */
 .app { margin-right: var(--space-1); padding: 0 var(--space-1); border-radius: var(--radius-hairline); background: var(--blueprint-soft); color: var(--blueprint); font-weight: var(--weight-semibold); }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import type { Span, TestTrace } from "../trace/model";
-import { formatDuration, formatOffset, kindLabel, tone } from "../trace/format";
+import { formatDuration, formatOffset, kindLabel, outcomeLabel, tone } from "../trace/format";
 import KindChip from "../ui/KindChip.vue";
 import FilterChip from "../ui/FilterChip.vue";
 import TextInput from "../ui/TextInput.vue";
@@ -121,23 +121,23 @@ function onKey(event: KeyboardEvent) {
       <TextInput v-model="query" type="search" placeholder="Find by name, kind or attribute" label="Find a span"
                  title="Find a span (press / to focus)" class="find" />
     </template>
-    <div v-if="rows.length" ref="list" class="list" role="tree" aria-label="Every span">
+    <div v-if="rows.length" ref="list" class="list" role="list" aria-label="Every span">
       <div v-for="span in rows" :key="span.id" class="row" :class="[tone(span.status), { active: span.id === selected }]"
-           role="treeitem" :aria-level="span.depth + 1" :aria-expanded="span.children.length ? !folded.has(span.id) : undefined"
-           :aria-selected="span.id === selected" :style="{ '--depth': span.depth }">
+           role="listitem" :style="{ '--depth': span.depth }">
         <button v-if="span.children.length && !shown" type="button" class="fold" :aria-expanded="!folded.has(span.id)"
-                :aria-label="folded.has(span.id) ? 'Unfold' : 'Fold'" @click="toggle(span.id)">
+                :aria-label="`${folded.has(span.id) ? 'Unfold' : 'Fold'} ${span.name}`" @click="toggle(span.id)">
           <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">
             <path d="M1.6 5H8.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             <path class="stem" d="M5 1.6V8.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
           </svg>
         </button>
         <span v-else class="fold" />
-        <button type="button" class="pick" :data-span="span.id" @click="emit('select', span)">
+        <button type="button" class="pick" :data-span="span.id" :aria-current="span.id === selected ? 'true' : undefined" @click="emit('select', span)">
           <KindChip :type="kindLabel(span.kind)" />
           <span class="name">{{ span.name }}</span>
           <span class="kind">{{ span.kind }}</span>
           <span v-if="span.moments.length + span.evidence.length" class="events">{{ span.moments.length + span.evidence.length }} {{ span.moments.length + span.evidence.length === 1 ? "event" : "events" }}</span>
+          <span class="visually-hidden">{{ outcomeLabel(span.status) }}</span>
         </button>
         <span class="offset">{{ formatOffset(span.start - test.start) }}</span>
         <span class="duration">{{ formatDuration(span.duration) }}</span>
@@ -183,6 +183,7 @@ button.fold[aria-expanded="true"] .stem { opacity: 0; }
 button.fold { position: relative; }
 button.fold::after { content: ""; position: absolute; inset: -4px; }
 .pick { min-width: 0; padding: 0; display: flex; align-items: center; gap: var(--space-2); border: 0; background: transparent; text-align: left; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-meta); }
 .kind { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); font: var(--text-micro) var(--font-mono); }
 .events { flex: none; color: var(--muted); font-size: var(--text-micro); }

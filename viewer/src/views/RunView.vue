@@ -12,9 +12,11 @@ import FileList from "../ui/FileList.vue";
 import type { FileEntry } from "../ui/FileList.vue";
 import VisibilityStrip from "../ui/VisibilityStrip.vue";
 import { matchesOutcome, resetTestFilter, testFilter } from "../ui/testFilter";
+import Tabs from "../ui/Tabs.vue";
+import { href, type RunView } from "../router";
 
-const props = defineProps<{ run: Run; fileName: string; selectedSpan?: Span; selectedItem?: Item }>();
-const emit = defineEmits<{ select: [test: TestTrace, selection?: { span: string }]; span: [span: Span]; item: [item: Item]; artifact: [artifact: Artifact] }>();
+const props = withDefaults(defineProps<{ run: Run; fileName: string; selectedSpan?: Span; selectedItem?: Item; view?: RunView }>(), { view: "overview" });
+const emit = defineEmits<{ select: [test: TestTrace, selection?: { span: string }]; span: [span: Span]; item: [item: Item]; artifact: [artifact: Artifact]; tab: [view: string] }>();
 
 // Every file the run produced, in one place: the run's own reports first, then each test's, in test order.
 // The inspector reaches an artifact through the operation that wrote it; this is the whole list.
@@ -86,6 +88,21 @@ function operationBar(span: Span) {
   return { left: `${timelinePercent(span.start, props.run.start, props.run.duration)}%`, width: `${Math.max(0.4, span.duration / Math.max(props.run.duration, 1) * 100)}%` };
 }
 
+/*
+ * One question per view instead of every panel under each other: what needs attention and what the run could
+ * see; the run's clock; its own work; its identity; its files. A view with nothing in it has no tab.
+ */
+const tabs = computed(() => {
+  const list: [RunView, string][] = [["overview", "Overview"], ["timeline", "Timeline"]];
+  if (props.run.spans.length || props.run.items.length) list.push(["operations", "Operations"]);
+  list.push(["details", "Details"]);
+  if (files.value.length) list.push(["files", `Files ${files.value.length}`]);
+  return list.map(([id, label]) => ({ id, label, href: href({ name: "run", view: id }) }));
+});
+const current = computed<RunView>(() => tabs.value.some(tab => tab.id === props.view) ? props.view : "overview");
+const hasAttention = computed(() => attention.value.length > 0 || runProblems.value.spans.length > 0 || runProblems.value.moments.length > 0
+  || props.run.findings.length > 0 || props.run.gates.length > 0);
+
 /* The list follows the one test filter the rail shows, and keeps the run's own order: this list is a clock. */
 const visible = computed(() => props.run.tests.filter(test =>
   matchesOutcome(test, testFilter.outcome) && testMatches(test, testFilter.query)));
@@ -124,8 +141,13 @@ function bars(test: TestTrace) {
       </div>
     </header>
 
-    <Panel v-if="attention.length || runProblems.spans.length || runProblems.moments.length || run.findings.length || run.gates.length" title="Needs attention"
-           pad="none">
+    <div class="views">
+      <Tabs :items="tabs" :active="current" variant="underline" label="Views of this run" panel="run-view" @select="emit('tab', $event)" />
+    </div>
+
+    <div id="run-view" role="tabpanel" :aria-labelledby="`run-view-tab-${current}`" class="view" :class="current">
+    <template v-if="current === 'overview'">
+    <Panel v-if="hasAttention" title="Needs attention" pad="none">
       <div class="attention">
         <button v-for="test in attention" :key="test.id" type="button" class="issue" :class="tone(test.outcome)" @click="emit('select', test, testSelection(test))">
           <b>{{ pad(test.number) }}</b>
@@ -169,9 +191,15 @@ function bars(test: TestTrace) {
       </div>
     </Panel>
 
-    <VisibilityStrip :visibility="run.visibility" :resources="resources" />
+    <section v-else class="all-clear">
+      <strong>Nothing needs attention.</strong>
+      <span>All {{ run.tests.length }} tests passed, with no findings and no failing run operations.</span>
+    </section>
 
-    <Panel title="Run timeline" subtitle="Tests in start order on the run's clock. Hatched time has no recorded operation." pad="none">
+    <VisibilityStrip :visibility="run.visibility" :resources="resources" />
+    </template>
+
+    <Panel v-else-if="current === 'timeline'" title="Run timeline" subtitle="Tests in start order on the run's clock. Hatched time has no recorded operation." pad="none">
       <template #actions>
         <div class="filters">
           <OutcomeFilters :tests="run.tests" />
@@ -210,6 +238,7 @@ function bars(test: TestTrace) {
       </EmptyState>
     </Panel>
 
+    <template v-else-if="current === 'operations'">
     <Panel v-if="run.spans.length" title="Run operations" subtitle="Work owned by the run, on the same clock as its tests." pad="none">
       <div class="scale" aria-hidden="true"><span class="axis"><i>start</i><i>{{ formatOffset(run.duration) }}</i></span></div>
       <div class="tests">
@@ -231,21 +260,33 @@ function bars(test: TestTrace) {
       </div>
     </Panel>
 
-    <Panel title="Run details" subtitle="Identity and every environment value recorded in the trace.">
+    </template>
+
+    <Panel v-else-if="current === 'details'" title="Run details" subtitle="Identity and every environment value recorded in the trace.">
       <dl class="environment">
         <dt>Run id</dt><dd>{{ run.id }}</dd>
         <template v-for="[key, value] in environmentFacts" :key="key"><dt>environment.{{ key }}</dt><dd>{{ value }}</dd></template>
       </dl>
     </Panel>
 
-    <Panel v-if="files.length" title="Files" subtitle="Everything the run attached: reports, captured payloads, screenshots and browser traces." pad="none">
+    <Panel v-else-if="current === 'files'" title="Files" subtitle="Everything the run attached: reports, captured payloads, screenshots and browser traces." pad="none">
       <FileList :entries="files" @open="emit('artifact', $event)" />
     </Panel>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.run { display: grid; gap: var(--space-4); container-type: inline-size; }
+.run { display: grid; gap: var(--space-4); align-content: start; container-type: inline-size; }
+/* The view tabs stay in reach while a long view scrolls under them, as they do on a test. */
+.views { position: sticky; top: 0; z-index: 3; margin-bottom: calc(var(--space-2) * -1); border-bottom: 1px solid var(--border); background: var(--bg); }
+.view { min-width: 0; display: grid; gap: var(--space-4); align-content: start; }
+/* The overview reads side by side when there is room: what needs attention, and what the run could see. */
+@container (min-width: 960px) {
+  .view.overview { grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); align-items: start; }
+}
+.all-clear { padding: var(--space-4); display: grid; gap: var(--space-1); border: 1px solid var(--border); border-left: 3px solid var(--success); border-radius: var(--radius-panel); background: var(--surface); }
+.all-clear span { color: var(--muted); font-size: var(--text-meta); }
 
 
 .summary {

@@ -22,7 +22,7 @@ import { href, navigate, replace, route } from "./router";
 import { demos, demoFileUrl, resolveDemo, summarizeDemo, type DemoFacts } from "./demos";
 import { parseTraceParam, shareUrl, traceNameFromUrl, type TraceSource } from "./share";
 import { useSources } from "./trace/sources";
-import type { TestView as TestViewId } from "./router";
+import type { RunView as RunViewId, TestView as TestViewId } from "./router";
 
 const fileInput = ref<HTMLInputElement>();
 const run = ref<Run>();
@@ -207,6 +207,10 @@ function selectTab(id: string) {
   const current = route.value;
   if (current.name === "test") navigate({ ...current, view: id as TestViewId });
 }
+const runView = computed<RunViewId>(() => route.value.name === "run" ? route.value.view ?? "overview" : "overview");
+function selectRunTab(id: string) {
+  navigate({ name: "run", view: id as RunViewId });
+}
 
 /** The tests either side of this one, in the list's current filter and order. */
 const neighbours = computed(() => {
@@ -246,7 +250,7 @@ function showRun() {
 function selectSpan(span: Span | undefined) {
   const current = route.value;
   if (span?.test && span.test !== selectedTest.value) { showTest(span.test, { span: span.id }); return; }
-  if (span && current.name === "test" && run.value?.spans.includes(span)) { navigate({ name: "run", selection: { span: span.id } }); return; }
+  if (span && current.name === "test" && run.value?.spans.includes(span)) { navigate({ name: "run", view: "operations", selection: { span: span.id } }); return; }
   replace({ ...current, selection: span ? { span: span.id } : undefined });
 }
 function selectItem(item: Item) {
@@ -449,7 +453,7 @@ const problemTitle = computed(() => ({
           <!-- Cached so returning from a test keeps the run list instead of rebuilding it; deactivation detaches its DOM. -->
           <KeepAlive>
             <RunView v-if="!selectedTest" :run="run" :file-name="fileName" :selected-span="selectedSpan" :selected-item="selectedItem"
-                     @select="showTest" @span="selectSpan" @item="selectItem" @artifact="openArtifact = $event" />
+                     :view="runView" @tab="selectRunTab" @select="showTest" @span="selectSpan" @item="selectItem" @artifact="openArtifact = $event" />
           </KeepAlive>
           <TestView v-if="selectedTest" :test="selectedTest" :view="view" :tabs="testTabs"
                     :selected-span="selectedSpan" :selected-item="selectedItem"

@@ -1,9 +1,10 @@
-import type {ReactNode} from 'react';
+import {useState, type ReactNode} from 'react';
 
 import styles from './styles.module.css';
 
 /*
- * The demo run's diagnosis and selected timeline rows, followed by visibility and run metadata.
+ * The demo run as the viewer opens it: the verdict and its strip, then one view at a time. Overview holds what
+ * needs attention and what the run could see; Timeline and Details are the run's clock and identity.
  */
 
 type Tick = 'passed' | 'failed' | 'partial';
@@ -110,7 +111,11 @@ const timeline = [
   {number: '15', title: 'The address was hardcoded for one machine', phases: [['setup', 1880.988, 37.3838], ['execution', 1918.419, 2028.7205], ['teardown', 3947.283, 10.3628]], gapStart: 1918.419, gapLength: 2028.7205},
 ];
 
+type RunTab = 'overview' | 'timeline' | 'details';
+const runTabs: [RunTab, string][] = [['overview', 'Overview'], ['timeline', 'Timeline'], ['details', 'Details']];
+
 export default function RunView(): ReactNode {
+  const [tab, setTab] = useState<RunTab>('overview');
   return (
     <div className={styles.run}>
       <p className={styles.outcomeLine}>
@@ -129,19 +134,28 @@ export default function RunView(): ReactNode {
         ))}
       </div>
 
+      <div className={styles.runTabs} role="group" aria-label="Views of the run">
+        {runTabs.map(([id, label]) => (
+          <button key={id} type="button" aria-pressed={tab === id} className={`${styles.tab} ${tab === id ? styles.tabActive : ''}`} onClick={() => setTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && <>
       <section className={styles.panel}>
         <header className={styles.panelHead}>Needs attention</header>
-        <p className={styles.panelLead}>Failing and partial tests first, then what the run itself found and how its gates judged it.</p>
         <div className={styles.attention}>
           {attention.map((row) => (
             <div key={`${row.number}-${row.title}`} className={`${styles.attRow} ${attClass[row.outcome]}`}>
               <span className={styles.attNumber}>{row.number}</span>
               <span className={styles.attBody}>
                 <b className={styles.attTitle}>{row.title}</b>
-                {row.kicker && <span className={styles.attKicker}>{row.kicker}</span>}
-                <span className={styles.attDetail}>{row.detail}</span>
+                <span className={styles.attKicker}>
+                  <span className={`${styles.attLabel} ${attLabelClass[row.outcome]}`}>{row.label}</span> {row.kicker}
+                </span>
+                {row.detail && <span className={styles.attDetail}>{row.detail}</span>}
               </span>
-              <span className={`${styles.attLabel} ${attLabelClass[row.outcome]}`}>{row.label}</span>
             </div>
           ))}
         </div>
@@ -154,7 +168,8 @@ export default function RunView(): ReactNode {
           <i className={`${styles.chip} ${styles.chipOn}`}>Test side</i><i className={`${styles.chip} ${styles.chipOff}`}>Observed (not visible)</i><i className={`${styles.chip} ${styles.chipOn}`}>Application</i>
         </span></div>
       </section>
-      <section className={styles.panel}>
+      </>}
+      {tab === 'timeline' && <section className={styles.panel}>
         <header className={styles.panelHead}>Run timeline</header>
         <p className={styles.panelLead}>Four test rows from the full list. Hatched time has no recorded operation.</p>
         <div className={styles.mockRuler}><span>start</span><span>4.06 s</span></div>
@@ -164,8 +179,8 @@ export default function RunView(): ReactNode {
             {test.gapStart !== undefined && <i className={styles.gapBar} style={{left: `${test.gapStart / 4059.3055 * 100}%`, width: `${test.gapLength / 4059.3055 * 100}%`}} />}
           </span>
         </div>)}
-      </section>
-      <section className={styles.panel}>
+      </section>}
+      {tab === 'details' && <section className={styles.panel}>
         <header className={styles.panelHead}>Run details</header>
         <dl className={styles.runDetails}>
           <dt>Run id</dt><dd>b8f1c1c58d984319a2c90b05aa3f2d3e</dd>
@@ -174,7 +189,7 @@ export default function RunView(): ReactNode {
           <dt>environment.processArchitecture</dt><dd>X64</dd>
           <dt>environment.runtime</dt><dd>.NET 8.0.31</dd>
         </dl>
-      </section>
+      </section>}
     </div>
   );
 }

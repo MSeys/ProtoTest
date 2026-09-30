@@ -12,7 +12,8 @@ describe("run inspector through the app", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => archive.buffer.slice(archive.byteOffset, archive.byteOffset + archive.byteLength) })));
     vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: () => {} }));
     Object.defineProperty(HTMLElement.prototype, "scrollTo", { configurable: true, value: vi.fn() });
-    history.replaceState(null, "", "/?demo=1");
+    history.replaceState(null, "", "/?demo=1#/run/operations");
+    route.value = { name: "run", view: "operations" };
     const host = document.createElement("div"); document.body.append(host);
     const app = createApp(App); app.mount(host);
     try {

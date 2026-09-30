@@ -12,7 +12,7 @@ Treat a trace as test output. It can contain application data, so check what was
 
 ## Read a run
 
-The run leads one test list, with shared search and outcome filters. Needs attention uses the same diagnosis rules as `prototest summary`. The run timeline marks untraced gaps; run operations and tracked items open in the inspector. Run details lists the run id and every `environment.*` value.
+The run leads one test list, with shared search and outcome filters, and splits into views: Overview (Needs attention, with the diagnosis rules `prototest summary` uses, beside what the run could see), Timeline (tests and untraced gaps on the run clock), Operations (the run's own work and tracked items), Details (the run id and every `environment.*` value) and Files.
 
 Each test has four views:
 

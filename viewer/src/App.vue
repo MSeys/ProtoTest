@@ -1,35 +1,28 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import AppHeader from "./ui/AppHeader.vue";
+import AppHeader, { type Crumb } from "./ui/AppHeader.vue";
 import DemoList from "./ui/DemoList.vue";
 import RunView from "./views/RunView.vue";
-import StoryView from "./views/StoryView.vue";
-import StateView from "./views/StateView.vue";
-import SpansView from "./views/SpansView.vue";
+import TestView from "./views/TestView.vue";
 import Inspector from "./inspector/Inspector.vue";
 import AppButton from "./ui/AppButton.vue";
 import BrandMark from "./ui/BrandMark.vue";
-import Tabs from "./ui/Tabs.vue";
 import TestRail from "./ui/TestRail.vue";
-import FailureCard from "./ui/FailureCard.vue";
-import OutcomePill from "./ui/OutcomePill.vue";
 import ArtifactOverlay from "./ui/ArtifactOverlay.vue";
-import FileList from "./ui/FileList.vue";
-import type { FileEntry } from "./ui/FileList.vue";
-import Panel from "./ui/Panel.vue";
 import ColumnResizer from "./ui/ColumnResizer.vue";
 import Icon from "./ui/Icon.vue";
 import { useColumnResize } from "./ui/useColumnResize";
+import { orderedTests, resetTestFilter } from "./ui/testFilter";
 import { openTraceArchive, TraceOpenError } from "./trace/archive";
 import type { TraceArchive, TraceProblem } from "./trace/archive";
 import { buildRun } from "./trace/model";
 import type { Artifact, Item, Run, Span, TestTrace } from "./trace/model";
-import { formatDuration, failureReason, pad, testCodeName, testGroup, testTitle, tone } from "./trace/format";
+import { itemTitle, pad, testTitle } from "./trace/format";
 import { href, navigate, replace, route } from "./router";
 import { demos, demoFileUrl, resolveDemo, summarizeDemo, type DemoFacts } from "./demos";
 import { parseTraceParam, shareUrl, traceNameFromUrl, type TraceSource } from "./share";
 import { useSources } from "./trace/sources";
-import type { Route, TestView } from "./router";
+import type { TestView as TestViewId } from "./router";
 
 const fileInput = ref<HTMLInputElement>();
 const run = ref<Run>();
@@ -42,8 +35,6 @@ const source = ref<TraceSource>();
 const demoFacts = ref<Record<string, DemoFacts | null>>({});
 // The demos sit in the start panel's sidebar; the reader can put them away and get the drop screen alone.
 const demosOpen = ref(true);
-// Open as a column where it fits; as a drawer on a narrow screen it starts closed.
-const railOpen = ref(matchMedia("(min-width: 1000px)").matches);
 const dragging = ref(false);
 const railResize = useColumnResize("prototrace.rail-width", { min: 200, max: 460, edge: "leading" });
 const inspectorResize = useColumnResize("prototrace.inspector-width", { min: 300, max: 640, edge: "trailing" });
@@ -98,9 +89,9 @@ function nudgeSheet(delta: number) {
 }
 
 /*
- * Two widths change behaviour, not just layout: from 1000px the test list is a column (below, a drawer), and
- * from 1180px the inspector docks beside the view (below, a sheet over it). They follow main's width, which
- * spans the window, so the window's media queries stand in for main's container queries here.
+ * Three widths change behaviour, not just layout: from 900px the test list is a column (below, a drawer);
+ * from 1024px the details dock beside the view (below, a sheet over it); and from 1360px the list keeps
+ * its width beside docked details (below, it steps aside to its numbers, so the view keeps room for time).
  */
 function widthQuery(minimum: number) {
   const query = matchMedia(`(min-width: ${minimum}px)`);
@@ -108,9 +99,15 @@ function widthQuery(minimum: number) {
   query.addEventListener("change", event => { matches.value = event.matches; });
   return matches;
 }
-const railFits = widthQuery(1000);
-const inspectorDocks = widthQuery(1180);
+const railFits = widthQuery(900);
+const inspectorDocks = widthQuery(1024);
+const railRoomy = widthQuery(1360);
+// Open as a column where it fits; as a drawer on a narrow screen it starts closed.
+const railOpen = ref(railFits.value);
+/** The reader asked for the whole list while details are open. */
+const railExpanded = ref(false);
 watch(railFits, fits => { railOpen.value = fits; });
+
 // Escape closes the topmost thing: an open artifact handles its own, then the drawer, then the details.
 addEventListener("keydown", event => {
   if (event.key !== "Escape" || openArtifact.value) return;
@@ -127,7 +124,7 @@ addEventListener("keydown", event => {
   if (event.altKey || event.ctrlKey || event.metaKey || openArtifact.value || !selectedTest.value) return;
   const target = event.target as HTMLElement | null;
   if (target?.closest("input, textarea, select, [contenteditable]")) return;
-  const ids = [...new Set([...(viewHost.value?.querySelectorAll<HTMLElement>("[data-span]") ?? [])].map(element => element.dataset.span!))];
+  const ids = [...new Set([...(viewHost.value?.querySelectorAll<HTMLElement>("#test-view [data-span]") ?? [])].map(element => element.dataset.span!))];
   if (!ids.length) return;
   const current = selectedSpan.value ? ids.indexOf(selectedSpan.value.id) : -1;
   const next = current < 0 ? (event.key === "ArrowDown" ? 0 : ids.length - 1)
@@ -147,7 +144,7 @@ const missingTestId = computed(() => {
   const current = route.value;
   return current.name === "test" && run.value && !selectedTest.value ? current.testId : undefined;
 });
-const view = computed<TestView | "run">(() => route.value.name === "test" && !missingTestId.value ? route.value.view : "run");
+const view = computed<TestViewId>(() => route.value.name === "test" ? route.value.view : "story");
 
 // The selection lives in the address, so a link to a failing check survives a reload and a share.
 const selectedSpan = computed<Span | undefined>(() => {
@@ -166,32 +163,23 @@ const viewHost = ref<HTMLElement>();
 watch(() => [route.value.name === "test" ? route.value.testId : "", view.value], () => {
   void nextTick(() => viewHost.value?.scrollTo({ top: 0 }));
 });
-const itemSelection = computed(() => selectedItem.value ? { kind: selectedItem.value.kind, id: selectedItem.value.id } : undefined);
 const inspecting = computed(() => Boolean(selectedTest.value && (selectedSpan.value || selectedItem.value)));
 
 /*
- * A test that stopped short without a failing operation - cancelled, or partial with nothing to blame -
- * still answers why: the check that decided it, or the outcome in its own words when no check did.
+ * The list is a column where it fits and a drawer where it does not. Beside docked details on a screen
+ * without room for both, it steps aside to its numbers until the reader asks for the whole list again.
  */
-const unexplained = computed(() => {
-  const test = selectedTest.value;
-  if (!test || test.failure || test.outcome === "succeeded" || test.outcome === "skipped") return null;
-  return { outcome: test.outcome, ...failureReason(test) };
-});
+const railColumn = computed(() => Boolean(run.value) && railOpen.value && railFits.value);
+const railDrawer = computed(() => Boolean(run.value) && railOpen.value && !railFits.value);
+const railSlim = computed(() => railColumn.value && inspecting.value && inspectorDocks.value && !railRoomy.value && !railExpanded.value);
+watch(inspecting, open => { if (!open) railExpanded.value = false; });
+function toggleRail() {
+  if (railSlim.value) { railExpanded.value = true; return; }
+  railOpen.value = !railOpen.value;
+}
 
 /**
- * The test a test tab opens when none is chosen yet: the first that failed, then the first that went partial
- * or was cancelled, then the first that ran. That is the test a reader would look for first.
- */
-const defaultTest = computed<TestTrace | undefined>(() => {
-  const tests = run.value?.tests ?? [];
-  return tests.find(test => test.outcome === "failed")
-    ?? tests.find(test => test.outcome === "partial" || test.outcome === "cancelled")
-    ?? tests[0];
-});
-
-/**
- * Where opening a test lands. Beside a docked inspector the failing check is selected, because that is what
+ * Where opening a test lands. Beside docked details the failing check is selected, because that is what
  * the reader came for. As a sheet it would cover a small screen with what the failure card already says.
  */
 function landing(test: TestTrace): { span: string } | undefined {
@@ -199,39 +187,60 @@ function landing(test: TestTrace): { span: string } | undefined {
   return inspectorDocks.value && failing ? { span: failing.id } : undefined;
 }
 
-// Every tab is always there, in the same place: the test tabs open the chosen test, or the default one.
-const testFiles = computed<FileEntry[]>(() => [...(selectedTest.value?.artifacts.values() ?? [])]
-  .map(artifact => ({ artifact, detail: artifact.description })));
-
-const tabs = computed(() => {
-  const test = selectedTest.value ?? defaultTest.value;
-  const items: { id: string; label: string; href: string; route: Route }[] =
-    [{ id: "run", label: "Run", href: href({ name: "run" }), route: { name: "run" } }];
-  if (!test) return items;
+/** A test's address from the list: the view the reader is in, landing on its failure where details dock. */
+function testHref(test: TestTrace): string {
   const current = route.value;
-  const selection = selectedTest.value && current.name === "test" ? current.selection : landing(test);
-  const views: [TestView, string][] = [["story", "Story"], ["state", "State"], ["spans", "Spans"], ["files", "Files"]];
-  for (const [id, label] of views) {
-    const target: Route = { name: "test", testId: test.id, view: id, selection };
-    items.push({ id, label, href: href(target), route: target });
-  }
-  return items;
+  return href({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "story", selection: landing(test) });
+}
+
+const testTabs = computed(() => {
+  const test = selectedTest.value;
+  const current = route.value;
+  if (!test || current.name !== "test") return [];
+  const views: [TestViewId, string][] = [["story", "Story"], ["state", "State"], ["spans", "Spans"], ["files", "Files"]];
+  return views.map(([id, label]) => ({ id, label, href: href({ name: "test", testId: test.id, view: id, selection: current.selection }) }));
 });
 
 // The strip is a tab list: clicking a tab follows its link, and the arrow keys emit the same choice.
 function selectTab(id: string) {
-  const item = tabs.value.find(entry => entry.id === id);
-  if (item) navigate(item.route);
+  const current = route.value;
+  if (current.name === "test") navigate({ ...current, view: id as TestViewId });
 }
 
+/** The tests either side of this one, in the list's current filter and order. */
+const neighbours = computed(() => {
+  const test = selectedTest.value;
+  if (!test || !run.value) return {};
+  const list = orderedTests(run.value.tests);
+  const index = list.indexOf(test);
+  if (index < 0) return {};
+  const link = (entry: TestTrace | undefined) => entry ? { test: entry, href: testHref(entry) } : undefined;
+  return { previous: link(list[index - 1]), next: link(list[index + 1]) };
+});
+
+/** Where the reader is: the trace, the test, and what the details show. Each step is a link back to it. */
+const trail = computed<Crumb[]>(() => {
+  if (!run.value) return [];
+  const crumbs: Crumb[] = [{ label: fileName.value || "Run", href: "#/", title: `${fileName.value}: the run` }];
+  const test = selectedTest.value;
+  const current = route.value;
+  if (!test || current.name !== "test") return crumbs;
+  crumbs.push({ label: `${pad(test.number)} ${testTitle(test)}`, href: href({ name: "test", testId: test.id, view: current.view }) });
+  const selected = selectedSpan.value?.name ?? (selectedItem.value ? itemTitle(selectedItem.value) : undefined);
+  if (selected) crumbs.push({ label: selected, href: href(current) });
+  return crumbs;
+});
+
 function openPicker() { fileInput.value?.click(); }
-function showTest(test: TestTrace, selection?: { span: string }) {
+function showTest(test: TestTrace) {
   const current = route.value;
   // Switching test keeps the view the reader chose; only a first visit lands on the story.
-  // A caller that names an operation - a finding - keeps it; otherwise the test decides its landing.
-  const next = current.name === "test" ? current.view : "story";
-  navigate({ name: "test", testId: test.id, view: next, selection: selection ?? landing(test) });
+  navigate({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "story", selection: landing(test) });
   // On a narrow screen the test list is a drawer: picking a test is the reason it was opened.
+  if (!railFits.value) railOpen.value = false;
+}
+function showRun() {
+  navigate({ name: "run" });
   if (!railFits.value) railOpen.value = false;
 }
 function selectSpan(span: Span | undefined) {
@@ -258,6 +267,7 @@ async function loadBuffer(buffer: ArrayBuffer, name: string) {
     archive.value = opened;
     useSources(path => opened.readSource(path));
     fileName.value = name;
+    resetTestFilter();
   } catch (reason) {
     problem.value = reason instanceof TraceOpenError
       ? { kind: reason.problem, message: reason.message }
@@ -369,7 +379,8 @@ const problemTitle = computed(() => ({
 </script>
 
 <template>
-  <AppHeader :share="shareLink" @open="openPicker" />
+  <AppHeader :share="shareLink" :trail="trail" :rail="run ? { open: railOpen && !railSlim } : undefined"
+             @open="openPicker" @toggle-rail="toggleRail" />
   <input ref="fileInput" type="file" accept=".prototrace,application/zip" hidden @change="fileChanged">
   <main>
     <section v-if="!run" class="empty-state">
@@ -412,30 +423,23 @@ const problemTitle = computed(() => ({
       </div>
     </section>
 
-    <section v-else class="workspace" :class="{ railed: selectedTest && railOpen, docked: inspecting }"
+    <section v-else class="workspace" :class="{ railed: railColumn, slim: railSlim, docked: inspecting && inspectorDocks, sheet: inspecting && !inspectorDocks }"
              :style="{
                '--rail-width': railResize.width.value ? `${railResize.width.value}px` : undefined,
                '--inspector-width': inspectorResize.width.value ? `${inspectorResize.width.value}px` : undefined,
                '--inspector-sheet-height': sheetHeight === null ? undefined : `${sheetHeight}px`
              }">
       <a class="skip" href="#workspace-view">Skip to the view</a>
-      <div class="view-bar">
-        <!-- Always rendered so the tabs never shift; on the run screen the run itself is the list. -->
-        <AppButton variant="icon" class="rail-toggle" :class="{ inert: !selectedTest }" :disabled="!selectedTest"
-                   :label="railOpen ? 'Hide the test list' : 'Show the test list'" @click="railOpen = !railOpen">
-          <Icon name="sidebar" />
-        </AppButton>
-        <Tabs :items="tabs" :active="view" variant="underline" label="Views" panel="workspace-view" @select="selectTab" />
-      </div>
 
-      <button v-if="selectedTest && railOpen && !railFits" class="rail-scrim" type="button" aria-label="Close the test list"
-              @click="railOpen = false" />
-      <TestRail v-if="selectedTest && railOpen" :tests="run.tests" :selected="selectedTest" @select="showTest" />
-      <ColumnResizer v-if="selectedTest && railOpen" class="rail-resizer" label="Resize the test list"
+      <button v-if="railDrawer" class="rail-scrim" type="button" aria-label="Close the test list" @click="railOpen = false" />
+      <TestRail v-if="railColumn || railDrawer" :class="{ drawer: railDrawer }" :tests="run.tests" :counts="run.counts"
+                :selected="selectedTest" :at-run="!selectedTest && !missingTestId" :slim="railSlim" :href-for="testHref"
+                @select="showTest" @run="showRun" @expand="railExpanded = true" />
+      <ColumnResizer v-if="railColumn && !railSlim" class="rail-resizer" label="Resize the test list"
                      :min="railResize.min" :max="railResize.max" :now="railResize.width.value" edge="leading"
                      @start="railResize.start" @nudge="railResize.nudge" @reset="railResize.reset" />
 
-      <div ref="viewHost" class="view-host" id="workspace-view" role="tabpanel" tabindex="-1" :aria-labelledby="`workspace-view-tab-${view}`">
+      <div ref="viewHost" class="view-host" id="workspace-view" tabindex="-1">
         <div v-if="missingTestId" class="missing-test">
           <h2>This trace has no such test</h2>
           <p>The link names <code>{{ missingTestId }}</code>, which is not in {{ fileName }}. It may come from another run.</p>
@@ -446,38 +450,19 @@ const problemTitle = computed(() => ({
           <KeepAlive>
             <RunView v-if="!selectedTest" :run="run" :file-name="fileName" @select="showTest" @artifact="openArtifact = $event" />
           </KeepAlive>
-          <div v-if="selectedTest" class="test">
-            <header class="test-head">
-              <b>{{ pad(selectedTest.number) }}</b>
-              <div class="test-title">
-                <h1>{{ testTitle(selectedTest) }}</h1>
-                <p><span>{{ testGroup(selectedTest) }}</span><code>{{ testCodeName(selectedTest) }}</code></p>
-              </div>
-              <OutcomePill :outcome="selectedTest.outcome" :detail="formatDuration(selectedTest.duration)" />
-            </header>
-            <FailureCard v-if="selectedTest.failure && selectedTest.outcome !== 'succeeded'" :failure="selectedTest.failure"
-                         :outcome="selectedTest.outcome" :test="selectedTest" @select="selectSpan" />
-            <section v-else-if="unexplained" class="unexplained" :class="tone(unexplained.outcome)" aria-label="Why this test did not pass">
-              <i class="status" :class="tone(unexplained.outcome)" />
-              <p><strong>{{ unexplained.title }}</strong><span v-if="unexplained.detail">{{ unexplained.detail }}</span></p>
-            </section>
-            <StoryView v-if="view === 'story'" :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
-            <StateView v-else-if="view === 'state'" :test="selectedTest" :selected="itemSelection" :selected-span="selectedSpan?.id"
-                       @select-item="selectItem" @select-span="selectSpan" />
-            <Panel v-else-if="view === 'files'" title="Files" subtitle="Everything this test attached, in the order it produced them." pad="none">
-              <FileList :entries="testFiles" @open="openArtifact = $event" />
-            </Panel>
-            <SpansView v-else :test="selectedTest" :selected="selectedSpan?.id" @select="selectSpan" />
-          </div>
+          <TestView v-if="selectedTest" :test="selectedTest" :view="view" :tabs="testTabs"
+                    :selected-span="selectedSpan" :selected-item="selectedItem"
+                    :previous="neighbours.previous" :next="neighbours.next"
+                    @select-span="selectSpan" @select-item="selectItem" @artifact="openArtifact = $event" @tab="selectTab" />
         </template>
       </div>
 
-      <ColumnResizer v-if="inspecting" class="inspector-resizer" label="Resize the details"
+      <ColumnResizer v-if="inspecting && inspectorDocks" class="inspector-resizer" label="Resize the details"
                      :min="inspectorResize.min" :max="inspectorResize.max" :now="inspectorResize.width.value" edge="trailing"
                      @start="inspectorResize.start" @nudge="inspectorResize.nudge" @reset="inspectorResize.reset" />
       <Inspector v-if="selectedTest && inspecting" :test="selectedTest" :span="selectedSpan" :item="selectedItem"
                  @select="selectSpan" @item="selectItem" @artifact="openArtifact = $event" @close="selectSpan(undefined)" />
-      <button v-if="inspecting" class="inspector-handle" type="button"
+      <button v-if="inspecting && !inspectorDocks" class="inspector-handle" type="button"
               aria-label="Resize the details" title="Drag to resize, tap to expand"
               @pointerdown="startSheetDrag" @keydown.up.prevent="nudgeSheet(64)" @keydown.down.prevent="nudgeSheet(-64)" />
     </section>
@@ -487,73 +472,57 @@ const problemTitle = computed(() => ({
 </template>
 
 <style scoped>
-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); container-type: inline-size; }
+main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
+/*
+ * One row of columns: the test list, the view, the details. Which of them are columns is decided in the
+ * script (the widths change behaviour); the defaults below are clamps, and the reader can drag them.
+ */
 .workspace {
+  --rail-default: clamp(220px, 18vw, 290px);
+  --rail-slim: 56px;
+  --inspector-default: clamp(340px, 27vw, 460px);
   min-width: 0;
   min-height: 0;
   /* No bottom padding: the view scrolls to the window's edge, and keeps its breathing room inside the scroll. */
   padding: var(--space-3) clamp(10px, 1.4vw, 20px) 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--space-3);
 }
-.view-bar {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  border-bottom: 1px solid var(--border);
+.workspace.railed { grid-template-columns: var(--rail-width, var(--rail-default)) 7px minmax(0, 1fr); }
+.workspace.railed.slim { grid-template-columns: var(--rail-slim) minmax(0, 1fr); }
+.workspace.docked { grid-template-columns: minmax(0, 1fr) 7px var(--inspector-width, var(--inspector-default)); }
+.workspace.railed.docked {
+  grid-template-columns: var(--rail-width, var(--rail-default)) 7px minmax(0, 1fr) 7px var(--inspector-width, var(--inspector-default));
 }
-.view-bar > .tabs { flex: 0 0 auto; }
-.view-bar > button { margin-bottom: var(--space-1); }
-/* Held in place on the run screen so the tabs never move, but there is nothing for it to open there. */
-.rail-toggle.inert { visibility: hidden; }
+.workspace.railed.slim.docked { grid-template-columns: var(--rail-slim) minmax(0, 1fr) 7px var(--inspector-width, var(--inspector-default)); }
 /* The one scroller for a view. Its content runs to the bottom edge of the window and ends with its own
    margin, so a scrolled view is cut by the window - not by a strip of background above it. */
 .view-host { min-width: 0; min-height: 0; padding-bottom: var(--space-4); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 /* The rail and the docked inspector scroll inside themselves, so they keep the gap the view scrolls into. */
 .workspace > .rail { margin-bottom: var(--space-4); }
-
-.test { display: grid; gap: var(--space-3); }
-/* Keyboard readers jump past the rail and the tab strip straight to the view. */
+.workspace.docked > .inspector { margin-bottom: var(--space-4); }
+/* Keyboard readers jump past the rail straight to the view. */
 .skip { position: fixed; z-index: 60; top: var(--space-2); left: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--blueprint); border-radius: var(--radius-control); background: var(--surface); font-size: var(--text-meta); transform: translateY(-300%); }
 .skip:focus-visible { transform: none; }
-/* A test that stopped short with no failing operation still says why, in the failure card's shape. */
-.unexplained { padding: var(--space-3) var(--space-4); display: flex; align-items: flex-start; gap: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--dim); border-radius: var(--radius-control); background: var(--surface); }
-.unexplained.danger { border-left-color: var(--danger); background: var(--danger-soft); }
-.unexplained.warning { border-left-color: var(--warning); background: var(--warning-soft); }
-.unexplained .status { margin-top: var(--space-1); }
-.unexplained p { display: grid; gap: 2px; font-size: var(--text-meta); }
-.unexplained span { overflow-wrap: anywhere; font: var(--text-micro)/var(--leading) var(--font-mono); }
-.test-head { padding: var(--space-1) var(--space-1) 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: var(--space-3); }
-.test-head > b { padding-top: var(--space-1); color: var(--dim); font: var(--text-meta) var(--font-mono); }
-.test-title { min-width: 0; display: grid; gap: 2px; }
-.test-title h1 { font-size: var(--text-heading); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; }
-.test-title p { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); color: var(--muted); font-size: var(--text-micro); }
-.test-title code { overflow-wrap: anywhere; color: var(--dim); font-family: var(--font-mono); }
-.test-head :deep(.pill) { padding-top: var(--space-1); }
-/* Narrow: the outcome keeps its own row under the title instead of squeezing it. */
-@container (max-width: 560px) {
-  .test-head { grid-template-columns: auto minmax(0, 1fr); }
-  .test-head :deep(.pill) { grid-column: 2; padding-top: 0; }
+
+/* Below the column width the test list is a drawer over the view; picking a test or the scrim closes it. */
+.workspace > .rail.drawer {
+  position: fixed;
+  z-index: 51;
+  inset: 0 auto 0 0;
+  width: min(86vw, 340px);
+  margin: 0;
+  border-block: 0;
+  border-left: 0;
+  border-radius: 0 var(--radius-overlay) var(--radius-overlay) 0;
+  box-shadow: var(--elevation-overlay);
 }
+.rail-scrim { position: fixed; z-index: 50; inset: 0; padding: 0; border: 0; background: color-mix(in srgb, var(--pt-navy-abyss) 48%, transparent); cursor: default; }
 
-.empty-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
-/* The start panel's one control: the demos sidebar can be put away, and this brings it back. */
-.demos-toggle { position: absolute; top: var(--space-3); right: var(--space-3); z-index: 1; }
-.demos { display: grid; gap: var(--space-3); text-align: left; }
-.demos h2 { font-family: var(--font-ui); font-size: var(--text-title); font-weight: var(--weight-bold); color: var(--text); }
-.drop-zone h1 { margin-top: var(--space-3); }
-.drop-zone code { padding: 1px var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); font-family: var(--font-mono); font-size: var(--text-meta); }
-.drop-zone .problem { color: var(--danger); }
-
-/* The rail and the inspector become columns when there is room, and step aside when there is not.
-   Their widths are draggable, so the defaults are only a starting point. */
-.workspace { --rail-default: clamp(220px, 19vw, 300px); --inspector-default: clamp(340px, 28vw, 480px); }
-.rail-resizer, .inspector-resizer { display: none; }
-/* A definite height, not a max: the inspector's body is then always the thing that scrolls. */
-.workspace > .inspector {
+/* Below the docking width the details are a sheet with a definite height, so its body is always what scrolls. */
+.workspace.sheet > .inspector {
   position: fixed;
   z-index: 40;
   inset: auto 0 0 0;
@@ -562,6 +531,12 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
   border-bottom: 0;
   border-radius: var(--radius-overlay) var(--radius-overlay) 0 0;
   box-shadow: var(--elevation-overlay);
+}
+/* Under a sheet, the view keeps the sheet's height free at its end and scrolls a selection above it, so
+   nothing the reader picked hides behind the details it opened. */
+.workspace.sheet > .view-host {
+  padding-bottom: calc(var(--inspector-sheet-height, min(62dvh, 560px)) + var(--space-4));
+  scroll-padding-bottom: calc(var(--inspector-sheet-height, min(62dvh, 560px)) + var(--space-4));
 }
 /* The grabber is the sheet's one control: it sits on the sheet's top edge and moves it. */
 .inspector-handle {
@@ -591,46 +566,17 @@ main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: minmax(
 }
 .inspector-handle:hover::before { background: var(--muted); }
 .inspector-handle:active { cursor: grabbing; }
-/* Below the column width the test list is a drawer over the view; picking a test or the scrim closes it. */
-@container (max-width: 999px) {
-  .workspace.railed > .rail {
-    position: fixed;
-    z-index: 51;
-    inset: 0 auto 0 0;
-    width: min(86vw, 340px);
-    margin: 0;
-    border-block: 0;
-    border-left: 0;
-    border-radius: 0 var(--radius-overlay) var(--radius-overlay) 0;
-    box-shadow: var(--elevation-overlay);
-  }
-}
-/* Under a sheet, the view keeps the sheet's height free at its end and scrolls a selection above it, so
-   nothing the reader picked hides behind the details it opened. */
-@container (max-width: 1179px) {
-  .workspace.docked > .view-host {
-    padding-bottom: calc(var(--inspector-sheet-height, min(62dvh, 560px)) + var(--space-4));
-    scroll-padding-bottom: calc(var(--inspector-sheet-height, min(62dvh, 560px)) + var(--space-4));
-  }
-}
-.rail-scrim { position: fixed; z-index: 50; inset: 0; padding: 0; border: 0; background: color-mix(in srgb, var(--pt-navy-abyss) 48%, transparent); cursor: default; }
+
+.empty-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
+/* The start panel's one control: the demos sidebar can be put away, and this brings it back. */
+.demos-toggle { position: absolute; top: var(--space-3); right: var(--space-3); z-index: 1; }
+.demos { display: grid; gap: var(--space-3); text-align: left; }
+.demos h2 { font-family: var(--font-ui); font-size: var(--text-title); font-weight: var(--weight-bold); color: var(--text); }
+.drop-zone h1 { margin-top: var(--space-3); }
+.drop-zone code { padding: 1px var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); font-family: var(--font-mono); font-size: var(--text-meta); }
+.drop-zone .problem { color: var(--danger); }
 .missing-test { max-width: 560px; margin: var(--space-6) auto; padding: var(--space-5); display: grid; gap: var(--space-3); justify-items: start; border: 1px dashed var(--border-strong); border-radius: var(--radius-panel); }
 .missing-test h2 { margin: 0; font-size: var(--text-title); }
 .missing-test p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 .missing-test code { font-family: var(--font-mono); font-size: var(--text-meta); }
-@container (min-width: 1000px) {
-  .workspace.railed { grid-template-columns: var(--rail-width, var(--rail-default)) 7px minmax(0, 1fr); }
-  .workspace.railed > .view-bar { grid-column: 1 / -1; }
-  .rail-resizer { display: grid; }
-}
-@container (min-width: 1180px) {
-  .workspace.docked { grid-template-columns: minmax(0, 1fr) 7px var(--inspector-width, var(--inspector-default)); }
-  .workspace.railed.docked {
-    grid-template-columns: var(--rail-width, var(--rail-default)) 7px minmax(0, 1fr) 7px var(--inspector-width, var(--inspector-default));
-  }
-  .workspace.docked > .view-bar { grid-column: 1 / -1; }
-  .inspector-resizer { display: grid; }
-  .inspector-handle { display: none; }
-  .workspace > .inspector { position: static; height: auto; max-height: none; margin-bottom: var(--space-4); border-bottom: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: none; }
-}
 </style>

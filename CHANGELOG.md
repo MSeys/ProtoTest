@@ -5,6 +5,16 @@ All notable changes to ProtoTest are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 All ProtoTest packages share one version; breaking API changes are called out below.
 
+## [Unreleased]
+
+### Features
+
+- Viewer: one test list on every screen, led by the run, with one filter for every list and a path from the run to the open operation; each test is a link. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
+### Fixes
+
+- Viewer: the header keeps the brand, the path and the actions apart on a phone instead of drawing them over each other. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
 ## [1.1.0] - 2026-09-30
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the

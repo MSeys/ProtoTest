@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { Artifact, Run, Span, TestTrace } from "../trace/model";
 import { failureReason, formatDate, formatDuration, formatOffset, needsAttention, outcomeLabel, pad, phaseSegments, testCodeName, testGroup, testMatches, testTitle, timelinePercent, tone } from "../trace/format";
 import Panel from "../ui/Panel.vue";
 import TextInput from "../ui/TextInput.vue";
 import FilterChip from "../ui/FilterChip.vue";
+import OutcomeFilters from "../ui/OutcomeFilters.vue";
 import EmptyState from "../ui/EmptyState.vue";
 import FileList from "../ui/FileList.vue";
 import type { FileEntry } from "../ui/FileList.vue";
 import VisibilityStrip from "../ui/VisibilityStrip.vue";
+import { matchesOutcome, resetTestFilter, testFilter } from "../ui/testFilter";
 
 const props = defineProps<{ run: Run; fileName: string }>();
 const emit = defineEmits<{ select: [test: TestTrace, selection?: { span: string }]; artifact: [artifact: Artifact] }>();
@@ -21,10 +23,6 @@ const files = computed<FileEntry[]>(() => [
     artifact, owner: pad(test.number), detail: artifact.description ?? testTitle(test)
   })))
 ]);
-
-
-const query = ref("");
-const filter = ref<"all" | "attention">("all");
 
 const attention = computed(() => props.run.tests.filter(needsAttention)
   .sort((left, right) => (left.outcome === "failed" ? 0 : 1) - (right.outcome === "failed" ? 0 : 1) || left.number - right.number));
@@ -65,8 +63,9 @@ const verdict = computed(() => {
 
 const environment = computed(() => [props.run.environment.runtime, props.run.environment.os].filter(Boolean).join(" on "));
 
+/* The list follows the one test filter the rail shows, and keeps the run's own order: this list is a clock. */
 const visible = computed(() => props.run.tests.filter(test =>
-  (filter.value === "all" || needsAttention(test)) && testMatches(test, query.value)));
+  matchesOutcome(test, testFilter.outcome) && testMatches(test, testFilter.query)));
 
 /** Each test's phases placed on the run's own time axis, so parallel and slow tests show as such. */
 function bars(test: TestTrace) {
@@ -157,10 +156,8 @@ function bars(test: TestTrace) {
     <Panel title="Tests" subtitle="In the order they started. The bar is where the test ran within the run, split by phase." pad="none">
       <template #actions>
         <div class="filters">
-          <FilterChip label="All" :count="run.tests.length" :active="filter === 'all'" @select="filter = 'all'" />
-          <FilterChip label="Needs attention" :count="attention.length" :tone="attention.length ? 'danger' : 'neutral'"
-                      :active="filter === 'attention'" @select="filter = 'attention'" />
-          <TextInput v-model="query" type="search" placeholder="Find a test" label="Find a test" class="find" />
+          <OutcomeFilters :tests="run.tests" />
+          <TextInput v-model="testFilter.query" type="search" placeholder="Find a test" label="Find a test" class="find" />
         </div>
       </template>
       <div class="legend" aria-hidden="true">
@@ -190,7 +187,7 @@ function bars(test: TestTrace) {
         </button>
       </div>
       <EmptyState v-else message="No test matches this filter.">
-        <FilterChip label="Show all tests" @select="filter = 'all'; query = ''" />
+        <FilterChip label="Show all tests" @select="resetTestFilter()" />
       </EmptyState>
     </Panel>
 

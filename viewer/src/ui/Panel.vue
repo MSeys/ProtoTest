@@ -41,7 +41,8 @@ defineProps<{
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.head.sticky { position: sticky; top: 0; z-index: 1; }
+/* A sticky head stops under whatever the view keeps pinned above it (the test's view tabs). */
+.head.sticky { position: sticky; top: var(--sticky-offset, 0px); z-index: 1; }
 .titles { min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
 .text { min-width: 0; display: grid; }
 h2 { font-family: var(--font-ui); font-size: var(--text-strong); font-weight: var(--weight-bold); letter-spacing: 0; line-height: var(--leading-tight); }

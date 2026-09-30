@@ -44,6 +44,18 @@ export function needsAttention(test: TestTrace): boolean {
   return test.outcome !== "succeeded" && test.outcome !== "skipped";
 }
 
+/** The run in words, what went wrong first: "4 failed, 1 partial, 14 passed". Every recorded outcome is named. */
+export function verdictParts(counts: Record<Outcome, number>): { text: string; tone: ReturnType<typeof tone> }[] {
+  const parts: { text: string; tone: ReturnType<typeof tone> }[] = [];
+  if (counts.failed) parts.push({ text: `${counts.failed} failed`, tone: "danger" });
+  if (counts.partial) parts.push({ text: `${counts.partial} partial`, tone: "warning" });
+  if (counts.cancelled) parts.push({ text: `${counts.cancelled} cancelled`, tone: "warning" });
+  if (counts.unknown) parts.push({ text: `${counts.unknown} unknown`, tone: "neutral" });
+  parts.push({ text: `${counts.succeeded} passed`, tone: "success" });
+  if (counts.skipped) parts.push({ text: `${counts.skipped} skipped`, tone: "neutral" });
+  return parts;
+}
+
 /** Why a test needs attention, in the words of the check that decided it. */
 export function failureReason(test: TestTrace): { title: string; detail: string } {
   const failure = test.failure;

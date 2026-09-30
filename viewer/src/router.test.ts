@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { href } from "./router";
+import { href, parse } from "./router";
 
 // The address names the view and the test, and carries the selection: a link to a failing check shares as one.
 describe("router addresses", () => {
@@ -8,12 +8,12 @@ describe("router addresses", () => {
   });
 
   it("names a test view", () => {
-    expect(href({ name: "test", testId: "t1", view: "story" })).toBe("#/test/t1/story");
+    expect(href({ name: "test", testId: "t1", view: "steps" })).toBe("#/test/t1/steps");
   });
 
   it("carries a span selection", () => {
-    expect(href({ name: "test", testId: "t1", view: "story", selection: { span: "s1" } }))
-      .toBe("#/test/t1/story?span=s1");
+    expect(href({ name: "test", testId: "t1", view: "steps", selection: { span: "s1" } }))
+      .toBe("#/test/t1/steps?span=s1");
   });
 
   it("carries an item selection", () => {
@@ -22,6 +22,15 @@ describe("router addresses", () => {
   });
 
   it("escapes test ids", () => {
-    expect(href({ name: "test", testId: "a/b c", view: "story" })).toBe("#/test/a%2Fb%20c/story");
+    expect(href({ name: "test", testId: "a/b c", view: "steps" })).toBe("#/test/a%2Fb%20c/steps");
+  });
+
+  // A link shared before a view was renamed still opens the view it meant.
+  it("reads a renamed view's old name", () => {
+    expect(parse("#/test/t1/story?span=s1")).toEqual({ name: "test", testId: "t1", view: "steps", selection: { span: "s1" } });
+  });
+
+  it("opens the steps for a view it does not know", () => {
+    expect(parse("#/test/t1/nothing")).toMatchObject({ view: "steps" });
   });
 });

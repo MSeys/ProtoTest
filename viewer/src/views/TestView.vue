@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { Artifact, Item, Span, TestTrace } from "../trace/model";
-import { failureReason, formatDuration, pad, testCodeName, testGroup, testTitle, tone } from "../trace/format";
+import { formatDuration, pad, testCodeName, testGroup, testTitle } from "../trace/format";
 import type { TestView as TestViewId } from "../router";
-import StoryView from "./StoryView.vue";
+import StepsView from "./StepsView.vue";
 import StateView from "./StateView.vue";
 import SpansView from "./SpansView.vue";
 import Tabs from "../ui/Tabs.vue";
-import FailureCard from "../ui/FailureCard.vue";
+import VerdictBar from "../ui/VerdictBar.vue";
+import PhaseBand from "../ui/PhaseBand.vue";
 import OutcomePill from "../ui/OutcomePill.vue";
 import Panel from "../ui/Panel.vue";
 import FileList from "../ui/FileList.vue";
@@ -32,15 +33,8 @@ const emit = defineEmits<{ selectSpan: [span: Span | undefined]; selectItem: [it
 const itemSelection = computed(() => props.selectedItem ? { kind: props.selectedItem.kind, id: props.selectedItem.id } : undefined);
 const files = computed<FileEntry[]>(() => [...props.test.artifacts.values()].map(artifact => ({ artifact, detail: artifact.description })));
 
-/*
- * A test that stopped short without a failing operation - cancelled, or partial with nothing to blame -
- * still answers why: the check that decided it, or the outcome in its own words when no check did.
- */
-const unexplained = computed(() => {
-  const test = props.test;
-  if (test.failure || test.outcome === "succeeded" || test.outcome === "skipped") return null;
-  return { outcome: test.outcome, ...failureReason(test) };
-});
+/* Every outcome short of pass and skip says why, even when no operation failed. */
+const explains = computed(() => props.test.outcome !== "succeeded" && props.test.outcome !== "skipped");
 </script>
 
 <template>
@@ -64,18 +58,14 @@ const unexplained = computed(() => {
       <OutcomePill :outcome="test.outcome" :detail="formatDuration(test.duration)" />
     </header>
 
-    <FailureCard v-if="test.failure && test.outcome !== 'succeeded'" :failure="test.failure"
-                 :outcome="test.outcome" :test="test" @select="emit('selectSpan', $event)" />
-    <section v-else-if="unexplained" class="unexplained" :class="tone(unexplained.outcome)" aria-label="Why this test did not pass">
-      <i class="status" :class="tone(unexplained.outcome)" />
-      <p><strong>{{ unexplained.title }}</strong><span v-if="unexplained.detail">{{ unexplained.detail }}</span></p>
-    </section>
+    <VerdictBar v-if="explains" :test="test" @select="emit('selectSpan', $event)" />
+    <PhaseBand :test="test" />
 
     <div class="views">
       <Tabs :items="tabs" :active="view" variant="underline" label="Views of this test" panel="test-view" @select="emit('tab', $event)" />
     </div>
     <div id="test-view" role="tabpanel" :aria-labelledby="`test-view-tab-${view}`">
-      <StoryView v-if="view === 'story'" :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
+      <StepsView v-if="view === 'steps'" :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
       <StateView v-else-if="view === 'state'" :test="test" :selected="itemSelection" :selected-span="selectedSpan?.id"
                  @select-item="emit('selectItem', $event)" @select-span="emit('selectSpan', $event)" />
       <Panel v-else-if="view === 'files'" title="Files" subtitle="Everything this test attached, in the order it produced them." pad="none">
@@ -101,13 +91,6 @@ span.step { visibility: hidden; }
 .test-title p { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); color: var(--muted); font-size: var(--text-meta); }
 .test-title code { overflow-wrap: anywhere; color: var(--dim); font-family: var(--font-mono); }
 .test-head :deep(.pill) { padding-top: var(--space-1); }
-/* A test that stopped short with no failing operation still says why, in the failure card's shape. */
-.unexplained { padding: var(--space-3) var(--space-4); display: flex; align-items: flex-start; gap: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--dim); border-radius: var(--radius-control); background: var(--surface); }
-.unexplained.danger { border-left-color: var(--danger); background: var(--danger-soft); }
-.unexplained.warning { border-left-color: var(--warning); background: var(--warning-soft); }
-.unexplained .status { margin-top: var(--space-1); }
-.unexplained p { display: grid; gap: 2px; font-size: var(--text-body); }
-.unexplained span { overflow-wrap: anywhere; font: var(--text-meta)/var(--leading) var(--font-mono); }
 /* The view tabs stay in reach while the view scrolls under them. */
 .views { position: sticky; top: 0; z-index: 3; border-bottom: 1px solid var(--border); background: var(--bg); }
 

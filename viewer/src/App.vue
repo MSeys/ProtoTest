@@ -144,7 +144,7 @@ const missingTestId = computed(() => {
   const current = route.value;
   return current.name === "test" && run.value && !selectedTest.value ? current.testId : undefined;
 });
-const view = computed<TestViewId>(() => route.value.name === "test" ? route.value.view : "story");
+const view = computed<TestViewId>(() => route.value.name === "test" ? route.value.view : "steps");
 
 // The selection lives in the address, so a link to a failing check survives a reload and a share.
 const selectedSpan = computed<Span | undefined>(() => {
@@ -190,14 +190,14 @@ function landing(test: TestTrace): { span: string } | undefined {
 /** A test's address from the list: the view the reader is in, landing on its failure where details dock. */
 function testHref(test: TestTrace): string {
   const current = route.value;
-  return href({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "story", selection: landing(test) });
+  return href({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "steps", selection: landing(test) });
 }
 
 const testTabs = computed(() => {
   const test = selectedTest.value;
   const current = route.value;
   if (!test || current.name !== "test") return [];
-  const views: [TestViewId, string][] = [["story", "Story"], ["state", "State"], ["spans", "Spans"], ["files", "Files"]];
+  const views: [TestViewId, string][] = [["steps", "Steps"], ["state", "State"], ["spans", "Spans"], ["files", "Files"]];
   return views.map(([id, label]) => ({ id, label, href: href({ name: "test", testId: test.id, view: id, selection: current.selection }) }));
 });
 
@@ -234,8 +234,8 @@ const trail = computed<Crumb[]>(() => {
 function openPicker() { fileInput.value?.click(); }
 function showTest(test: TestTrace) {
   const current = route.value;
-  // Switching test keeps the view the reader chose; only a first visit lands on the story.
-  navigate({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "story", selection: landing(test) });
+  // Switching test keeps the view the reader chose; only a first visit lands on the steps.
+  navigate({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "steps", selection: landing(test) });
   // On a narrow screen the test list is a drawer: picking a test is the reason it was opened.
   if (!railFits.value) railOpen.value = false;
 }
@@ -319,7 +319,7 @@ async function loadDemo(key = "full") {
     source.value = { kind: "demo", key: entry.key };
     syncQuery(`?demo=${entry.key === "full" ? "1" : entry.key}`);
     if (entry.key !== "full" && run.value?.tests.length === 1) {
-      replace({ name: "test", testId: run.value.tests[0].id, view: "story" });
+      replace({ name: "test", testId: run.value.tests[0].id, view: "steps" });
     }
   } catch (reason) {
     problem.value = { kind: "load", message: reason instanceof Error ? reason.message : "The demo trace could not be opened." };

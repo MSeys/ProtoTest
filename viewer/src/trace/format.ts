@@ -261,3 +261,27 @@ export function itemKindLabel(item: Item): KindLabel {
   const label = item.kind.charAt(0).toLocaleUpperCase() + item.kind.slice(1);
   return { id: families[item.kind.toLocaleLowerCase()] ?? "data", label };
 }
+
+function descendants(span: Span): Span[] {
+  return span.children.flatMap(child => [child, ...descendants(child)]);
+}
+
+/**
+ * A folded phase in one line: how many operations ran, what the framework set up or released, and the
+ * scenario work inside it with its time, so the reader knows whether to open it.
+ */
+export function phaseSummary(lifecycle: Span): string {
+  const all = descendants(lifecycle);
+  const count = (kind: string) => all.filter(span => span.kind === kind).length;
+  const parts = [`${all.length} ${plural(all.length, "operation")}`];
+  const clients = count("client.initialize");
+  const released = count("resource.release");
+  const published = count("attachment.publish");
+  if (clients) parts.push(`${clients} ${plural(clients, "client")} initialized`);
+  if (released) parts.push(`${released} ${plural(released, "resource")} released`);
+  if (published) parts.push(`${published} ${plural(published, "file")} published`);
+  const work = all.filter(span => /^data\.(create|cleanup)$/.test(span.kind) || span.kind === "http.request" || span.kind === "graphql.operation" || span.kind.startsWith("messaging."));
+  for (const span of work.slice(0, 2)) parts.push(`${span.name} (${formatDuration(span.duration)})`);
+  if (work.length > 2) parts.push(`and ${work.length - 2} more`);
+  return parts.join(", ");
+}

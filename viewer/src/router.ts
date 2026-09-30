@@ -1,7 +1,10 @@
 import { ref } from "vue";
 
-export type TestView = "story" | "state" | "spans" | "files";
-export const testViews: TestView[] = ["story", "state", "spans", "files"];
+export type TestView = "steps" | "state" | "spans" | "files";
+export const testViews: TestView[] = ["steps", "state", "spans", "files"];
+
+/** Names a view had before, so a link shared then still opens the view it meant. */
+const viewAliases: Record<string, TestView> = { story: "steps" };
 
 /** What the inspector shows: an operation, or a tracked item by kind and id. */
 export type Selection = { span: string } | { item: { kind: string; id: string } };
@@ -12,10 +15,11 @@ export type Route =
 
 export const route = ref<Route>(parse(location.hash));
 
-function parse(hash: string): Route {
+export function parse(hash: string): Route {
   const match = /^#\/test\/([^/?#]+)(?:\/([a-z]+))?(?:\?(.*))?/.exec(hash);
   if (!match) return { name: "run" };
-  const view = (testViews as string[]).includes(match[2] ?? "") ? match[2] as TestView : "story";
+  const named = viewAliases[match[2] ?? ""] ?? match[2] ?? "";
+  const view = (testViews as string[]).includes(named) ? named as TestView : "steps";
   // The selection belongs in the address: a link to a failure has to survive a reload and a share.
   const query = new URLSearchParams(match[3] ?? "");
   const span = query.get("span") ?? query.get("entry");

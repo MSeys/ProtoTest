@@ -6,9 +6,20 @@ description: "Run your ASP.NET Core application in-process with WebApplicationFa
 
 # ASP.NET Core
 
-## What it adds
-
 `ProtoTest.AspNetCore` runs your ASP.NET Core application in-process with `WebApplicationFactory`, and hands its `HttpClient` to the REST and GraphQL clients. No deployed environment, no ports.
+
+```csharp
+[ProtoTest]
+public async Task Health_endpoint_answers()
+{
+    using var response = await Proto.Context.Rest("Api").GetAsync("/health");
+    response.Should.HaveHttpStatus(HttpStatusCode.OK);
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed Health_endpoint_answers`, and the trace records an `aspnetcore.server.initialize` event with a `server` entity for the application.
+
+## What it adds
 
 The in-memory test host has no address a browser can open; [Hosting a browser journey](#hosting-a-browser-journey) puts the same application on a real loopback port or in its own container when a test needs one.
 
@@ -44,30 +55,7 @@ protected override void Configure(IProtoHostBuilder builder) => ProtoTestHost.Fo
 
 `ProtoTestHost.For` composes exactly `AddApplication("Api", app => app.AddAspNetCoreServer<Program>())`; it adds no behavior of its own, so the sections below apply unchanged. An unnamed `Proto.Context.Rest()` in a suite without a REST client still reaches the application through its in-process transport; register the client when the test needs REST options, attachments or the `REST` capability.
 
-```csharp
-public static IProtoApplicationBuilder AddAspNetCoreServer<TProgram>(
-    this IProtoApplicationBuilder application,
-    Action<IWebHostBuilder>? configureWebHost = null,
-    Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
-    AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun)
-    where TProgram : class;
-```
-
-The server is registered under the **application name**. `TProgram` is your application's entry point; for minimal APIs, add `public partial class Program;` to the application so the test project can see it.
-
-The same registration exists on a host builder, for suites that drive the server directly:
-
-```csharp
-public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
-    this IProtoHostBuilder builder,
-    string name = "Default",
-    Action<IWebHostBuilder>? configureWebHost = null,
-    Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
-    AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun)
-    where TProgram : class;
-```
-
-Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name: `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name (the same `TProgram` under one name is a no-op, a different one throws naming both programs), while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside; see [Real server or in-process?](#real-server-or-in-process).
+The application overload registers the server under the application name; the host overload registers it under a name (`"Default"`). Both declare the `ASP.NET Core` server capability and step aside when the application's address is configured. The [reference](#reference) lists the signatures and the rules.
 
 ### One application, or one per test
 
@@ -84,67 +72,9 @@ builder.AddApplication("Api", app => app.AddAspNetCoreServer<Program>(lifetime: 
 
 Choose `PerTest` when the application keeps state you can't partition (static caches, a single in-memory database without tenant separation), or when tests leave state behind in singleton services, such as a recording fake.
 
-### Options and keys
-
-`ProtoTest.AspNetCore` has no options type of its own. Configuration that affects it:
-
-| Key | Type | Default | |
-| --- | --- | --- | --- |
-| `ProtoTest:Applications:{app}:BaseUrl` | string | unset → the in-process transport | set it to point the application at a real deployment |
-| `ProtoTest:Applications:{app}:Web:Pages:Include` | scalar string or array of globs | empty | keep only matching page paths |
-| `ProtoTest:Applications:{app}:Web:Pages:Exclude` | scalar string or array of globs | empty | drop matching page paths |
-| `ProtoTest:TestSupport` | `"1"` / `"true"` | unset → the surface is absent | a [sample-side convention](#the-test-support-convention), not a package API |
-
-The glob syntax is `*` for any run of characters and `?` for exactly one, case-insensitive. Include is applied first, then exclude.
-
-### Context API
-
-```csharp
-WebApplicationFactory<TProgram> ServerFactory<TProgram>(this ProtoExecutionContext context, string? name = null)
-    where TProgram : class;
-IServiceScope CreateServerScope<TProgram>(this ProtoExecutionContext context, string? name = null)
-    where TProgram : class;
-IServiceProvider ApplicationServices<TProgram>(this ProtoExecutionContext context, string? name = null)
-    where TProgram : class;
-TService ServerService<TProgram, TService>(this ProtoExecutionContext context, string? name = null)
-    where TProgram : class where TService : notnull;
-void Override<TService>(this ProtoExecutionContext context, TService instance, string? name = null)
-    where TService : class;
-void Override<TService>(this ProtoExecutionContext context, Func<TService> factory, string? name = null)
-    where TService : class;
-void Override<TService, TImplementation>(this ProtoExecutionContext context, string? name = null)
-    where TService : class where TImplementation : class, TService;
-```
-
-When `name` is omitted, each method targets the application selected for the test, then falls back to `"Default"`. `ServerFactory` returns the registered factory; `CreateServerScope` creates a scope from its container that **you** own and dispose. `ApplicationServices` returns the test's own keyed scope over the application, created on first use and disposed with the test, so scoped domain services (repositories, handlers, a `DbContext`) resolve from it; when no server is registered under the resolved name it throws an `InvalidOperationException` naming the expected `AddAspNetCoreServer<TProgram>("{key}")` call, or the configured address and the missing in-process server when the application's address is configured. `ServerService` is `ApplicationServices(...).GetRequiredService<TService>()`.
-
-```csharp
-var emails = Proto.Context.ServerService<Program, IEmailSender>("Api");
-
-using var scope = Proto.Context.CreateServerScope<Program>("Api");
-var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-```
-
-`ServerFactory<TProgram>()` also gives you the underlying `TestServer`: the GraphQL [WebSocket factory](./graphql/subscriptions.md#supplying-your-own-websocket) uses it to open in-process WebSockets. The per-test scope itself is registered as a resource named `application:services:{name}` of kind `"application"`.
-
 ## The tasks
 
-```csharp
-builder.AddApplication("Api", app => app
-    .AddAspNetCoreServer<Program>()
-    .AddRest(rest => rest.AddClient("Api")));
-```
-
-```csharp
-[ProtoTest]
-public async Task Health_endpoint_answers()
-{
-    using var response = await Proto.Context.Rest("Api").GetAsync("/health");
-    response.Should.HaveHttpStatus(HttpStatusCode.OK);
-}
-```
-
-The sample suite's full registration, an in-process application sharing its store with the tests, is in [Setup.cs](../../../samples/Northstar.ProtoTest/Setup.cs).
+The `Health_endpoint_answers` test above is the whole pattern: compose the server with its client, call it, assert.
 
 ### Going further
 
@@ -215,6 +145,78 @@ app.AddAspNetCoreServer<Program>(webHost => webHost.AddTestUserAuthentication())
 ```
 
 The handler decodes the `ProtoTest-User` header a test's [`[SignedInAs]`](./rest/authentication.md#built-in-test-user) identity travels in and authenticates the request as that user: the name, a `ClaimTypes.Role` claim per role and the declared claims. It becomes the application's default authentication scheme, so the application's own `[Authorize]`, role checks and policies decide - a `[SignedInAs("alice", "admin")]` test reaches an admin endpoint, a `[SignedInAs("bob", "viewer")]` test gets the application's own `403`. No header means no result: anonymous requests stay anonymous and are challenged as usual.
+
+## Reference
+
+```csharp
+public static IProtoApplicationBuilder AddAspNetCoreServer<TProgram>(
+    this IProtoApplicationBuilder application,
+    Action<IWebHostBuilder>? configureWebHost = null,
+    Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
+    AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun)
+    where TProgram : class;
+```
+
+The server is registered under the **application name**. `TProgram` is your application's entry point; for minimal APIs, add `public partial class Program;` to the application so the test project can see it.
+
+The same registration exists on a host builder, for suites that drive the server directly:
+
+```csharp
+public static IProtoHostBuilder AddAspNetCoreServer<TProgram>(
+    this IProtoHostBuilder builder,
+    string name = "Default",
+    Action<IWebHostBuilder>? configureWebHost = null,
+    Action<WebApplicationFactoryClientOptions>? configureClientOptions = null,
+    AspNetCoreServerLifetime lifetime = AspNetCoreServerLifetime.PerRun)
+    where TProgram : class;
+```
+
+Both overloads register a `server` capability named `ASP.NET Core` and expose the application's client under the server name: `"{name}:Factory"` for the `WebApplicationFactory<TProgram>` and `{name}` for the `HttpClient`. Registration is per server name: the host overload keeps the first registration for a name (the same `TProgram` under one name is a no-op, a different one throws naming both programs), while the application overload has no whole-call guard and lets the client initializer pick the first server that initializes. The application overload also registers the application's default transport, so an HTTP client with no configured base URL reuses this server. When the environment configures the application's address, both the server and its capability step aside; see [Real server or in-process?](#real-server-or-in-process).
+
+### Options and keys
+
+`ProtoTest.AspNetCore` has no options type of its own. Configuration that affects it:
+
+| Key | Type | Default | |
+| --- | --- | --- | --- |
+| `ProtoTest:Applications:{app}:BaseUrl` | string | unset → the in-process transport | set it to point the application at a real deployment |
+| `ProtoTest:Applications:{app}:Web:Pages:Include` | scalar string or array of globs | empty | keep only matching page paths |
+| `ProtoTest:Applications:{app}:Web:Pages:Exclude` | scalar string or array of globs | empty | drop matching page paths |
+| `ProtoTest:TestSupport` | `"1"` / `"true"` | unset → the surface is absent | a [sample-side convention](#the-test-support-convention), not a package API |
+
+The glob syntax is `*` for any run of characters and `?` for exactly one, case-insensitive. Include is applied first, then exclude.
+
+### Context API
+
+```csharp
+WebApplicationFactory<TProgram> ServerFactory<TProgram>(this ProtoExecutionContext context, string? name = null)
+    where TProgram : class;
+IServiceScope CreateServerScope<TProgram>(this ProtoExecutionContext context, string? name = null)
+    where TProgram : class;
+IServiceProvider ApplicationServices<TProgram>(this ProtoExecutionContext context, string? name = null)
+    where TProgram : class;
+TService ServerService<TProgram, TService>(this ProtoExecutionContext context, string? name = null)
+    where TProgram : class where TService : notnull;
+void Override<TService>(this ProtoExecutionContext context, TService instance, string? name = null)
+    where TService : class;
+void Override<TService>(this ProtoExecutionContext context, Func<TService> factory, string? name = null)
+    where TService : class;
+void Override<TService, TImplementation>(this ProtoExecutionContext context, string? name = null)
+    where TService : class where TImplementation : class, TService;
+```
+
+When `name` is omitted, each method targets the application selected for the test, then falls back to `"Default"`. `ServerFactory` returns the registered factory; `CreateServerScope` creates a scope from its container that **you** own and dispose. `ApplicationServices` returns the test's own keyed scope over the application, created on first use and disposed with the test, so scoped domain services (repositories, handlers, a `DbContext`) resolve from it; when no server is registered under the resolved name it throws an `InvalidOperationException` naming the expected `AddAspNetCoreServer<TProgram>("{key}")` call, or the configured address and the missing in-process server when the application's address is configured. `ServerService` is `ApplicationServices(...).GetRequiredService<TService>()`.
+
+```csharp
+var emails = Proto.Context.ServerService<Program, IEmailSender>("Api");
+
+using var scope = Proto.Context.CreateServerScope<Program>("Api");
+var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+```
+
+`ServerFactory<TProgram>()` also gives you the underlying `TestServer`: the GraphQL [WebSocket factory](./graphql/subscriptions.md#supplying-your-own-websocket) uses it to open in-process WebSockets. The per-test scope itself is registered as a resource named `application:services:{name}` of kind `"application"`.
+
+The sample suite's full registration, an in-process application sharing its store with the tests, is in [Setup.cs](../../../samples/Northstar.ProtoTest/Setup.cs).
 
 ## In the trace and coverage
 

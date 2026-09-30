@@ -19,12 +19,15 @@ const emit = defineEmits<{ open: [artifact: Artifact] }>();
 
 const owned = computed(() => props.entries.some(entry => entry.owner));
 const query = ref("");
+const searching = computed(() => query.value.trim().length > 0);
 const visible = computed(() => {
   const needle = query.value.trim().toLowerCase();
   if (!needle) return props.entries;
   return props.entries.filter(entry => [entry.artifact.name, entry.artifact.mediaType, entry.owner ?? "", entry.detail ?? ""]
     .some(field => field.toLowerCase().includes(needle)));
 });
+/* No files at all is a fact about the run; no match is a fact about the search. Only one of those is news. */
+const emptyMessage = computed(() => props.entries.length ? "No file matches this search." : "No files were attached.");
 </script>
 
 <template>
@@ -42,8 +45,8 @@ const visible = computed(() => {
         <small class="file-size">{{ entry.artifact.error ?? formatBytes(entry.artifact.sizeBytes) }}</small>
       </button>
     </div>
-    <EmptyState v-else message="No file matches this search.">
-      <FilterChip label="Show all files" @select="query = ''" />
+    <EmptyState v-else :message="emptyMessage">
+      <FilterChip v-if="searching" label="Show all files" @select="query = ''" />
     </EmptyState>
   </div>
 </template>

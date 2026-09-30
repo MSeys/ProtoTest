@@ -1,111 +1,64 @@
-/* The home page is the marketing surface: fluid type, intrinsic columns, section rhythm built from the
-   spacing scale. Every value is a token; the hero opts into the blueprint surface in the markup. */
+/* The home page: the prototype claim beside the test itself, then the commands, what the run
+   records, one failure explained, the protocols, and the measured proof. Every value is a token;
+   the hero opts into the blueprint surface in the markup, and every visual sits in a Frame. */
 
 .hero {
   position: relative;
   overflow: hidden;
-  padding: calc(var(--space-7) * 2.5) 0 calc(var(--space-7) * 2.25);
+  padding: calc(var(--space-7) * 1.75) 0;
   border-bottom: 1px solid var(--border-strong);
   background:
-    radial-gradient(circle at 72% 38%, color-mix(in srgb, var(--pt-cyan) 16%, transparent), transparent 42%),
+    radial-gradient(circle at 38% 0%, color-mix(in srgb, var(--pt-cyan) 14%, transparent), transparent 46%),
     linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
     var(--pt-navy-deep);
   color: var(--text);
 }
 
+/* The claim and the failure frame sit side by side and stack on their own width, so 820 and 390 read
+   as one column without a breakpoint. */
+.heroSplit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr));
+  gap: var(--space-7) var(--space-6);
+  align-items: center;
+}
+
+.heroCopy { min-width: 0; }
+
 .eyebrow {
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
   color: var(--pt-cyan);
   font: var(--weight-semibold) var(--text-meta) var(--font-mono);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
 }
 
-.heroInner {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
-  gap: calc(var(--space-7) * 1.5);
-  align-items: center;
-}
-
 .heroTitle {
-  margin-bottom: var(--space-5);
+  margin: 0;
+  max-width: 20ch;
   color: var(--pt-white);
-  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
-  line-height: 1.04;
+  font-size: clamp(1.9rem, 3.4vw, 3rem);
+  line-height: 1.05;
   letter-spacing: var(--tracking-display);
 }
 
 .heroLead {
-  max-width: 48ch;
-  margin-bottom: var(--space-5);
+  max-width: 52ch;
+  margin: var(--space-4) 0 0;
   color: var(--muted);
   font-size: clamp(1rem, 1.1vw, 1.08rem);
-  line-height: 1.62;
-}
-
-/* The line under the command box: what the pasted commands leave behind. */
-.heroNext {
-  max-width: 48ch;
-  margin-top: var(--space-3);
-  margin-bottom: 0;
-  color: var(--muted);
-  font-size: var(--text-meta);
   line-height: 1.6;
 }
 
-.heroNext code {
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 0.92em;
-}
-
-/* The quiet route under the command box: the one path for a reader who is still learning. */
-.heroLearn { margin-top: var(--space-5); margin-bottom: 0; font-weight: var(--weight-semibold); }
-
-/* The proof strip between the hero and the paths: measured values in mono, the prose beside them. One row
-   that wraps, no cards: the numbers are evidence, not decoration. */
-.proof {
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-}
-
-.proofInner {
+.heroButtons {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-3) var(--space-6);
-  padding-top: var(--space-5);
-  padding-bottom: var(--space-5);
+  gap: var(--space-3);
+  margin-top: var(--space-6);
 }
 
-.proofLead { color: var(--muted); font: var(--weight-semibold) var(--text-meta) var(--font-ui); }
-
-.proofFacts {
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-3) var(--space-7);
-}
-
-.proofFact { display: flex; align-items: baseline; gap: var(--space-2); color: inherit; text-decoration: none; }
-.proofFact:hover .proofValue { text-decoration: underline; text-underline-offset: 2px; }
-
-.proofValue {
-  color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-title) var(--font-mono);
-  white-space: nowrap;
-}
-
-.proofLabel { max-width: 34ch; color: var(--muted); font-size: var(--text-meta); line-height: 1.45; }
-
-.heroButtons { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-
-/* The viewer's button roles, scaled for a page CTA. */
+/* The viewer's button roles, at page scale. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -122,89 +75,171 @@
 
 .btnPrimary { background: var(--blueprint); color: var(--bg); font-weight: var(--weight-bold); }
 .btnPrimary:hover { background: color-mix(in srgb, var(--blueprint) 85%, white); color: var(--bg); }
+.btnGhost { border-color: color-mix(in srgb, var(--pt-white) 32%, transparent); color: var(--pt-white); }
+.btnGhost:hover { border-color: var(--pt-white); color: var(--pt-white); }
 
-.section { padding: calc(var(--space-7) * 2) 0; }
-.sectionAlt { background: var(--surface); }
+.heroNote {
+  max-width: 48ch;
+  margin: var(--space-4) 0 0;
+  color: var(--dim);
+  font-size: var(--text-meta);
+  line-height: 1.6;
+}
 
-.sectionHead { max-width: 720px; margin: 0 auto var(--space-7); text-align: center; }
+.heroFrame { min-width: 0; }
+
+/* The head of a Frame: which run, which file. */
+.frameMeta { color: var(--muted); font: var(--text-meta) var(--font-mono); }
+
+/* A trace row, in the viewer's grammar: a kind chip, the entry, and the detail the run recorded. */
+.traceRows { margin: 0; padding: 0; list-style: none; }
+
+.traceRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.traceRow:first-child { border-top: 0; }
+
+.traceRow[data-status='failed'] { background: var(--danger-soft); box-shadow: inset 2px 0 0 var(--danger); }
+
+.traceKind {
+  grid-column: 1;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--node-color) 14%, transparent);
+  color: color-mix(in srgb, var(--node-color) 78%, var(--text));
+  font-size: var(--text-micro);
+  font-weight: var(--weight-semibold);
+  line-height: 1.8;
+  white-space: nowrap;
+}
+
+.traceTitle {
+  grid-column: 2;
+  min-width: 0;
+  color: var(--text);
+  font: var(--weight-semibold) var(--text-body) var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.traceDetail {
+  grid-column: 2;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-meta);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* A request or response body: mono on the sunken surface, wrapping rather than widening the page. */
+.traceBody {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-chip);
+  background: var(--surface-sunken);
+  color: var(--text-on-sunken);
+  font: var(--text-meta)/1.6 var(--font-mono);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* Sections: generous rhythm, a band on the two text-only blocks, a rule before the close. */
+.section { padding: calc(var(--space-7) * 1.5) 0; }
+.band { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+.sectionHead { max-width: 46rem; margin-bottom: var(--space-6); }
 
 .sectionHead h2 {
-  margin-bottom: var(--space-3);
-  font-size: clamp(1.6rem, 2.4vw, 2rem);
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(1.5rem, 2.2vw, 1.9rem);
   letter-spacing: var(--tracking-display);
 }
 
-.sectionHead p { color: var(--muted); font-size: clamp(1rem, 1.1vw, 1.05rem); line-height: 1.62; }
+.sectionLead { margin: var(--space-3) 0 0; color: var(--muted); font-size: clamp(1rem, 1.1vw, 1.05rem); line-height: 1.6; }
 
-/* The three entry paths: one panel per reader. Same border and surface, no shadow, no icon. */
-.paths {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
-  gap: var(--space-5);
-}
-
-.pathCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-6);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
-}
-
-.pathCard h3 { font-size: 1.1rem; letter-spacing: var(--tracking-display); }
-.pathCard p { margin: 0; color: var(--muted); line-height: 1.6; }
-
-.pathLink { margin-top: auto; font-weight: var(--weight-semibold); }
-.pathLinks { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: auto; font-weight: var(--weight-semibold); }
-
-/* Feature rows: copy beside a live visual. The row is its own container, so it restacks on its own width
-   rather than the viewport's. */
-.featureRow {
-  container-type: inline-size;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
-  gap: calc(var(--space-7) * 1.25);
-  align-items: center;
-}
-
-/* Grid items may shrink below their content: a code block scrolls inside its column instead of widening it. */
-.heroInner > *, .featureRow > * { min-width: 0; }
-
-.featureCopy p { margin-bottom: var(--space-3); color: var(--muted); line-height: 1.65; }
-
-/* The Frame head of the agent exchange: which tool, which run. */
-.frameMeta { color: var(--muted); font: var(--text-meta) var(--font-mono); }
-
-.featureLink { display: inline-block; margin-top: var(--space-2); font-weight: var(--weight-semibold); }
-.featureLinks { display: flex; flex-wrap: wrap; column-gap: var(--space-5); }
-.sectionHead .featureLinks { justify-content: center; }
-
-/* The closing CTA is a quiet panel: the hero spent the boldness. */
-.ctaBanner {
-  padding: calc(var(--space-7) * 2) var(--space-6);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
-  text-align: center;
-}
-
-.ctaBanner h2 { margin-bottom: var(--space-3); font-size: clamp(1.6rem, 2.4vw, 2rem); }
-.ctaBanner .heroButtons { justify-content: center; }
-
-.ctaBanner p {
-  max-width: 54ch;
-  margin: 0 auto var(--space-6);
+/* The one-line claim under a section's visual, with its links at the end. */
+.line {
+  max-width: 66ch;
+  margin: var(--space-5) 0 0;
   color: var(--muted);
+  font-size: var(--text-body);
+  line-height: 1.65;
 }
 
-/* The expected green run inside the closing CTA: narrow, left-aligned, centered on the panel. */
-.ctaSnippet {
-  max-width: 40rem;
-  margin: 0 auto var(--space-6);
-  text-align: left;
+.line a { font-weight: var(--weight-semibold); }
+
+.commandsInner { max-width: 36rem; }
+
+/* The protocols: cards with the real package names, one line each. */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--space-4); }
+
+.card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--motion-fast) var(--motion-ease);
 }
 
-/* The release note inside the closing CTA: quiet, kept apart from the starter copy. */
-.ctaRelease { margin-bottom: var(--space-6); font-size: var(--text-meta); }
+.card:hover { border-color: var(--blueprint-line); color: var(--text); }
+.card strong { font-size: var(--text-title); }
+.cardPackages { color: var(--blueprint); font: var(--text-micro)/1.6 var(--font-mono); overflow-wrap: anywhere; }
+.card span { color: var(--muted); font-size: var(--text-body); line-height: 1.55; }
+
+.failureInner { max-width: 60rem; }
+
+/* Proof: the number first, its scope under it, the whole block a link to the measurement. */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-4); }
+
+.stat {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blueprint);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color var(--motion-fast) var(--motion-ease);
+}
+
+.stat:hover { border-color: var(--blueprint-line); color: var(--text); }
+.stat strong { color: var(--blueprint); font: var(--weight-bold) var(--text-heading) var(--font-mono); letter-spacing: var(--tracking-display); }
+.stat span { color: var(--muted); font-size: var(--text-meta); line-height: 1.5; }
+
+.adoption { max-width: 62rem; margin-top: var(--space-6); }
+.adoption h3 { margin: 0 0 var(--space-2); font-size: var(--text-title); }
+.adoption p { margin: 0; color: var(--muted); line-height: 1.65; }
+
+.honesty {
+  max-width: 62rem;
+  margin: var(--space-5) 0 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* The close: one row of entry points and the last line. */
+.close { border-top: 1px solid var(--border); padding-bottom: calc(var(--space-7) * 1.75); }
+
+.closeNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  font-weight: var(--weight-semibold);
+}
+
+.closeLine { margin: var(--space-5) 0 0; max-width: 52ch; color: var(--muted); line-height: 1.6; }

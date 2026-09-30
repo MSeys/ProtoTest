@@ -58,6 +58,14 @@ function countChanges(span: Span): number {
 const evidence = computed(() => props.row.type === "step" ? props.row.span.evidence : []);
 const artifacts = computed(() => evidence.value.filter(item => item.type === "attachment").length);
 const observations = computed(() => evidence.value.filter(item => item.type === "observation").length);
+/* What the operation stated, in its own words: observations are deliberate facts, so the first reads inline. */
+const firstObservation = computed(() => {
+  if (props.row.type !== "step") return null;
+  for (const item of props.row.span.evidence) {
+    if (item.type === "observation") return item;
+  }
+  return null;
+});
 const applicationSide = computed(() => props.row.type === "step" && props.row.span.changes.some(change => change.source === "applicationside"));
 
 /** What the fold button folds: the step's name, or the framework group's label. */
@@ -103,8 +111,8 @@ function pick() {
       <span v-else class="checks" />
 
       <span class="marks">
-        <span v-if="artifacts" :title="`${artifacts} ${plural(artifacts, 'artifact')}`">⧉ {{ artifacts }}</span>
-        <span v-if="observations" :title="`${observations} ${plural(observations, 'observation')}`">◎ {{ observations }}</span>
+        <span v-if="artifacts" :title="`${artifacts} ${plural(artifacts, 'attachment')} captured by this operation`">{{ artifacts }} {{ plural(artifacts, "attachment") }}</span>
+        <span v-if="observations" :title="`${observations} ${plural(observations, 'observation')} stated by this operation`">{{ observations }} {{ plural(observations, "observation") }}</span>
       </span>
       <span class="waterfall" aria-hidden="true"><i :style="bar" /></span>
       <span class="duration">{{ formatDuration(duration) }}</span>
@@ -112,6 +120,9 @@ function pick() {
 
     <p v-if="row.type === 'step' && row.span.error && !row.span.kind.startsWith('test.')" class="error">
       {{ row.span.error.message.split(/\r?\n/)[0] }}
+    </p>
+    <p v-if="firstObservation" class="observed">
+      Observed {{ firstObservation.kind }} <span class="muted">on {{ firstObservation.target }}</span><span v-if="observations > 1">, and {{ observations - 1 }} more</span>
     </p>
 
     <template v-if="isOpen">
@@ -202,6 +213,9 @@ function pick() {
 .duration { color: var(--muted); font-size: var(--text-micro); text-align: right; font-variant-numeric: tabular-nums; }
 
 .error { margin: 1px 0 var(--space-1) var(--space-6); color: var(--danger); font-size: var(--text-meta); }
+/* A stated fact reads where it happened; the full value stays one click away in the inspector. */
+.observed { margin: 1px 0 var(--space-1) var(--space-6); color: var(--text); font-size: var(--text-meta); overflow-wrap: anywhere; }
+.observed .muted { color: var(--muted); font-size: var(--text-micro); }
 
 @container (max-width: 720px) {
   .line { grid-template-columns: 16px minmax(0, 1fr) 56px; row-gap: 0; padding-block: var(--space-1); }

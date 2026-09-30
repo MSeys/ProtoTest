@@ -1,45 +1,23 @@
 # ProtoTrace Viewer
 
-A static application for opening `.prototrace` files created by ProtoTest.
+A static app that opens `.prototrace` files created by ProtoTest. It shows the test lifecycle, operations, checks, observations, resources, attachments and gate results in one place.
 
 **[Open the interactive demo](https://trace.prototest.dev/?demo=1)**
 
-## What is it for?
+## Open a trace
 
-A failed assertion is not always enough to explain what happened. The viewer shows the test lifecycle, operations, checks, observations, resources, attachments and gate results in one place. Coverage reports travel in the archive as the JSON and HTML report files, listed with the run's other attachments.
+Drop a `.prototrace` file on [trace.prototest.dev](https://trace.prototest.dev). Nothing is uploaded. The file opens in browser memory.
 
-Supported spreadsheet artifacts can also be previewed without leaving the viewer.
+Treat a trace as test output. It can contain application data, so check what was captured before sharing it.
 
-## Does it upload the trace?
-
-No. The file is opened in browser memory.
-
-It may still contain application data. Treat it as a test artifact and check what was captured before sharing it.
-
-## Bundled demos
-
-The start screen lists the bundled demos with their test counts, read from the traces themselves.
-This includes a genuine OpenCSMS product run alongside the Northstar samples. To add one, drop the
-`.prototrace` file in `public/demos/` and add one entry to the registry in `src/demos.ts` with the
-key, the file name, the label, and a one-line description. The entry opens under `?demo=<key>`.
-
-To refresh a product demo, run its suite, replace the file in `public/demos/`, and keep the entry.
-Do not bundle a trace that misrepresents the product: a synthetic benchmark trace is not a product
-demo.
-
-## Sharing a trace
+## Share a trace
 
 Two query parameters make a trace shareable:
 
-- `?demo=<key>` opens a bundled demo (`?demo=1` is the full demo). Anyone with the viewer link sees
-  the same trace.
-- `?trace=<absolute-url>` fetches a trace hosted anywhere that allows cross-origin reads, for example
-  a `raw.githubusercontent.com` URL of a committed trace. The host must send CORS headers; when the
-  fetch fails the viewer says so, and a downloaded copy still opens by dropping it in.
+- `?demo=<key>` opens a bundled demo (`?demo=1` is the full demo). Anyone with the link sees the same trace.
+- `?trace=<absolute-url>` fetches a trace hosted anywhere that allows cross-origin reads, for example a `raw.githubusercontent.com` URL. When the fetch fails the viewer says so, and a downloaded copy still opens by dropping it in.
 
-The header's Copy link button copies the demo or trace URL behind the open trace, keeping the
-reader's test and selection. A trace opened from a local file has no URL to share, so the button
-stays hidden there.
+The header's Copy link button copies the URL behind the open trace, keeping the reader's test and selection. A trace opened from a local file has no URL to share, so the button stays hidden there.
 
 ## Run locally
 
@@ -49,13 +27,15 @@ npm test
 npm run dev
 ```
 
-Create the production output with `npm run build`. The generated `dist` directory is static and does not require a server runtime.
+Create the production output with `npm run build`. The generated `dist` directory is static and needs no server runtime.
 
-## Measure it at scale
+## Add a demo
 
-`npm run scale:trace` builds a 1,000+ test trace from the bundled demo trace into the gitignored `.perf`
-directory, and `npm run scale:measure` times the built viewer against it in Edge. The measured numbers and
-the method live on the [benchmarks page](https://prototest.dev/docs/project/benchmarks#the-viewer-at-1000-tests).
+The start screen lists the bundled demos with their test counts, read from the traces themselves. To add one, drop the `.prototrace` file in `public/demos/` and add one entry to the registry in `src/demos.ts` with the key, the file name, the label and a one-line description. The entry opens under `?demo=<key>`.
+
+To refresh a product demo, run its suite and replace the file in `public/demos/`. Do not bundle a trace that misrepresents the product: a synthetic benchmark trace is not a product demo.
+
+Supported spreadsheet artifacts can also be previewed without leaving the viewer. `npm run scale:trace` builds a 1,000+ test trace into the gitignored `.perf` directory, and `npm run scale:measure` times the built viewer against it in Edge. Numbers and method live on the [benchmarks page](https://prototest.dev/docs/project/benchmarks#the-viewer-at-1000-tests).
 
 ## Learn more
 

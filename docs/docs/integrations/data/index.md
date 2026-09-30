@@ -7,20 +7,28 @@ description: "Build test objects with deterministic defaults, so a test only sta
 
 # Test data
 
-## What it adds
-
 `ProtoTest.Data` builds test objects from deterministic defaults. Write only the values the test is about. Hand the object to your application to create it for real.
+
+```csharp
+[ProtoTest]
+public void An_overdue_invoice_of_125()
+{
+    var invoice = Proto.Context.Data().For<Invoice>()
+        .With(x => x.Total, 125m)
+        .With(x => x.Status, InvoiceStatus.Overdue)
+        .Build();
+
+    Assert.That(invoice.Total, Is.EqualTo(125m));
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed An_overdue_invoice_of_125`, and the trace records a `data.build` operation with a `data.value.resolve` event per member.
+
+## What it adds
 
 Numbers, enums, dates and your own value objects are never invented: if nothing supplies a member, the build fails with a `ProtoDataException` naming it, rather than a silently wrong `0`.
 
-```csharp
-var invoice = Proto.Context.Data().For<Invoice>()
-    .With(x => x.Total, 125m)
-    .With(x => x.Status, InvoiceStatus.Overdue)
-    .Build();
-```
-
-A reader sees immediately that this test cares about an overdue invoice of 125. Every other property, such as the id, the customer or the currency, comes from [defaults you configure once](./defaults.md).
+A reader sees immediately that the test above cares about an overdue invoice of 125. Every other property, such as the id, the customer or the currency, comes from [defaults you configure once](./defaults.md).
 
 ## Install
 
@@ -38,57 +46,11 @@ builder
     .AddDataProvisioner<Invoice, InvoiceProvisioner>();
 ```
 
-```csharp
-public static IProtoHostBuilder AddData(
-    this IProtoHostBuilder builder,
-    Action<ProtoDataConfiguration>? configure = null);
-
-public static IProtoHostBuilder AddDataProvisioner<T, TProvisioner>(this IProtoHostBuilder builder)
-    where TProvisioner : class, IProtoDataProvisioner<T>;
-
-public static IProtoHostBuilder AddDataProvisioner<TInput, TResult, TProvisioner>(this IProtoHostBuilder builder)
-    where TProvisioner : class, IProtoDataProvisioner<TInput, TResult>;
-```
-
-`AddData` registers the `Data` capability (`ProtoCapabilityKinds.Data`) and a scoped `IProtoData`, one per test. Repeated calls share one registry. Each `AddData` callback runs once, and shared registrations are kept only once.
-
-### Options and keys
-
-`ProtoTest.Data` has no options type and no `ProtoTest:Data` configuration section. Everything is configured through the `AddData` callback:
-
-| Entry point | Configures |
-| --- | --- |
-| `data.AddDefaults<TModule>()` | a defaults module with a public parameterless constructor |
-| `data.AddDefaultsFromAssembly(assembly)` | every public, concrete, non-generic module in an assembly, ordered by full type name (ordinal) |
-| `data.For<T>().Default(...)` | member defaults, and domain factories with `ConstructUsing(...)` |
-| `data.Values.Use<T>(...)` | a provider for every member of a type |
-| `data.AddValueResolver(...)` | convention resolvers, run in registration order |
-| `data.RedactValueType<TValue>()` | every resolved value of a type, in ProtoTrace |
-
-[Defaults](./defaults.md) lists the precedence order and every signature.
-
-### Context API
-
-```csharp
-IProtoData data = Proto.Context.Data();
-```
-
-| Member | Does |
-| --- | --- |
-| `For<T>()` | starts a `ProtoDataObjectBuilder<T>` |
-| `Ref<T>(identity = null)` | resolves a value `CreateAsync` provisioned earlier in this test, from the identity map |
-
-On the builder:
-
-| Member | Does |
-| --- | --- |
-| `With(member, value)` | sets a scenario-relevant member; returns the same builder |
-| `Explain()` | resolves and describes every value without constructing the object |
-| `Build()` / `BuildMany(count, configure)` | constructs in memory only |
-| `CreateAsync()` / `CreateAsync<TResult>()` | builds, provisions through the registered provisioner, and returns the application's value |
-| `CreateManyAsync(count, configure)` / `CreateManyAsync<TResult>(...)` | the same for `count` independently resolved objects |
+`AddData` registers the `Data` capability (`ProtoCapabilityKinds.Data`) and a scoped `IProtoData`, one per test. Repeated calls share one registry. Each `AddData` callback runs once, and shared registrations are kept only once. The [reference](#reference) lists the signatures, the configuration entries and the context API.
 
 ## The tasks
+
+The `An_overdue_invoice_of_125` test above is the whole pattern: state the values the test is about, build, assert.
 
 ```mermaid
 flowchart LR
@@ -162,6 +124,56 @@ foreach (var value in plan.Values)
 ```
 
 Each `ProtoDataValueExplanation` carries `MemberName`, `ValueType`, `Value`, `SourceKind` and `Source`, which for defaults is the module that registered them. `SourceKind` is one of `Explicit`, `MemberDefault`, `TypeProvider`, `CustomResolver`, `BuiltIn` or `ConstructorDefault`. For a factory type, `Explain()` lists only the explicit `With(...)` values plus the construction source, because the factory resolves its inputs when `Build()` runs.
+
+## Reference
+
+```csharp
+public static IProtoHostBuilder AddData(
+    this IProtoHostBuilder builder,
+    Action<ProtoDataConfiguration>? configure = null);
+
+public static IProtoHostBuilder AddDataProvisioner<T, TProvisioner>(this IProtoHostBuilder builder)
+    where TProvisioner : class, IProtoDataProvisioner<T>;
+
+public static IProtoHostBuilder AddDataProvisioner<TInput, TResult, TProvisioner>(this IProtoHostBuilder builder)
+    where TProvisioner : class, IProtoDataProvisioner<TInput, TResult>;
+```
+
+### Options and keys
+
+`ProtoTest.Data` has no options type and no `ProtoTest:Data` configuration section. Everything is configured through the `AddData` callback:
+
+| Entry point | Configures |
+| --- | --- |
+| `data.AddDefaults<TModule>()` | a defaults module with a public parameterless constructor |
+| `data.AddDefaultsFromAssembly(assembly)` | every public, concrete, non-generic module in an assembly, ordered by full type name (ordinal) |
+| `data.For<T>().Default(...)` | member defaults, and domain factories with `ConstructUsing(...)` |
+| `data.Values.Use<T>(...)` | a provider for every member of a type |
+| `data.AddValueResolver(...)` | convention resolvers, run in registration order |
+| `data.RedactValueType<TValue>()` | every resolved value of a type, in ProtoTrace |
+
+[Defaults](./defaults.md) lists the precedence order and every signature.
+
+### Context API
+
+```csharp
+IProtoData data = Proto.Context.Data();
+```
+
+| Member | Does |
+| --- | --- |
+| `For<T>()` | starts a `ProtoDataObjectBuilder<T>` |
+| `Ref<T>(identity = null)` | resolves a value `CreateAsync` provisioned earlier in this test, from the identity map |
+
+On the builder:
+
+| Member | Does |
+| --- | --- |
+| `With(member, value)` | sets a scenario-relevant member; returns the same builder |
+| `Explain()` | resolves and describes every value without constructing the object |
+| `Build()` / `BuildMany(count, configure)` | constructs in memory only |
+| `CreateAsync()` / `CreateAsync<TResult>()` | builds, provisions through the registered provisioner, and returns the application's value |
+| `CreateManyAsync(count, configure)` / `CreateManyAsync<TResult>(...)` | the same for `count` independently resolved objects |
 
 ## In the trace and coverage
 

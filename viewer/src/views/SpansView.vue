@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import type { Span, TestTrace } from "../trace/model";
-import { formatDuration, formatOffset, kindLabel, outcomeLabel, tone } from "../trace/format";
+import { formatDuration, formatOffset, kindLabel, outcomeLabel, plural, tone } from "../trace/format";
 import KindChip from "../ui/KindChip.vue";
 import FilterChip from "../ui/FilterChip.vue";
 import TextInput from "../ui/TextInput.vue";
@@ -89,6 +89,20 @@ const emptyMessage = computed(() => {
   return "No span needs attention.";
 });
 
+/** What a span left behind, in the model's own words: observations stated it, attachments it captured. */
+function marks(span: Span): string {
+  const observations = span.evidence.filter(item => item.type === "observation").length;
+  const attachments = span.evidence.filter(item => item.type === "attachment").length;
+  const findings = span.evidence.filter(item => item.type === "finding").length;
+  const moments = span.moments.length;
+  const parts: string[] = [];
+  if (observations) parts.push(`${observations} ${plural(observations, "observation")}`);
+  if (attachments) parts.push(`${attachments} ${plural(attachments, "attachment")}`);
+  if (findings) parts.push(`${findings} ${plural(findings, "finding")}`);
+  if (moments) parts.push(`${moments} ${plural(moments, "moment")}`);
+  return parts.join(" · ");
+}
+
 // A selection made elsewhere scrolls its row into view, so the tree never hides what the details show.
 const list = ref<HTMLElement>();
 watch(() => props.selected, () => void nextTick(() => list.value?.querySelector(".row.active")?.scrollIntoView({ block: "nearest" })), { immediate: true });
@@ -136,7 +150,7 @@ function onKey(event: KeyboardEvent) {
           <KindChip :type="kindLabel(span.kind)" />
           <span class="name">{{ span.name }}</span>
           <span class="kind">{{ span.kind }}</span>
-          <span v-if="span.moments.length + span.evidence.length" class="events">{{ span.moments.length + span.evidence.length }} {{ span.moments.length + span.evidence.length === 1 ? "event" : "events" }}</span>
+          <span v-if="marks(span)" class="events">{{ marks(span) }}</span>
           <span class="visually-hidden">{{ outcomeLabel(span.status) }}</span>
         </button>
         <span class="offset">{{ formatOffset(span.start - test.start) }}</span>

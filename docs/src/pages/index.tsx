@@ -10,10 +10,10 @@ import Frame from '@site/src/components/Frame';
 import styles from './index.module.css';
 
 /*
- * The home page leads with the prototype idea, then shows the three commands, the test, the
- * machinery, the protocols, one failure, the measured proof and the entry points. Every trace row,
- * test line and number is quoted from the committed demo trace, the Northstar sample and the
- * benchmarks page.
+ * The home page leads with the prototype idea beside the test itself, then the three commands,
+ * what the run records, one failure explained, the protocols, the measured proof and the entry
+ * points. Every test line, trace row and number is quoted from the Northstar sample, the
+ * committed demo trace and the benchmarks page.
  */
 
 /* The trace rows the page shows: a viewer row is a kind chip, a title, and the detail the run recorded. */
@@ -50,59 +50,30 @@ function TraceRows({rows}: {rows: TraceRowData[]}): ReactNode {
   );
 }
 
-/*
- * Function heads read the demo's recorded rows. The check, the response body and the asserting line
- * are the committed prototest-demo.prototrace, test 08.
- */
-const heroRows: TraceRowData[] = [
-  {
-    chip: 'Check',
-    tone: '--type-assertion',
-    title: 'Assert status · 201 Created',
-    detail: 'Expected HTTP status 201 (Created), but received 400 (BadRequest).',
-    status: 'failed',
-  },
-  {
-    chip: 'Response',
-    tone: '--type-artifact',
-    title: 'POST /api/v1/projects returned 400 (BadRequest)',
-    body: `{"code":"validation_failed","message":"The value cannot be an empty string or composed entirely of whitespace. (Parameter 'name')","details":null}`,
-  },
-  {
-    chip: 'Source',
-    tone: '--type-framework',
-    title: 'FailureDrills.cs:139',
-    detail: 'response.Should.HaveHttpStatus(HttpStatusCode.Created);',
-  },
-];
-
-/* The real sample, samples/Northstar.ProtoTest/PlatformJourney.cs, one REST write read back over GraphQL. */
-const platformJourney = `[Application(NorthstarTargets.Api)]
-[NorthstarMember(PlanIds.Growth)]
-public sealed class PlatformJourney
+/* The real sample, samples/Northstar.ProtoTest/PlatformJourney.cs: the test method, one REST
+   write read back over GraphQL. The class carries [Application] and the suite membership; the
+   method is the journey. */
+const platformJourney = `[ProtoTest]
+[SignedInAs]
+public async Task RestWritesAreVisibleThroughGraphQL()
 {
-    [ProtoTest]
-    [SignedInAs]
-    public async Task RestWritesAreVisibleThroughGraphQL()
-    {
-        // Arrange: write through the public REST surface.
-        using var created = await Proto.Context.Rest()
-            .Body(new CreateProjectRequest("atlas"))
-            .PostAsync("/api/v1/projects");
-        created.Should.HaveHttpStatus(HttpStatusCode.Created);
+    // Arrange: write through the public REST surface.
+    using var created = await Proto.Context.Rest()
+        .Body(new CreateProjectRequest("atlas"))
+        .PostAsync("/api/v1/projects");
+    created.Should.HaveHttpStatus(HttpStatusCode.Created);
 
-        // Act
-        using var projects = await Proto.Context.GraphQL()
-            .Query("projects", new { first = 10 })
-            .ExpectAsync(new
-            {
-                totalCount = 1,
-                nodes = new[] { new { name = "atlas", status = ProjectStatuses.Active } }
-            });
+    // Act
+    using var projects = await Proto.Context.GraphQL()
+        .Query("projects", new { first = 10 })
+        .ExpectAsync(new
+        {
+            totalCount = 1,
+            nodes = new[] { new { name = "atlas", status = ProjectStatuses.Active } }
+        });
 
-        // Assert
-        projects.Should.HaveNoErrors();
-    }
+    // Assert
+    projects.Should.HaveNoErrors();
 }`;
 
 /* What that test recorded, from test 18 of the committed demo trace. */
@@ -161,33 +132,6 @@ const runnerChoices: CommandBoxRunner[] = [
   {id: 'mstest', label: 'MSTest', commands: templateCommands('mstest')},
 ];
 
-const machinery: {title: string; body: ReactNode; to: string}[] = [
-  {
-    title: 'The host, per suite',
-    body: 'Application, clients, servers, databases and brokers are composed once, in Configure.',
-    to: '/docs/foundation/overview',
-  },
-  {
-    title: 'The context, per test',
-    body: 'Clients, state and trace are scoped to one test, and the suite stays parallel-safe.',
-    to: '/docs/foundation/execution-context',
-  },
-  {
-    title: 'The lifecycle',
-    body: 'Setup, authentication, cleanup and teardown run through attributes and hooks, not copy-paste.',
-    to: '/docs/foundation/lifecycle',
-  },
-  {
-    title: 'Your runner',
-    body: (
-      <>
-        NUnit, xUnit.net v2, xUnit.net v3, TUnit and MSTest stay; add <code>[ProtoTest]</code>.
-      </>
-    ),
-    to: '/docs/runners/overview',
-  },
-];
-
 const protocols = [
   {
     title: 'REST, GraphQL and gRPC',
@@ -240,8 +184,8 @@ const proof = [
 ];
 
 /*
- * First screen: the prototype claim, the two actions, and the real failure the trace explains. The
- * copy and the frame sit side by side and stack on their own width.
+ * First screen: the prototype claim beside the test itself. The H1 promises readability, so the
+ * frame proves it: the real journey method, no setup in sight.
  */
 function Hero(): ReactNode {
   return (
@@ -276,17 +220,12 @@ function Hero(): ReactNode {
             className={styles.heroFrame}
             head={
               <>
-                <strong>prototest-demo.prototrace</strong>
-                <span className={styles.frameMeta}>failure 08</span>
+                <strong>PlatformJourney.cs</strong>
+                <span className={styles.frameMeta}>samples/Northstar.ProtoTest</span>
               </>
             }
-            foot={
-              <>
-                FailureDrills.ABareStatusHidesWhatTheApplicationSaid, from the committed demo trace.{' '}
-                <Link href="https://trace.prototest.dev/?demo=1">Open it in the viewer</Link>.
-              </>
-            }>
-            <TraceRows rows={heroRows} />
+            foot="RestWritesAreVisibleThroughGraphQL: a REST write read back over GraphQL.">
+            <CodeSnippet code={platformJourney} language="csharp" showLineNumbers />
           </Frame>
         </div>
       </div>
@@ -313,23 +252,18 @@ function CommandsSection(): ReactNode {
   );
 }
 
-function ScenarioSection(): ReactNode {
+/*
+ * The same test's run: every call, check and cleanup the host recorded for it. The attributes
+ * carry identity, auth and lifecycle; the method stays the journey; the trace keeps the rest.
+ */
+function RecordSection(): ReactNode {
   return (
     <section className={styles.section}>
       <div className="container">
         <header className={styles.sectionHead}>
-          <Heading as="h2">The test is the scenario.</Heading>
+          <Heading as="h2">The run is recorded.</Heading>
         </header>
-        <div className={styles.split}>
-          <Frame
-            head={
-              <>
-                <strong>PlatformJourney.cs</strong>
-                <span className={styles.frameMeta}>samples/Northstar.ProtoTest</span>
-              </>
-            }>
-            <CodeSnippet code={platformJourney} language="csharp" showLineNumbers />
-          </Frame>
+        <div className={styles.failureInner}>
           <Frame
             head={
               <>
@@ -342,31 +276,10 @@ function ScenarioSection(): ReactNode {
           </Frame>
         </div>
         <p className={styles.line}>
-          The shared setup lives in the host composition; the attributes carry identity, auth and
-          lifecycle; the method is the journey.{' '}
+          Clients, state and trace are scoped to one test, and the suite stays parallel-safe.{' '}
           <Link to="/docs/foundation/execution-context">Execution context</Link>{' '}
           <Link to="/docs/foundation/lifecycle">Lifecycle</Link>
         </p>
-      </div>
-    </section>
-  );
-}
-
-function MachinerySection(): ReactNode {
-  return (
-    <section className={`${styles.section} ${styles.band}`}>
-      <div className="container">
-        <header className={styles.sectionHead}>
-          <Heading as="h2">Where the machinery lives.</Heading>
-        </header>
-        <div className={styles.machinery}>
-          {machinery.map((item) => (
-            <Link key={item.title} className={styles.machineryItem} to={item.to}>
-              <strong>{item.title}</strong>
-              <span>{item.body}</span>
-            </Link>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -389,7 +302,9 @@ function ProtocolsSection(): ReactNode {
           ))}
         </div>
         <p className={styles.line}>
+          NUnit, xUnit.net v2, xUnit.net v3, TUnit and MSTest stay; add <code>[ProtoTest]</code>.
           44 packages, 29 supported and 15 preview; the integrations map marks which.{' '}
+          <Link to="/docs/runners/overview">Runners</Link>{' '}
           <Link to="/docs/integrations/overview">Integrations map</Link>
         </p>
       </div>
@@ -513,8 +428,7 @@ export default function Home(): ReactNode {
       <Hero />
       <main>
         <CommandsSection />
-        <ScenarioSection />
-        <MachinerySection />
+        <RecordSection />
         <ProtocolsSection />
         <FailureSection />
         <ProofSection />

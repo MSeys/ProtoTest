@@ -47,6 +47,7 @@ $linkFailures = New-Object System.Collections.Generic.List[string]
 $anchorFailures = New-Object System.Collections.Generic.List[string]
 $shapeFailures = New-Object System.Collections.Generic.List[string]
 $releaseFailures = New-Object System.Collections.Generic.List[string]
+$secretFailures = New-Object System.Collections.Generic.List[string]
 
 function Get-RelativePath {
     param([string]$FullPath)
@@ -583,10 +584,105 @@ foreach ($file in $fragmentFiles) {
     }
 }
 
+# 8. Committed evidence secrets ----------------------------------------------------
+
+# The lesson archives and the viewer demos carry application data; a real token in a fixture
+# would ship silently. The scan reads every .prototrace archive entry (and any loose JSON beside
+# them) and flags credential-shaped content, while the redaction marker and synthetic
+# placeholders pass. A code fragment is not a credential: an assignment whose value is a call or
+# an operator is left alone. Each hit reads `file -> entry -> pattern`.
+
+$secretValueAllowlist = '^(test|fake|dummy|example|changeme|placeholder|sample|localhost|guest)\b'
+
+function Test-SecretValueAllowed {
+    param([string]$Value)
+
+    $trimmed = $Value.Trim().Trim('"', "'").Trim()
+    if ($trimmed -eq '') { return $true }
+    if ($trimmed.Contains('[REDACTED]') -or $trimmed -match '(?i)%5BREDACTED%5D') { return $true }
+    if ($trimmed -match $secretValueAllowlist) { return $true }
+    if ($trimmed -eq '>' -or $trimmed -eq '=>' -or $trimmed.Contains('(')) { return $true }
+    return $false
+}
+
+# Patterns with a value group are checked against the allowlist; bare patterns always fail.
+$secretValuePatterns = @(
+    [pscustomobject]@{ Name = 'connection-string-password'; Regex = '(?i)\b(password|passwd|pwd)\s*=\s*(?<value>"[^"]+"|''[^'']+''|[^;\s""''\}\]>]+)' },
+    [pscustomobject]@{ Name = 'json-secret-value'; Regex = '(?i)(\\u0022|")(?<key>[^"\\]*?(password|passwd|pwd|secret|apikey|ownertoken|connectionstring|access_token|refresh_token|client_secret|auth_token))[^"\\]{0,20}(\\u0022|")\s*:\s*(\\u0022|")(?<value>(?:\\.|[^"\\]){1,200})(\\u0022|")' },
+    [pscustomobject]@{ Name = 'uri-credentials'; Regex = '(?i)\b(amqps?|mqtts?|rediss?|postgres(ql)?|mysql|mongodb(\+srv)?|sqlserver|https?|wss?)://(?<value>[^/\s""''<>]*:[^/\s""''<>@]+)@' },
+    [pscustomobject]@{ Name = 'bearer-token'; Regex = '(?i)\bbearer\s+(?<value>[A-Za-z0-9\-._~+/=]{8,})' }
+)
+$secretBarePatterns = @(
+    [pscustomobject]@{ Name = 'provider-token'; Regex = '\b(sk-(live|test)-[A-Za-z0-9]{16,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9\-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_\-]{16,})\b' },
+    [pscustomobject]@{ Name = 'private-key'; Regex = '-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----' }
+)
+
+function Test-SecretText {
+    param([string]$Relative, [string]$Entry, [string]$Text)
+
+    foreach ($pattern in $secretValuePatterns) {
+        foreach ($match in [regex]::Matches($Text, $pattern.Regex)) {
+            if (Test-SecretValueAllowed -Value $match.Groups['value'].Value) { continue }
+            $secretFailures.Add(("{0} -> {1} -> {2}" -f $Relative, $Entry, $pattern.Name))
+            break
+        }
+    }
+    foreach ($pattern in $secretBarePatterns) {
+        if ([regex]::IsMatch($Text, $pattern.Regex)) {
+            $secretFailures.Add(("{0} -> {1} -> {2}" -f $Relative, $Entry, $pattern.Name))
+        }
+    }
+}
+
+$secretArchiveCount = 0
+$secretEvidenceRoots = @((Join-Path $repository 'docs/static/lessons'), (Join-Path $repository 'viewer/public/demos'))
+$secretFiles = @()
+foreach ($secretRoot in $secretEvidenceRoots) {
+    if (-not (Test-Path -LiteralPath $secretRoot)) { continue }
+    $secretFiles += @(Get-ChildItem -LiteralPath $secretRoot -Recurse -File |
+        Where-Object { $_.Extension -in '.prototrace', '.json' })
+}
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+foreach ($secretFile in $secretFiles) {
+    $secretRelative = Get-RelativePath $secretFile.FullName
+    if ($secretFile.Extension -eq '.json') {
+        Test-SecretText -Relative $secretRelative -Entry '(file)' -Text (Get-Content -Raw -LiteralPath $secretFile.FullName)
+        continue
+    }
+    $secretArchiveCount++
+    try {
+        $secretArchive = [IO.Compression.ZipFile]::OpenRead($secretFile.FullName)
+        try {
+            foreach ($secretEntry in $secretArchive.Entries) {
+                if ([string]::IsNullOrEmpty($secretEntry.Name)) { continue }
+                try {
+                    $secretReader = New-Object IO.StreamReader($secretEntry.Open())
+                    try {
+                        $secretText = $secretReader.ReadToEnd()
+                    }
+                    finally {
+                        $secretReader.Dispose()
+                    }
+                    Test-SecretText -Relative $secretRelative -Entry $secretEntry.FullName -Text $secretText
+                }
+                catch {
+                    $secretFailures.Add(("{0} -> {1} -> unreadable-entry" -f $secretRelative, $secretEntry.FullName))
+                }
+            }
+        }
+        finally {
+            $secretArchive.Dispose()
+        }
+    }
+    catch {
+        $secretFailures.Add(("{0} -> (archive) -> unreadable-archive" -f $secretRelative))
+    }
+}
+
 # Summary -----------------------------------------------------------------------
 
 $checkedFiles = $contentFiles.Count + $docsSourceFiles.Count + $factFiles.Count
-$totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $anchorFailures.Count + $shapeFailures.Count + $releaseFailures.Count
+$totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $anchorFailures.Count + $shapeFailures.Count + $releaseFailures.Count + $secretFailures.Count
 
 if ($totalFailures -gt 0) {
     Write-Host "Documentation checks failed:"
@@ -618,12 +714,17 @@ if ($totalFailures -gt 0) {
         Write-Host ("  Generated changelog ({0}):" -f $releaseFailures.Count)
         foreach ($failure in $releaseFailures) { Write-Host "    $failure" }
     }
+    if ($secretFailures.Count -gt 0) {
+        Write-Host ("  Committed evidence secrets ({0}):" -f $secretFailures.Count)
+        foreach ($failure in $secretFailures) { Write-Host "    $failure" }
+    }
 }
 
 $summary = "check-docs: checked {0} files ({1} docs pages, {2} learn pages, {3} source files, {4} fact sheets); {5} failure(s)." -f
     $checkedFiles, $docsContentFiles.Count, $learnContentFiles.Count, $docsSourceFiles.Count, $factFiles.Count, $totalFailures
 $summary += " The integration shape check covered {0} page(s)." -f $integrationShapePages.Count
 $summary += " The link-fragment check covered {0} link(s)." -f $fragmentLinkCount
+$summary += " The secret scan covered {0} archive(s)." -f $secretArchiveCount
 if ($keyCrossCheckSkipped) {
     $summary += " The private fact sheets are absent; the key cross-check ran against docs/configuration-keys.json (source section constants and documented exceptions), so a docs key no source section backs still fails. The fact-sheet-to-docs half needs the private records checkout."
 }

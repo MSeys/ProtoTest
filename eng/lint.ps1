@@ -67,6 +67,7 @@ if ($duplicates.Count -gt 0) {
 # copy cannot trip it. The in-repo sample's own assemblies are the one recorded exception, and only
 # under samples/.
 $ignoredFriendEdgePaths = '[\\/](bin|obj|node_modules|\.git|artifacts|assets[\\/]internal)[\\/]'
+$ignoredFriendEdgeDirectoryNames = @('bin', 'obj', 'node_modules', '.git', 'artifacts')
 $friendEdgePatterns = @(
     @{ Form = "assembly attribute"; Pattern = 'InternalsVisibleTo(?:Attribute)?\s*\(\s*@?"([^"]+)"' },
     @{ Form = "csproj item"; Pattern = 'InternalsVisibleTo[\s\S]{0,300}?Include\s*=\s*"([^"]+)"' },
@@ -80,11 +81,45 @@ $allowedFriendEdgeNames = @('^DynamicProxyGenProxies')
 # src/ may ever join them.
 $allowedSampleFriendEdgeNames = @('^ProtoTest\.SampleApp$', '^Northstar\.ProtoTest$')
 $friendEdgeViolations = New-Object System.Collections.Generic.List[string]
-$friendEdgeFiles = Get-ChildItem -LiteralPath $repository -Recurse -File -Include *.cs,*.csproj |
-    Where-Object { $_.FullName -notmatch $ignoredFriendEdgePaths }
+# The scan prunes ignored and derived directories instead of filtering after a full
+# recursion, so a worktree vanishing mid-scan cannot fail the gate. Reads below still
+# guard a file removed between enumeration and read.
+$friendEdgeFiles = New-Object System.Collections.Generic.List[System.IO.FileInfo]
+$friendEdgeScanStack = New-Object System.Collections.Generic.Stack[string]
+$friendEdgeScanStack.Push($repository)
+while ($friendEdgeScanStack.Count -gt 0) {
+    $scanDirectory = $friendEdgeScanStack.Pop()
+    try {
+        $scanChildren = @(Get-ChildItem -LiteralPath $scanDirectory -Force -ErrorAction Stop)
+    }
+    catch {
+        continue
+    }
+    foreach ($child in $scanChildren) {
+        if ($child.PSIsContainer) {
+            if ($child.Name -in $ignoredFriendEdgeDirectoryNames) { continue }
+            $childRelative = $child.FullName.Substring($repository.Length + 1).Replace('\', '/')
+            if ($childRelative -eq 'assets/internal' -or
+                $childRelative.StartsWith('assets/internal/', [StringComparison]::OrdinalIgnoreCase)) { continue }
+            $friendEdgeScanStack.Push($child.FullName)
+            continue
+        }
+        if ($child.Extension -in '.cs', '.csproj' -and $child.FullName -notmatch $ignoredFriendEdgePaths) {
+            $friendEdgeFiles.Add($child)
+        }
+    }
+}
+$friendEdgeFiles = @($friendEdgeFiles | Sort-Object -Property FullName)
 
 foreach ($file in $friendEdgeFiles) {
-    $text = Get-Content -Raw -LiteralPath $file.FullName
+    $text = $null
+    try {
+        $text = Get-Content -Raw -LiteralPath $file.FullName -ErrorAction Stop
+    }
+    catch {
+        if (Test-Path -LiteralPath $file.FullName) { throw }
+        continue
+    }
     foreach ($pattern in $friendEdgePatterns) {
         foreach ($match in [regex]::Matches($text, $pattern.Pattern)) {
             $target = $match.Groups[1].Value.Trim()

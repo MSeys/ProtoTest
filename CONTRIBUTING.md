@@ -63,6 +63,12 @@ ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for 
 
 The first command restores and builds the solution and runs the test suites. The second validates the NuGet packages. Some browser and container-backed tests also require Chromium or a container runtime; the scripts report when an optional environment is unavailable.
 
+While iterating, scope the suite with `-Include` (semicolon-separated project directories):
+
+```powershell
+./eng/test.ps1 -Include "tests/ProtoTest.Core.Tests;tests/ProtoTest.Rest.Tests"
+```
+
 For documentation changes:
 
 ```powershell

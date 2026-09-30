@@ -8,7 +8,7 @@ description: "Measured trace size, run time, export time and memory growth for s
 
 Same short test: raw 0.33 ms, ProtoTest without trace 0.95 ms (about 3x), with trace 2.55 ms (about 8x). The trace adds about 1.6 ms and 1 MB per test here. On suites whose tests talk to a database or a browser, that difference disappears into the setup the framework replaces.
 
-These numbers come from the in-repo harnesses on an AMD Ryzen 7 9800X3D, Windows 11, .NET 8. `TraceScaleTests.cs` covers trace size. `PerTestPhaseBenchmarkTests.cs` covers the phase profile. `OverheadBenchmarkTests.cs` covers the `WebApplicationFactory` comparison. The OpenCSMS numbers come from that repository's own `eng/run-benchmark.ps1`. They are indicative, not a contract: run the harnesses on your own hardware and CI image before quoting them, and expect run-to-run medians to move by around 20%.
+These numbers come from the in-repo harnesses, and their scope is narrow: one machine (AMD Ryzen 7 9800X3D, Windows 11, .NET 8), synthetic suites where each test records one operation, `EmbedSources = false` and `EmbedArtifacts = false`, a raw baseline that creates a client per test but never opens a broker consumer, and medians taken after warmup. `TraceScaleTests.cs` covers trace size. `PerTestPhaseBenchmarkTests.cs` covers the phase profile. `OverheadBenchmarkTests.cs` covers the `WebApplicationFactory` comparison. The OpenCSMS numbers come from that repository's own `eng/run-benchmark.ps1`. They are indicative, not a contract: run the harnesses on your own hardware and CI image before quoting them, and expect run-to-run medians to move by around 20%.
 
 | Question | Harness |
 | --- | --- |

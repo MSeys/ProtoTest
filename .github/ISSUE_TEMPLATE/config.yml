@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and usage help
+    url: https://github.com/MSeys/ProtoTest/discussions
+    about: Ask usage questions in Discussions so the answer stays useful to others.
+  - name: Documentation
+    url: https://prototest.dev/docs/
+    about: Start with the docs and the troubleshooting guide.

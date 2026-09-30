@@ -275,6 +275,9 @@ public sealed class ReportSinkTests
             Assert.That(html, Does.Contain(".empty-state[hidden] { display: none; }"));
             Assert.That(html, Does.Contain("class=\"report-item partial status-warning root\""));
             Assert.That(html, Does.Contain(">Partial</span>"));
+            Assert.That(html, Does.Contain("class=\"report-footer\""));
+            Assert.That(html, Does.Contain("https://trace.prototest.dev"));
+            Assert.That(html, Does.Contain(".prototrace"));
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

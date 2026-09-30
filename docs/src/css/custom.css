@@ -308,6 +308,9 @@ div[class*='codeBlockTitle'] {
 .markdown table tbody tr:first-child td { border-top: 0; }
 .markdown table tr { border: 0; }
 
+/* A figure in running text keeps the same distance to the next paragraph as a code block does. */
+.markdown [data-frame] { margin-bottom: var(--ifm-spacing-vertical); }
+
 /* On a phone a row reads as a short card: its first cell as the title, every other cell under its column's
    heading (data-label, added at build time by plugins/rehype-table-labels.cjs). Wide pages keep the table. */
 @media (max-width: 700px) {

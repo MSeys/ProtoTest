@@ -5,10 +5,12 @@
   align-self: stretch;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 auto;
+  /* A zero basis lets the strip shrink and scroll, so the copy button keeps its place beside it. */
+  flex: 1 1 0;
   margin-bottom: calc(var(--space-2) * -1 - 1px);
   overflow-x: auto;
   scrollbar-width: none;
+  mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent);
 }
 
 .tabs::-webkit-scrollbar { display: none; }

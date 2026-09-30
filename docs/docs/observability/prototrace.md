@@ -151,6 +151,14 @@ The in-process server is also a state entity with id `server:{type}` (`{type}` i
 
 Sensitive values stay out: form fills are recorded by length, headers and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction), and sensitive query parameter values are redacted in HTTP request URLs and web navigation addresses.
 
+A suite can name more values sensitive. `ConfigureRedaction` adds names to the defaults, and state values and finding metadata redact them:
+
+```csharp
+builder.ConfigureRedaction(redaction => redaction.AddSensitiveName("OwnerToken"));
+```
+
+The names travel with the host: a second host in the same process keeps the defaults only. `ProtoTest:Redaction` binds the same names from configuration. See [Configuration](../getting-started/configuration.md) for which source wins.
+
 ### A walk through one test
 
 The sample's `TheTestClockClosesTheDueWindow` was recorded with one of each layer in it. The walk below reads that trace layer by layer, including the parts the same file cannot show.

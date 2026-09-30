@@ -21,27 +21,50 @@ internal static class ProtoMetadataRedaction
         new(ProtoRedactionDefaults.SensitivePropertyNames, StringComparer.OrdinalIgnoreCase);
 
     public static IReadOnlyDictionary<string, object>? Redact(IReadOnlyDictionary<string, object>? metadata)
+        => Redact(metadata, additionalSensitiveNames: null);
+
+    /// <summary>
+    /// Redacts metadata with the shared list plus the run's configured names, so a finding recorded
+    /// on one host never carries a name another host configured.
+    /// </summary>
+    public static IReadOnlyDictionary<string, object>? Redact(
+        IReadOnlyDictionary<string, object>? metadata,
+        IReadOnlyCollection<string>? additionalSensitiveNames)
         => metadata is null || metadata.Count == 0
             ? metadata
-            : RedactDictionary(metadata, depth: 0, new HashSet<object>(ReferenceEqualityComparer.Instance));
+            : RedactDictionary(
+                metadata,
+                EffectiveNames(additionalSensitiveNames),
+                depth: 0,
+                new HashSet<object>(ReferenceEqualityComparer.Instance));
+
+    private static HashSet<string> EffectiveNames(IReadOnlyCollection<string>? additional)
+    {
+        if (additional is null || additional.Count == 0) return SensitiveNames;
+        var names = new HashSet<string>(SensitiveNames, StringComparer.OrdinalIgnoreCase);
+        foreach (var name in additional) names.Add(name);
+        return names;
+    }
 
     private static IReadOnlyDictionary<string, object> RedactDictionary(
         IEnumerable<KeyValuePair<string, object>> entries,
+        HashSet<string> sensitive,
         int depth,
         HashSet<object> visited)
     {
         var redacted = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         foreach (var (key, value) in entries)
         {
-            redacted[key] = SensitiveNames.Contains(key)
+            redacted[key] = sensitive.Contains(key)
                 ? ProtoUriSanitizer.RedactedValue
-                : RedactValue(value, depth + 1, visited)!;
+                : RedactValue(value, sensitive, depth + 1, visited)!;
         }
 
         return redacted;
     }
 
-    private static object? RedactValue(object? value, int depth, HashSet<object> visited)
+    private static object? RedactValue(
+        object? value, HashSet<string> sensitive, int depth, HashSet<object> visited)
     {
         if (value is null || IsJsonSafeScalar(value))
         {
@@ -51,7 +74,7 @@ internal static class ProtoMetadataRedaction
         if (depth > MaxDepth)
         {
             // Deep or exotic structures degrade to the formatter's bounded text instead of recursing.
-            return ProtoTraceValueFormatter.Serialize(value) ?? value.ToString();
+            return ProtoTraceValueFormatter.Serialize(value, sensitive) ?? value.ToString();
         }
 
         if (value is IDictionary<string, object> or IReadOnlyDictionary<string, object>)
@@ -63,7 +86,7 @@ internal static class ProtoMetadataRedaction
 
             try
             {
-                return RedactDictionary((IEnumerable<KeyValuePair<string, object>>)value, depth, visited);
+                return RedactDictionary((IEnumerable<KeyValuePair<string, object>>)value, sensitive, depth, visited);
             }
             finally
             {
@@ -84,7 +107,7 @@ internal static class ProtoMetadataRedaction
                 var items = new List<object?>();
                 foreach (var item in sequence)
                 {
-                    var redacted = RedactValue(item, depth + 1, visited);
+                    var redacted = RedactValue(item, sensitive, depth + 1, visited);
                     changed |= !ReferenceEquals(redacted, item);
                     items.Add(redacted);
                 }
@@ -97,7 +120,7 @@ internal static class ProtoMetadataRedaction
             }
         }
 
-        return ProtoTraceValueFormatter.Serialize(value) ?? value.ToString();
+        return ProtoTraceValueFormatter.Serialize(value, sensitive) ?? value.ToString();
     }
 
     private static bool IsJsonSafeScalar(object value)

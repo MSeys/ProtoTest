@@ -132,6 +132,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Docs: the agent workflows document the feedback webhook payload, the configuration page lists every section's keys, and the template page shows what the scaffold creates. [CLI](https://prototest.dev/docs/agent-workflows/cli)
 - Docs: the reference pages gain the recorded trace walks, the decision figures and the triage tables; the longest pages split into child pages (web page coverage, messaging adapters, gRPC calls, the ProtoTrace archive, the CI providers). [Docs](https://prototest.dev/docs/)
 - Samples: Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
+- Core: suites name their own sensitive values (`ConfigureRedaction`, `ProtoTest:Redaction`); state and findings redact them like the defaults. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - Viewer: the viewer stays responsive at 1,000+ tests; search, filter and open times drop. [Benchmarks](https://prototest.dev/docs/project/benchmarks)
 - Viewer: skipped ticks read as planned, focus states and hit targets are restored, and the run header's outcome pill drops under the title on narrow screens. [Trace viewer](https://trace.prototest.dev)
 

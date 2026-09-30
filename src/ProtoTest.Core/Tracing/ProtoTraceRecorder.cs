@@ -22,6 +22,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     private ProtoTraceError? _error;
     private TimeSpan _duration;
     private readonly ProtoTraceOptions _options;
+    private readonly IReadOnlyCollection<string>? _additionalSensitiveNames;
     private readonly Action<ActivityTraceId, ProtoTestTraceRecorder>? _onTraceStarted;
     private readonly Action<ProtoTestTraceRecorder>? _onCompleted;
     private readonly ProtoItemStore _items = new();
@@ -40,13 +41,15 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         MethodInfo method,
         ProtoTraceOptions? options = null,
         Action<ActivityTraceId, ProtoTestTraceRecorder>? onTraceStarted = null,
-        Action<ProtoTestTraceRecorder>? onCompleted = null)
+        Action<ProtoTestTraceRecorder>? onCompleted = null,
+        IReadOnlyCollection<string>? additionalSensitiveNames = null)
     {
         TestId = testId;
         Name = name;
         _className = method.DeclaringType?.FullName;
         _methodName = method.Name;
         _options = options ?? new ProtoTraceOptions();
+        _additionalSensitiveNames = additionalSensitiveNames;
         _onTraceStarted = onTraceStarted;
         _onCompleted = onCompleted;
     }
@@ -297,7 +300,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         if (!_options.Enabled) return;
         // The recording boundary applies the evidence policy too, so a direct Trace.Finding caller
         // cannot put raw or cyclic metadata into the archive.
-        metadata = ProtoMetadataRedaction.Redact(metadata);
+        metadata = ProtoMetadataRedaction.Redact(metadata, _additionalSensitiveNames);
         var entry = _current.Value;
         if (entry is not null)
         {

@@ -121,7 +121,7 @@ When the runner completes the test:
 4. `context.DisposeAsync` releases owned resources in reverse registration order, then disposes the DI scope.
 5. The test's trace artifacts are captured and the recorder is completed with its outcome. `Proto.Context` is cleared.
 
-**Teardown attempts each step**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported, so a cleanup error never hides a failed assertion. The failure still surfaces to the runner: one exception is rethrown as-is, several become one `AggregateException`.
+**Teardown attempts each step**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported, so a cleanup error never hides a failed assertion. `CompleteTestAsync` rethrows one failure as-is and aggregates several; the runner adapters complete through `ProtoTestScope`, which keeps the test's own outcome.
 
 ### When setup fails
 
@@ -216,5 +216,5 @@ builder.AddRunGate("no error findings", context => context
 - **One context per async flow.** Starting a second test on the same flow before completing the first throws, and completing a test from a different host throws.
 - **One build per builder.** `Build()` can only run once, and once stopping has begun, starting a new test throws.
 - **A skipped test never reaches the lifecycle.** A skipped test never creates a context. See [Skip conditions](./skip-conditions.md).
-- **A teardown failure does not replace the outcome.** It is recorded as an `Error` finding and still surfaces to the runner as an exception.
+- **A teardown failure does not replace the outcome.** It is recorded as an `Error` finding while the test's own outcome stands.
 - **Ids cannot grow past 18 digits.** Running out of sequence numbers throws. `Proto.Context` is flow-local: work that escapes the test's flow cannot read it. See [Execution context](./execution-context.md) and [Concurrency](./concurrency.md).

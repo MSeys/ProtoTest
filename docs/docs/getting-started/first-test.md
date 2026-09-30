@@ -220,7 +220,7 @@ builder.ConfigureTracing(trace => trace.OutputPath = "TestResults/orders.prototr
 
 Run the tests, then:
 
-- drop the trace file (`TestResults/orders.prototrace` with the line above, otherwise the default `TestResults/prototest-{runId}.prototrace`) onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of the test, the request and the shape comparison;
+- drop the trace file (`TestResults/orders.prototrace` with the line above, otherwise the default `TestResults/prototest-{runId}.prototrace`) onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of the test, the request and the shape comparison. The file is a binary archive, so open it in the viewer or print it with `prototest summary` ([ProtoTrace](../observability/prototrace.md#open-your-own-archive)); reading it as text shows nothing useful.
 - open `TestResults/report.html` for the endpoints the suite exercised. See [Reporting](../observability/reporting.md).
 
 One recorded journey reads like this. The walk below is the sample suite's project journey (`ProjectsJourney.CreatingAProjectReturnsIt`), which follows the same six steps against a real application:

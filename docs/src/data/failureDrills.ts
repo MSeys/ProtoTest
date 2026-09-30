@@ -161,7 +161,7 @@ export const failureDrills: DrillPair[] = [
     ask: 'Where does the address come from?',
     drill: {
       test: 'TheAddressWasHardcodedForOneMachine',
-      what: 'Connects a plain HttpClient to a hardcoded address, 127.0.0.1:5099.',
+      what: 'Connects a plain HttpClient to a hardcoded address, 127.0.0.1:5099. The raw client is outside the composition, so the run records no operation for the call.',
       elapsed: '2.05 s',
       record: [
         {
@@ -169,7 +169,7 @@ export const failureDrills: DrillPair[] = [
           name: 'Test execution',
           status: 'failed',
           detail:
-            '2.05 s, failed: ConnectionError reaching http://127.0.0.1:5099: connection refused. No operation was recorded: the raw client is outside the composition.',
+            '2.05 s, failed: ConnectionError reaching http://127.0.0.1:5099: connection refused.',
         },
       ],
     },

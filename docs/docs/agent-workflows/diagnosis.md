@@ -42,7 +42,7 @@ FAILED orders match their shape (16 ms)
     {line: 10, title: 'The rule', note: 'The diagnosis rule that matched. An assertion lists its mismatches; an operation error names the error.'},
     {line: 11, title: 'The mismatches', note: 'Path, expected and actual, capped at three per block with a truncation line.'},
   ]}
-  foot={<>A failed run gate gets its own block at the end, with the gate's message and details. The output above is the committed MCP test fixture; a run with nothing to report prints two lines and the words <code>All green.</code></>}
+  foot={<>A failed run gate gets its own block at the end, with the gate's message and details. The output above is the committed MCP test fixture; a run with nothing to report prints the header, the counts and <code>All green.</code></>}
 />
 
 The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other three commands.

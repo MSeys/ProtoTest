@@ -46,7 +46,7 @@ Publishing happens during teardown, **after** every attribute and hook has finis
 - an `AfterTestAsync` can still add attachments, and they are published;
 - browser artifacts, which are finalised as the browser closes, are ready in time.
 
-A failure publishing one attachment does not stop the others. It is recorded like the rest of the teardown failures and surfaces to the runner.
+A failure publishing one attachment does not stop the others. It is recorded like the rest of the teardown failures.
 
 ## How each runner receives them
 

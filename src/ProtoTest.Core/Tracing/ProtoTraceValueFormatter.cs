@@ -25,13 +25,22 @@ public static class ProtoTraceValueFormatter
     };
 
     public static string? Serialize(object? value)
+        => Serialize(value, additionalSensitiveNames: null);
+
+    /// <summary>
+    /// Serializes a value into compact, cycle-safe, redacted JSON for trace attributes. Names in
+    /// <paramref name="additionalSensitiveNames"/> redact like the defaults; the names travel with
+    /// the host, so pass the run's configured ones and leave this empty where no host is in reach.
+    /// </summary>
+    public static string? Serialize(object? value, IReadOnlyCollection<string>? additionalSensitiveNames)
     {
         if (value is null) return null;
+        var sensitive = EffectiveNames(additionalSensitiveNames);
         try
         {
             var json = JsonSerializer.Serialize(value, value.GetType(), SerializerOptions);
             var node = JsonNode.Parse(json);
-            if (node is not null) Redact(node);
+            if (node is not null) Redact(node, sensitive);
             var result = node?.ToJsonString(SerializerOptions) ?? json;
             return result.Length <= MaximumLength
                 ? result
@@ -40,9 +49,17 @@ public static class ProtoTraceValueFormatter
         catch (Exception)
         {
             var fallback = DescribeObject(value);
-            Redact(fallback);
+            Redact(fallback, sensitive);
             return fallback.ToJsonString(SerializerOptions);
         }
+    }
+
+    private static HashSet<string> EffectiveNames(IReadOnlyCollection<string>? additional)
+    {
+        if (additional is null || additional.Count == 0) return SensitiveNames;
+        var names = new HashSet<string>(SensitiveNames, StringComparer.OrdinalIgnoreCase);
+        foreach (var name in additional) names.Add(name);
+        return names;
     }
 
     private static JsonObject DescribeObject(object value)
@@ -100,19 +117,19 @@ public static class ProtoTraceValueFormatter
         }
     }
 
-    private static void Redact(JsonNode node)
+    private static void Redact(JsonNode node, HashSet<string> sensitive)
     {
         if (node is JsonObject obj)
         {
             foreach (var property in obj.ToArray())
             {
-                if (SensitiveNames.Contains(property.Key)) obj[property.Key] = "[REDACTED]";
-                else if (property.Value is not null) Redact(property.Value);
+                if (sensitive.Contains(property.Key)) obj[property.Key] = "[REDACTED]";
+                else if (property.Value is not null) Redact(property.Value, sensitive);
             }
         }
         else if (node is JsonArray array)
         {
-            foreach (var item in array) if (item is not null) Redact(item);
+            foreach (var item in array) if (item is not null) Redact(item, sensitive);
         }
     }
 }

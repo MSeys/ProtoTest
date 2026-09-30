@@ -17,7 +17,8 @@ internal sealed class ProtoHostComposer(
     ProtoTestIdOptions testIdOptions,
     ProtoTraceOptions traceOptions,
     ProtoRunResourceStore runResources,
-    ProtoReadinessOptions readinessOptions)
+    ProtoReadinessOptions readinessOptions,
+    ProtoRedactionOptions redactionOptions)
 {
     /// <summary>Applies the run composition to the service collection in one pass.</summary>
     public void Compose()
@@ -30,6 +31,11 @@ internal sealed class ProtoHostComposer(
         // binds over the code values and validation runs exactly once, where the options resolve - the
         // host forces that resolve when it builds.
         ProtoOptionsRegistration.Configure<ProtoReadinessOptions>(services, () => readinessOptions);
+
+        // The run's additional sensitive names: the single instance every redaction consumer shares.
+        // It registers through the shared options registrar, so the ProtoTest:Redaction section binds
+        // over the code values and validation runs exactly once, where the options resolve.
+        ProtoOptionsRegistration.Configure<ProtoRedactionOptions>(services, () => redactionOptions);
 
         // Every key any registered infrastructure piece declares counts as provided, including a piece
         // this build will skip because configuration already fills its keys, so a container that will

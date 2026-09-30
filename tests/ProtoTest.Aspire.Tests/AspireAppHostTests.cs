@@ -336,6 +336,40 @@ public sealed class AspireAppHostTests
         }
     }
 
+    [Test]
+    public void AspireEvidence_ShouldRedactAPublishedConnectionStringButKeepItsAddress()
+    {
+        // Entity state reaches the archive unredacted, so a published connection string must be
+        // evidence by presence only: the secret never lands in the trace.
+        var piece = new ProtoAspireAppHost<TestAppHostAnchor>(
+            ["api", "db"],
+            options => options.Set("Aspire:Test:ConnectionString", "true"));
+        piece.MapConnectionString("db", "ConnectionStrings:Db");
+        var evidence = piece.BuildEvidence(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["ProtoTest:Applications:api:BaseUrl"] = "http://127.0.0.1:9",
+                ["ConnectionStrings:Db"] = "Host=db;Password=hunter2"
+            },
+            new ConfigurationBuilder().Build());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                evidence["aspire.resource.db.connection_string"],
+                Is.EqualTo(ProtoUriSanitizer.RedactedValue),
+                "a published connection string is presence-only evidence");
+            Assert.That(
+                evidence["aspire.resource.api.address"],
+                Is.EqualTo("http://127.0.0.1:9"),
+                "a published endpoint address stays readable evidence");
+            Assert.That(
+                evidence.Values,
+                Has.None.Contains("hunter2"),
+                "the secret reaches no evidence attribute");
+        }
+    }
+
     /// <summary>Sets the global AppHost selection key; the AppHost serves only when selected.</summary>
     private static void SelectTheAppHost(ProtoHostBuilder builder)
         => builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(

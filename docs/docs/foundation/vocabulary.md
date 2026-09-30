@@ -20,7 +20,7 @@ export const entityCode = `{
 }
 {
   "kind": "http.request",
-  "name": "REST - POST /api/v1/projects",
+  "name": "REST · POST /api/v1/projects",
   "entity": "client:System.Net.Http.HttpClient:Northstar",
   "http.response.status_code": 201
 }`;
@@ -94,7 +94,7 @@ Entities are state, not history: each appears once in the archive with its lates
 | `client` | `client:{fullTypeName}:{name}` | `client:System.Net.Http.HttpClient:Northstar` | a client a test resolved |
 | `context` | `{fullTypeName}`, or `{key}:{fullTypeName}` when set with a key | `Northstar.ProtoTest.NorthstarMemberContext` | typed state an attribute or hook set |
 | `auth` | `auth:user` | `auth:user` | the test user and how it signed in |
-| `server` | `server:{entryPointFullName}` | `server:ProtoTest.SampleApp.Program:Northstar` | the in-process application server |
+| `server` | `server:{entryPointFullName}:{application}` | `server:ProtoTest.SampleApp.Program:Northstar` | the in-process application server |
 | `capability` | `{kind}:{name}`, with `:{instance}` when the descriptor carries one | `server:ASP.NET Core:Northstar` | what the run can serve |
 | `clock` | `clock:run` for the run, and a clock per test | `clock:725654000001` | the clocks a test can advance |
 | `device` | `device:{client}:{deviceType}:{id}` | a pattern; no lesson archive records one | a device session |

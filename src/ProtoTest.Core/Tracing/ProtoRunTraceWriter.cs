@@ -14,6 +14,8 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
     private static readonly IReadOnlyDictionary<string, string?> NoAttributes =
         new Dictionary<string, string?>();
 
+    private readonly IReadOnlyCollection<string>? _additionalSensitiveNames;
+
     private readonly ConcurrentQueue<ProtoTraceEntry> _entries = new();
     private readonly ProtoItemStore _items = new();
     private readonly ProtoLock _recordGate = new();
@@ -21,6 +23,11 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
     private readonly List<ProtoTraceAttachmentRecord> _attachments = [];
     private readonly List<ProtoTraceFindingRecord> _findings = [];
     private int _sequence;
+
+    public ProtoRunTraceWriter(IReadOnlyCollection<string>? additionalSensitiveNames = null)
+    {
+        _additionalSensitiveNames = additionalSensitiveNames;
+    }
 
     public IReadOnlyList<ProtoTraceEntry> Snapshot()
         => [.. _entries.OrderBy(entry => entry.TimestampUtc)];
@@ -86,7 +93,7 @@ internal sealed class ProtoRunTraceWriter : IProtoTraceWriter
                 category,
                 targetName,
                 tags,
-                ProtoMetadataRedaction.Redact(metadata)));
+                ProtoMetadataRedaction.Redact(metadata, _additionalSensitiveNames)));
         }
     }
 

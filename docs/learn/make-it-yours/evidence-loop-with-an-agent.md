@@ -75,13 +75,13 @@ prototest summary l0-time-drill.prototrace
 The command reads the archive and prints one deterministic document. The shape of that document, with the drill's values and the run id shortened:
 
 ```text
-ProtoTest trace 2.0 · run 316f2b23... · 2026-09-29 06:18:29Z - 2026-09-29 06:18:34Z
+ProtoTest trace 2.0 · run d7b73deb... · 2026-09-29 18:36:43Z - 2026-09-29 18:36:46Z
 1 tests · 1 failed
 
-FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (2.16 s)
+FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (1.79 s)
   Shape mismatch failed with 1 error(s):
     • [$.status]: Values did not match. (Expected: "past_due", Actual: "active")
-  at samples/Northstar.ProtoTest/FailureDrills.cs:34 (Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow)
+  at samples/Northstar.ProtoTest/FailureDrills.cs:36 (Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow)
   assert.json.shape Assert response shape · failed
   cause: assertion (1 mismatch)
   mismatch: $.status: expected past_due, actual active
@@ -137,12 +137,12 @@ With `detail: context`, the same failure returns its context package beside the 
 ```text
 context: Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow
 ancestors: test.execution > http.request REST GET /api/v1/organization > assert.json.shape
-attributes: $.status, expected past_due, actual active; clock unmoved, elapsed 1.33 s
-source: samples/Northstar.ProtoTest/FailureDrills.cs:34
+attributes: $.status, expected past_due, actual active
+source: samples/Northstar.ProtoTest/FailureDrills.cs:36
 artifacts: rest-01-response, rest-01-expected-shape, scenario-summary.json
 ```
 
-The five lines are the ancestor chain, the attributes, the source snippet location, the artifacts it can reach and the state it changed. The checkpoint at the top of this lesson asks what the package adds over the one-line summary, and what it can never do.
+The five lines are the test, the ancestor chain, the mismatch attributes, the source location and the artifacts it can reach. The checkpoint at the top of this lesson asks what the package adds over the one-line summary, and what it can never do.
 
 ## Close the loop
 

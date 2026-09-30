@@ -180,6 +180,6 @@ dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~TheSubstitu
 Remove-Item Env:ProtoTest__TargetUrl
 ```
 
-The runner reports one skipped test with the reason: this test substitutes `TimeProvider` on the `Northstar` application, which this run does not host in-process, so register it with `AddAspNetCoreServer` or name the in-process server in a mixed run. Nothing ran and nothing failed, which is the honest outcome for a substitution that cannot be served.
+The runner reports one skipped test with the reason: this test substitutes `TimeProvider` on the `Default` application, which this run does not host in-process, so register it with `AddAspNetCoreServer` or name the in-process server in a mixed run. The probe carries no `[Application]`, so the gate falls back to `Default`. Nothing ran and nothing failed, which is the honest outcome for a substitution that cannot be served.
 
 </LearnShell>

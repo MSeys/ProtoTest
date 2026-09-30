@@ -19,16 +19,16 @@ prototest summary TestResults/prototest-{runId}.prototrace
 ```
 
 ```text
-ProtoTest trace 2.0 · run 761778e6dc82498a9f9965fa1e6b5a24 · 2026-09-29 06:19:01Z - 2026-09-29 06:19:05Z
+ProtoTest trace 2.0 · run bb2dd8b330924038894c161efda1e5f4 · 2026-09-29 18:36:55Z - 2026-09-29 18:36:58Z
 1 tests · 1 failed
 
-FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.66 s)
+FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.60 s)
   ConnectionError reaching http://127.0.0.1:5099: connection refused.
   test.execution Test execution · failed
   cause: runner-reported failure
 ```
 
-That is a committed failing run of the Learning track. [Open the sample trace](https://trace.prototest.dev/?demo=1) to look around before you have one of your own, and read [the archive format](./prototrace-archive.md#the-file-format) for what is inside.
+That is a committed failing run of the Learning track. Run ids and timestamps are new on every run; compare the shape, not the values. [Open the sample trace](https://trace.prototest.dev/?demo=1) to look around before you have one of your own, and read [the archive format](./prototrace-archive.md#the-file-format) for what is inside.
 
 ## What it is
 
@@ -147,9 +147,17 @@ A few of the entry kinds recorded automatically:
 | `sql.connection.open`, `sql.transaction.begin`, `sql.transaction.rollback`, `sql.enlist` | the [SQL connection lifecycle](../integrations/sql/index.md#in-the-trace-and-coverage) |
 | `aspnetcore.server.initialize` | the in-process server, carrying `aspnetcore.application.type`, `aspnetcore.server.lifetime`, `aspnetcore.server.reused`, `aspnetcore.web_host.customized` and `aspnetcore.client.customized` |
 
-The in-process server is also a state entity with id `server:{type}` (`{type}` is the entry point's full name, as in `server:Northstar.Api.Program`), and those `aspnetcore.*` attributes are its state.
+The in-process server is also a state entity with id `server:{type}:{application}` (`{type}` is the entry point's full name, as in `server:ProtoTest.SampleApp.Program:Northstar`), and those `aspnetcore.*` attributes are its state.
 
 Sensitive values stay out: form fills are recorded by length, headers and JSON properties are redacted using the [same rules as attachments](../integrations/rest/attachments.md#redaction), and sensitive query parameter values are redacted in HTTP request URLs and web navigation addresses.
+
+A suite can name more values sensitive. `ConfigureRedaction` adds names to the defaults, and state values and finding metadata redact them:
+
+```csharp
+builder.ConfigureRedaction(redaction => redaction.AddSensitiveName("OwnerToken"));
+```
+
+The names travel with the host: a second host in the same process keeps the defaults only. `ProtoTest:Redaction` binds the same names from configuration. See [Configuration](../getting-started/configuration.md) for which source wins. Attachment and diagnostic JSON keeps its own per-protocol list (`SensitiveJsonProperties` on each protocol's attachment options), so a name added here reaches state values and finding metadata, not those bodies.
 
 ### A walk through one test
 

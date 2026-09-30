@@ -136,7 +136,8 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder, IProtoComposableBuilde
             _testIdOptions,
             _traceOptions,
             _runResources,
-            ProtoReadinessExtensions.ResolveOptions(this));
+            ProtoReadinessExtensions.ResolveOptions(this),
+            ProtoRedactionExtensions.ResolveOptions(this));
         composer.Compose();
 
         var rootProvider = _services.BuildServiceProvider();

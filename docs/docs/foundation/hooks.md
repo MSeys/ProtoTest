@@ -162,4 +162,4 @@ Attachments added in `AfterTestAsync` are still published, because publishing ha
 - Test hooks receive no token parameter: they read `context.CancellationToken`, which carries the caller's token or the runner's own where its adapter has one (NUnit's test context, the xUnit v2 runner, xUnit v3's `TestContext.Current.CancellationToken`, TUnit's `TestContext.CancellationToken`). MSTest's 4.0.2 floor exposes no token, so those hooks see `CancellationToken.None`.
 - `AddTestHook` and `AddRunHook` do **not** dedupe: every call adds another registration. Register each hook once.
 - Run hooks get no context, since there is no test yet. See [Lifecycle](./lifecycle.md#the-run) for the run sequence and the rollback rule a `BeforeRunAsync` failure follows.
-- A teardown failure in a test hook is recorded as an `Error` finding and does not replace the test's outcome, but it still surfaces to the runner.
+- A teardown failure in a test hook is recorded as an `Error` finding and does not replace the test's outcome.

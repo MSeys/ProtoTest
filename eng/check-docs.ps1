@@ -44,6 +44,7 @@ $forbiddenFailures = New-Object System.Collections.Generic.List[string]
 $apiFailures = New-Object System.Collections.Generic.List[string]
 $keyFailures = New-Object System.Collections.Generic.List[string]
 $linkFailures = New-Object System.Collections.Generic.List[string]
+$anchorFailures = New-Object System.Collections.Generic.List[string]
 $shapeFailures = New-Object System.Collections.Generic.List[string]
 $releaseFailures = New-Object System.Collections.Generic.List[string]
 
@@ -407,10 +408,185 @@ else {
     $releaseFailures.Add("docs/scripts/generate-changelog.mjs is missing")
 }
 
+# 7. Link fragments -------------------------------------------------------------
+
+# Every internal link fragment must name a heading in its target file. The scan covers the two
+# content roots plus the repository changelog, whose prototest.dev links point back at the site.
+# Absolute site paths (/docs/..., /learn/...), relative paths, same-page fragments, directory
+# targets (which resolve to index.md) and the slug rules Docusaurus uses (lowercase, punctuation
+# stripped, spaces to hyphens, repeated headings suffixed) are mirrored so the gate agrees with
+# the build. Each failure reads `file:line -> target#fragment`.
+
+function Get-MarkdownAnchors {
+    param([string]$Path)
+
+    $anchors = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    if (-not (Test-Path -LiteralPath $Path)) { return $anchors }
+    $lines = @(Get-Content -LiteralPath $Path)
+    $index = 0
+    if ($lines.Count -gt 0 -and $lines[0] -eq '---') {
+        $index = 1
+        while ($index -lt $lines.Count -and $lines[$index] -notin @('---', '...')) { $index++ }
+        $index++
+    }
+    $counts = @{}
+    $inFence = $false
+    for (; $index -lt $lines.Count; $index++) {
+        $line = $lines[$index]
+        if ($line -match '^\s{0,3}(```|~~~)') { $inFence = -not $inFence; continue }
+        if ($inFence) { continue }
+        if ($line -notmatch '^\s{0,3}#{1,6}\s+(.*\S)\s*$') { continue }
+        $text = $Matches[1] -replace '\s+#+\s*$', ''
+        if ($text -match '\{#([A-Za-z0-9\-_]+)\}\s*$') {
+            [void]$anchors.Add($Matches[1])
+            continue
+        }
+        $slug = ($text.ToLowerInvariant() -replace '[^a-z0-9 _-]', '').Trim() -replace ' ', '-'
+        if ($slug -eq '') { continue }
+        if ($counts.ContainsKey($slug)) {
+            $counts[$slug]++
+            $slug = '{0}-{1}' -f $slug, $counts[$slug]
+        }
+        else {
+            $counts[$slug] = 0
+        }
+        [void]$anchors.Add($slug)
+    }
+    return $anchors
+}
+
+function Resolve-FragmentTarget {
+    param([string]$PathPart, [string]$SourceFile)
+
+    if ($PathPart -eq '') { return [pscustomobject]@{ Path = $SourceFile; Missing = $false } }
+
+    if ($PathPart -match '^https?://prototest\.dev(?<sitepath>/.*)?$') {
+        $PathPart = $Matches['sitepath']
+        if ([string]::IsNullOrEmpty($PathPart)) { return $null }
+    }
+    elseif ($PathPart -match '^[a-zA-Z][a-zA-Z0-9+.-]*:' -or $PathPart.StartsWith('//')) {
+        return $null
+    }
+
+    $separator = [System.IO.Path]::DirectorySeparatorChar
+    if ($PathPart.StartsWith('/')) {
+        if ($PathPart -match '^/docs(?<rest>/.*)?$') {
+            $rest = $Matches['rest']
+            if ([string]::IsNullOrEmpty($rest) -or $rest -eq '/') { return $null }
+            $candidate = Join-Path $docsContentRoot ($rest.TrimStart('/').Replace('/', $separator))
+        }
+        elseif ($PathPart -match '^/learn(?<rest>/.*)?$') {
+            $rest = $Matches['rest']
+            if ([string]::IsNullOrEmpty($rest) -or $rest -eq '/') { return $null }
+            $candidate = Join-Path $learnContentRoot ($rest.TrimStart('/').Replace('/', $separator))
+        }
+        elseif ($PathPart -match '^/changelog/?$') {
+            $candidate = $changelogPath
+        }
+        else {
+            return $null
+        }
+    }
+    else {
+        $candidate = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $SourceFile) $PathPart))
+    }
+
+    # Only the docs vocabulary is in scope: the content roots and the changelog they generate.
+    # Anything else (source files, images, other site routes) has no markdown headings to check.
+    $inScope = [string]::Equals($candidate, $changelogPath, [StringComparison]::OrdinalIgnoreCase)
+    foreach ($root in @($docsContentRoot, $learnContentRoot)) {
+        if ([string]::Equals($candidate, $root, [StringComparison]::OrdinalIgnoreCase) -or
+            $candidate.StartsWith($root + $separator, [StringComparison]::OrdinalIgnoreCase)) {
+            $inScope = $true
+            break
+        }
+    }
+    if (-not $inScope) { return $null }
+
+    $candidate = $candidate.TrimEnd($separator)
+    $tries = @()
+    if ((Test-Path -LiteralPath $candidate -PathType Container)) {
+        $tries = @((Join-Path $candidate 'index.md'), (Join-Path $candidate 'index.mdx'))
+    }
+    elseif ([System.IO.Path]::GetExtension($candidate) -in '.md', '.mdx') {
+        $tries = @($candidate)
+    }
+    else {
+        $tries = @(
+            ($candidate + '.md'),
+            ($candidate + '.mdx'),
+            (Join-Path $candidate 'index.md'),
+            (Join-Path $candidate 'index.mdx')
+        )
+    }
+    foreach ($try in $tries) {
+        if (Test-Path -LiteralPath $try -PathType Leaf) {
+            return [pscustomobject]@{ Path = $try; Missing = $false }
+        }
+    }
+    return [pscustomobject]@{ Path = $candidate; Missing = $true }
+}
+
+$changelogPath = Join-Path $repository "CHANGELOG.md"
+$fragmentFiles = @($contentFiles)
+if (Test-Path -LiteralPath $changelogPath) {
+    $fragmentFiles += @(Get-Item -LiteralPath $changelogPath)
+}
+$anchorCache = @{}
+$fragmentLinkCount = 0
+$fragmentLinkPattern = [regex]'\]\(([^()\s]+)\)'
+$fragmentReferencePattern = [regex]'\[([^\]]+)\]\[([^\]]*)\]'
+$fragmentDefinitionPattern = [regex]'^\s{0,3}\[([^\]]+)\]:\s*(\S+)'
+
+foreach ($file in $fragmentFiles) {
+    $relative = Get-RelativePath $file.FullName
+    $lines = @(Get-Content -LiteralPath $file.FullName)
+    $definitions = @{}
+    foreach ($definitionLine in $lines) {
+        $definition = $fragmentDefinitionPattern.Match($definitionLine)
+        if ($definition.Success) { $definitions[$definition.Groups[1].Value] = $definition.Groups[2].Value }
+    }
+    $inLinkFence = $false
+    for ($lineNumber = 0; $lineNumber -lt $lines.Count; $lineNumber++) {
+        if ($lines[$lineNumber] -match '^\s{0,3}(```|~~~)') { $inLinkFence = -not $inLinkFence; continue }
+        if ($inLinkFence) { continue }
+        $fragmentTargets = @()
+        foreach ($match in $fragmentLinkPattern.Matches($lines[$lineNumber])) {
+            $fragmentTargets += @($match.Groups[1].Value)
+        }
+        foreach ($match in $fragmentReferencePattern.Matches($lines[$lineNumber])) {
+            $label = if ($match.Groups[2].Value -eq '') { $match.Groups[1].Value } else { $match.Groups[2].Value }
+            if ($definitions.ContainsKey($label)) { $fragmentTargets += @($definitions[$label]) }
+        }
+        foreach ($target in $fragmentTargets) {
+            if ($target -notmatch '#') { continue }
+            $fragment = $target.Substring($target.IndexOf('#') + 1)
+            if ($fragment -eq '') { continue }
+            $pathPart = ($target.Substring(0, $target.IndexOf('#')) -split '\?')[0]
+            $fragmentLinkCount++
+            $resolved = Resolve-FragmentTarget -PathPart $pathPart -SourceFile $file.FullName
+            if ($null -eq $resolved) { continue }
+            if ($resolved.Missing) {
+                $anchorFailures.Add(("{0}:{1} -> {2} (no such page)" -f $relative, ($lineNumber + 1), $target))
+                continue
+            }
+            if (-not $anchorCache.ContainsKey($resolved.Path)) {
+                $anchorCache[$resolved.Path] = Get-MarkdownAnchors -Path $resolved.Path
+            }
+            $anchors = $anchorCache[$resolved.Path]
+            $decoded = $fragment
+            try { $decoded = [System.Uri]::UnescapeDataString($fragment) } catch { }
+            if (-not $anchors.Contains($fragment) -and -not $anchors.Contains($decoded)) {
+                $anchorFailures.Add(("{0}:{1} -> {2}" -f $relative, ($lineNumber + 1), $target))
+            }
+        }
+    }
+}
+
 # Summary -----------------------------------------------------------------------
 
 $checkedFiles = $contentFiles.Count + $docsSourceFiles.Count + $factFiles.Count
-$totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $shapeFailures.Count + $releaseFailures.Count
+$totalFailures = $forbiddenFailures.Count + $apiFailures.Count + $keyFailures.Count + $linkFailures.Count + $anchorFailures.Count + $shapeFailures.Count + $releaseFailures.Count
 
 if ($totalFailures -gt 0) {
     Write-Host "Documentation checks failed:"
@@ -430,6 +606,10 @@ if ($totalFailures -gt 0) {
         Write-Host ("  Repository paths ({0}):" -f $linkFailures.Count)
         foreach ($failure in $linkFailures) { Write-Host "    $failure" }
     }
+    if ($anchorFailures.Count -gt 0) {
+        Write-Host ("  Link fragments ({0}):" -f $anchorFailures.Count)
+        foreach ($failure in $anchorFailures) { Write-Host "    $failure" }
+    }
     if ($shapeFailures.Count -gt 0) {
         Write-Host ("  Integration page shape ({0}):" -f $shapeFailures.Count)
         foreach ($failure in $shapeFailures) { Write-Host "    $failure" }
@@ -443,6 +623,7 @@ if ($totalFailures -gt 0) {
 $summary = "check-docs: checked {0} files ({1} docs pages, {2} learn pages, {3} source files, {4} fact sheets); {5} failure(s)." -f
     $checkedFiles, $docsContentFiles.Count, $learnContentFiles.Count, $docsSourceFiles.Count, $factFiles.Count, $totalFailures
 $summary += " The integration shape check covered {0} page(s)." -f $integrationShapePages.Count
+$summary += " The link-fragment check covered {0} link(s)." -f $fragmentLinkCount
 if ($keyCrossCheckSkipped) {
     $summary += " The private fact sheets are absent; the key cross-check ran against docs/configuration-keys.json (source section constants and documented exceptions), so a docs key no source section backs still fails. The fact-sheet-to-docs half needs the private records checkout."
 }

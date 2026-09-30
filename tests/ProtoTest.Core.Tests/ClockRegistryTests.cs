@@ -79,6 +79,35 @@ public sealed class ClockRegistryTests
     }
 
     [Test]
+    public async Task ClockRegistry_WhenADuplicateTestIdFailsToStart_ShouldKeepTheRunningTestsClock()
+    {
+        await using var host = BuildHost();
+        await host.StartAsync();
+
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource<ProtoExecutionContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var running = Task.Run(async () =>
+        {
+            var context = await host.StartTestAsync("running", "00009", TestMethods.Placeholder);
+            started.SetResult(context);
+            await release.Task;
+            await host.CompleteTestAsync(ProtoTestResult.Passed);
+        });
+
+        var context = await started.Task;
+        Assert.Throws<InvalidOperationException>(() =>
+            host.StartTestAsync("duplicate", "00009", TestMethods.Placeholder));
+        Assert.That(
+            host.FindClock("00009"),
+            Is.SameAs(context.Clock),
+            "a start that never registered must not remove the running test's clock");
+
+        release.SetResult();
+        await running;
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task ClockRegistry_WhenTheHostIsDisposed_ShouldClearItsClocks()
     {
         var host = BuildHost();

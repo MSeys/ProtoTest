@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { KindLabel } from "../trace/format";
 
-defineProps<{ type: KindLabel }>();
+/** `quiet` drops the fill for lists, where a chip on every row would outweigh the names beside it. */
+defineProps<{ type: KindLabel; quiet?: boolean }>();
 </script>
 
 <template>
   <!-- The colour comes from the shared token file: --type-<id> falls back to the action family, so an
        integration's own span kinds get a chip without the viewer knowing about them. -->
-  <span class="chip" :style="{ '--node-color': `var(--type-${type.id}, var(--type-custom))` }">{{ type.label }}</span>
+  <span class="chip" :class="{ quiet }" :style="{ '--node-color': `var(--type-${type.id}, var(--type-custom))` }">{{ type.label }}</span>
 </template>
 
 <style scoped>
@@ -22,4 +23,5 @@ defineProps<{ type: KindLabel }>();
   line-height: 1.8;
   white-space: nowrap;
 }
+.chip.quiet { padding: 0; background: transparent; color: color-mix(in srgb, var(--node-color) 70%, var(--muted)); font-weight: var(--weight-medium); }
 </style>

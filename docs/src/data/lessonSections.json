@@ -1,0 +1,22 @@
+[
+  {
+    "id": "the-scenario",
+    "value": "The scenario",
+    "level": 2
+  },
+  {
+    "id": "checkpoint",
+    "value": "Checkpoint",
+    "level": 2
+  },
+  {
+    "id": "what-you-learned",
+    "value": "What you learned",
+    "level": 2
+  },
+  {
+    "id": "keep-exploring",
+    "value": "Keep exploring",
+    "level": 2
+  }
+]

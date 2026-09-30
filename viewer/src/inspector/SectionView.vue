@@ -2,6 +2,9 @@
 import { computed } from "vue";
 import type { Section } from "../trace/model";
 import JsonView from "./JsonView.vue";
+import DetailCard from "../ui/DetailCard.vue";
+import PropertyList from "../ui/PropertyList.vue";
+import { useClipboard } from "../ui/useClipboard";
 
 /*
  * A section by its kind: fields as a definition list, code as a readable block, checks with their verdict,
@@ -13,12 +16,30 @@ const props = defineProps<{ section: Section; brief?: boolean }>();
 
 const known = ["fields", "code", "checks", "diff"];
 const kind = computed(() => known.includes(props.section.kind) ? props.section.kind : "generic");
+/*
+ * Content that decoded to replacement characters is a binary payload recorded as text (an xlsx body, an
+ * image): shown as what it is, with its length, never as a screen of broken glyphs.
+ */
+const binary = computed(() => Boolean(props.section.content?.includes("\uFFFD")));
 // JSON content opens as a tree; other code is shown as written.
-const isJson = computed(() => props.section.language === "json" && Boolean(props.section.content));
+const isJson = computed(() => !binary.value && props.section.language === "json" && Boolean(props.section.content));
+// Plain code reads in the same card as source and JSON, so every recorded document in the details looks alike.
+const isCode = computed(() => kind.value === "code" && !binary.value && Boolean(props.section.content));
+const { copied, copy } = useClipboard();
+// Fields read as properties, in a card like every other recorded block.
+const isFields = computed(() => (kind.value === "fields" || (kind.value === "generic" && !props.section.content)) && props.section.items.length > 0);
+const fields = computed(() => props.section.items.map(item => ({ key: item.label, value: item.value, tone: item.tone, detail: item.detail })));
 </script>
 
 <template>
   <JsonView v-if="kind === 'code' && isJson" :value="section.content" :label="section.label" :open-depth="1" />
+  <DetailCard v-else-if="isFields" :title="section.label" :meta="kind === 'generic' ? section.kind : `${section.items.length} ${section.items.length === 1 ? 'field' : 'fields'}`" plain>
+    <PropertyList :entries="fields" />
+  </DetailCard>
+  <DetailCard v-else-if="isCode" :title="section.label" :meta="section.language ?? undefined">
+    <template #tools><button type="button" @click="copy(section.content ?? '')">{{ copied ? "Copied" : "Copy" }}</button></template>
+    <pre class="code"><code>{{ section.content }}</code></pre>
+  </DetailCard>
   <section v-else class="section" :class="`is-${kind}`">
     <h3>{{ section.label }}<small v-if="kind === 'generic'">{{ section.kind }}</small></h3>
 
@@ -45,7 +66,8 @@ const isJson = computed(() => props.section.language === "json" && Boolean(props
       </tbody>
     </table>
 
-    <pre v-if="(kind === 'code' || kind === 'generic') && section.content" class="code"><code>{{ section.content }}</code></pre>
+    <p v-if="binary" class="binary">Binary content, recorded as {{ section.content?.length }} characters of text. Open the attached file to see it.</p>
+    <pre v-else-if="(kind === 'code' || kind === 'generic') && section.content" class="code"><code>{{ section.content }}</code></pre>
     <p v-if="!section.items.length && !section.content" class="empty">Recorded without content.</p>
   </section>
 </template>
@@ -83,7 +105,7 @@ h3 small { color: var(--dim); font-size: var(--text-micro); font-weight: var(--w
 
 .code {
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-chip);
   background: var(--surface-sunken);
   color: var(--text-on-sunken);
@@ -92,4 +114,5 @@ h3 small { color: var(--dim); font-size: var(--text-micro); font-weight: var(--w
   font: var(--text-micro)/var(--leading) var(--font-mono);
 }
 .empty { color: var(--dim); font-size: var(--text-meta); }
+.binary { padding: var(--space-2) var(--space-3); border: 1px dashed var(--border-strong); border-radius: var(--radius-chip); color: var(--muted); font-size: var(--text-body); }
 </style>

@@ -1,6 +1,4 @@
-/* The viewer's Panel: border only. The blueprint against the page is contrast enough.
-   The frame is also the sizing container its panels query, so they restack on the frame's own
-   width instead of the device's. */
+/* Shared panel chrome. Container queries respond to the panel's width inside any document layout. */
 .frame {
   container-type: inline-size;
   min-width: 0;
@@ -10,13 +8,13 @@
   background: var(--surface);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: var(--text-body);
+  font-size: 1rem;
   line-height: var(--leading);
 }
 
 .head {
   min-height: var(--panel-head-height);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -29,10 +27,10 @@
 .head > * { min-width: 0; }
 
 .foot {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   border-top: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--muted);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
   line-height: var(--leading);
 }

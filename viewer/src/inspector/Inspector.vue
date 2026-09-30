@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Artifact, Item, Span, TestTrace } from "../trace/model";
+import type { Artifact, Item, Run, Span, TestTrace } from "../trace/model";
 import { formatDuration, formatOffset, itemKindLabel, itemTitle, kindLabel } from "../trace/format";
 import AppButton from "../ui/AppButton.vue";
 import KindChip from "../ui/KindChip.vue";
@@ -14,7 +14,8 @@ import ItemInspector from "./ItemInspector.vue";
  * detail under it scrolls. An operation and a tracked item share the head's shape, so the panel reads the
  * same whichever the reader walked to.
  */
-const props = defineProps<{ test: TestTrace; span?: Span; item?: Item }>();
+const props = defineProps<{ test: TestTrace | Run; span?: Span; item?: Item }>();
+const scope = computed(() => "number" in props.test ? "test" : "run");
 const emit = defineEmits<{ select: [span: Span]; item: [item: Item]; artifact: [artifact: Artifact]; close: [] }>();
 
 const path = computed(() => {
@@ -50,7 +51,7 @@ const itemOrigin = computed(() => {
   const parts: string[] = [];
   const title = `${itemTitle(item)} ${item.name}`.toLocaleLowerCase();
   if (!title.includes(item.id.toLocaleLowerCase())) parts.push(item.id);
-  if (item.scope && item.scope !== props.test.name) parts.push(`scope ${item.scope}`);
+  if (item.scope && (!("name" in props.test) || item.scope !== props.test.name)) parts.push(`scope ${item.scope}`);
   return parts.join(", ");
 });
 </script>
@@ -60,7 +61,7 @@ const itemOrigin = computed(() => {
     <header class="head">
       <div class="top">
         <nav v-if="span && path.length" class="path" aria-label="Where this ran">
-          <button v-for="ancestor in path" :key="ancestor.id" type="button" @click="emit('select', ancestor)">{{ ancestor.name }}</button>
+          <button v-for="ancestor in path" :key="ancestor.id" type="button" :title="ancestor.name" @click="emit('select', ancestor)">{{ ancestor.name }}</button>
         </nav>
         <span v-else-if="span" class="path-label">{{ span.phase.charAt(0).toUpperCase() + span.phase.slice(1) }} phase</span>
         <nav v-else-if="origin" class="path" aria-label="Where this came from">
@@ -74,18 +75,17 @@ const itemOrigin = computed(() => {
       </div>
 
       <template v-if="span">
-        <div class="title">
+        <!-- Two lines: what it is, and how it went. The raw kind and its source are a hover away, not a third line. -->
+        <div class="title" :title="`${span.kind} from ${span.source}, ${span.phase} phase`">
           <KindChip :type="kindLabel(span.kind)" />
           <h2>{{ span.name }}</h2>
         </div>
         <p class="facts">
           <OutcomePill :outcome="span.status" />
           <span>{{ formatDuration(span.duration) }}</span>
-          <span>{{ formatOffset(span.start - test.start) }} into the test</span>
-          <span class="phase" :style="{ '--phase-color': `var(--phase-${span.phase})` }"><i />{{ span.phase }}</span>
+          <span>{{ formatOffset(span.start - test.start) }} into the {{ scope }}</span>
           <span v-if="span.count > 1">ran {{ span.count }} times</span>
         </p>
-        <p class="origin" :title="`${span.kind} from ${span.source}`"><code>{{ span.kind }}</code> from {{ span.source }}</p>
       </template>
 
       <template v-else-if="item">
@@ -120,15 +120,18 @@ const itemOrigin = computed(() => {
   background: var(--surface);
   overflow: hidden;
 }
-.head { padding: var(--space-2) var(--space-4) var(--space-4); display: grid; gap: var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface); }
+/* One column that never grows past the panel: a long path or id is cut or wrapped, not pushed off the edge. */
+.head { padding: var(--space-2) var(--space-4) var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface); }
 .top { min-height: 28px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .actions { flex: none; display: flex; align-items: center; gap: var(--space-1); }
 .actions :deep(.close) { width: 28px; height: 28px; }
 .link { height: 28px; padding: 0 var(--space-3); border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: var(--text-micro); transition: color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease); }
 .link:hover { border-color: var(--border); color: var(--text); }
-.path { min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.path button { padding: 0; border: 0; background: transparent; color: var(--muted); font-size: var(--text-micro); text-align: left; transition: color var(--motion-fast) var(--motion-ease); }
-.path button:not(:last-child)::after { content: "/"; margin-left: var(--space-1); color: var(--dim); }
+.path { min-width: 0; display: flex; gap: var(--space-1); overflow: hidden; white-space: nowrap; }
+.path button { min-width: 3ch; flex: 0 1 auto; padding: 0; overflow: hidden; border: 0; background: transparent; color: var(--muted); font-size: var(--text-micro); text-align: left; text-overflow: ellipsis; transition: color var(--motion-fast) var(--motion-ease); }
+.path button:last-child { flex-shrink: 0; max-width: 100%; }
+/* The separator leads the next step, so it stays visible when a step is cut short. */
+.path button + button::before { content: "/"; margin-right: var(--space-1); color: var(--dim); }
 .path button:hover { color: var(--text); text-decoration: underline; }
 .path-label { color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 
@@ -136,8 +139,6 @@ const itemOrigin = computed(() => {
 .title :deep(.chip) { flex: none; margin-top: var(--space-1); }
 h2 { min-width: 0; font-size: var(--text-heading); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); overflow-wrap: anywhere; text-wrap: balance; }
 .facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-4); color: var(--muted); font-size: var(--text-meta); }
-.phase { display: inline-flex; align-items: center; gap: var(--space-1); text-transform: capitalize; }
-.phase i { width: 7px; height: 7px; border-radius: var(--radius-hairline); background: var(--phase-color); }
 .source { padding: 0 var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 .source.applicationside { background: var(--blueprint-soft); color: var(--blueprint); }
 /* One line: where it came from is context, not content; the whole of it is in the tooltip. */

@@ -33,6 +33,18 @@ Colour carries meaning only:
 
 <Swatches tokens={['--blueprint', '--success', '--warning', '--danger', '--violet', '--muted']} />
 
+## Documentation panels
+
+A panel's role determines its presentation. The shared frame supplies its border, header spacing and source line.
+
+| Role | Presentation |
+| --- | --- |
+| Explanatory figure | Follows the reader's theme; uses the document's reading scale for notes and explanations |
+| Code | Uses the sunken blueprint surface, the monospace scale and a shared copy control |
+| Recorded product preview | Retains the viewer's blueprint surface and compact row layout; names its source archive |
+
+Documentation prose uses the reader scale (1rem). The compact token scale remains appropriate for code, ids and authentic product controls. Headings, spacing, colours and radii continue to come from the existing tokens.
+
 ## The execution vocabulary
 
 These tokens describe a test run rather than a page. Anything that draws a ProtoTest execution uses

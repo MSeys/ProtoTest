@@ -6,6 +6,7 @@ description: "One portable .prototrace file records every hook, client, request,
 
 import TraceAnatomy from '@site/src/components/TraceAnatomy';
 import TraceDiff from '@site/src/components/TraceDiff';
+import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
 
 # ProtoTrace
 
@@ -53,12 +54,23 @@ The trace is not the same thing as [observations](./coverage.md). The trace is a
 
 The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace files are read **entirely in your browser** and never uploaded. To look around before you have a trace of your own, [open the sample trace](https://trace.prototest.dev/?demo=1): a run of the sample suite, with four failing tests and one partial one.
 
-- **The run** opens with its verdict, what needs attention (failing and partial tests with the check that decided them, findings, gates), and what the run could see: where the application ran, which capabilities were composed, and which sources of values were present.
-- **A failing test** leads with its failure: the check that failed, expected against actual for every property, and the call it judged.
-- **Story** tells the test phase by phase: each call carries its checks, and the framework's own steps fold away until you open them.
-- **State** shows every tracked item with its lifeline and changes. Select a change to jump to the operation that made it.
-- **Spans** is the complete, searchable tree.
-- **The inspector** shows everything one operation recorded: where in your code it started, request and response, JSON as a collapsible tree, the shape a check validated, what it changed, and every item's change trail. The URL holds the selected operation, so a link opens the same operation.
+- **The run** leads one test list with shared search and outcome filters, and splits into views. **Overview** holds Needs attention, named with the diagnosis rule (Assertion, Operation error, Runner failure or Finding, in the precedence `prototest summary` uses), beside what the run could see. **Timeline** places tests and their gaps on the run clock. **Operations** lists the run's own work and tracked items, which open in the inspector. **Details** lists the run id and every `environment.*` value, and **Files** everything the run attached. A view with nothing in it has no tab; `#/run/<view>` links to one.
+- **A failing test** starts with a verdict bar: the diagnosis rule, the check or operation that decided it, the call it judged, and the first difference. The inspector holds the full comparison.
+- **Steps** opens on the test body. Setup and teardown fold into summary rows and open along a failure. Calls carry their checks; time with no recorded operation gets its own row.
+- **Timeline** is every operation on the test clock. Zoom to one phase, search by name, kind or attribute, and filter for needs attention. Matching operations keep their ancestors for context.
+- **State** shows tracked items with lifelines and changes on that same clock. Select a change to open its operation, shade its time and highlight the items it touched. Select an item to see its trail; its operations are highlighted in Timeline.
+- **Evidence** brings observations, files, findings and moments into time order. Each names the operation that recorded it, or states that none was above it.
+- **The inspector** shows the source, request and response, comparisons, state changes and evidence. Moments include their attributes and sections, observations their metadata, and findings their category, tags, target and metadata. A section index jumps to each part. Binary bodies recorded as text are marked instead of shown as broken glyphs.
+
+The **Framework** switch beside the view tabs shows, dims or hides the framework's own operations (hooks, extensions, clients, resources) in Steps and Timeline, and the machinery a test ran on in State. Dim is the default, the choice is remembered, and a framework operation that failed always stays.
+
+The header follows the path Run > Test > Operation. Test views use `#/test/<id>/steps|timeline|state|evidence`; old `story`, `spans` and `files` links still open the corresponding view. The URL holds the selected operation or item, including selections on the run, so a shared link keeps that place.
+
+Hatched time means **no operation was recorded**, not that nothing happened. The viewer derives gaps inside a phase from 15% of its duration, at least 20 ms, and always from 250 ms. Test 12 in the sample has a one-second real wait; test 15 waits for an address that cannot be reached. Both become visible gaps without changing the trace format.
+
+These excerpts follow test 12 from the run through its four views and into the failing check:
+
+<ViewerWalkthrough />
 
 ### Open your own archive
 
@@ -200,7 +212,8 @@ Without a browser, `ProtoTest.Traces` reads the archive and the `prototest` CLI 
 | The limit | When it matters |
 | --- | --- |
 | Redaction covers ProtoTest's own capture | Your own attributes and attachments can still carry application data, so treat a trace like test output |
-| The viewer's run header shows only the runtime and the operating system | Read the other `environment.*` entries from `spans.json` or the report |
+| Untraced gaps are derived by the viewer, not stored on the wire | A gap identifies time without recorded operations; it does not diagnose what happened during that time |
+| Binary-body marking detects replacement characters in recorded text | Open the attached file for its bytes; marking does not repair capture or change the archive |
 | `CaptureSourceLocations` is the largest tracing cost | `EmbedSources` controls whether the archive carries the code the viewer shows; the [benchmarks page](../project/benchmarks.md) records what a trace costs at 100 and 1,000 tests and the levers that change it |
 | The archive, its versions and its lifetime | [The .prototrace archive](./prototrace-archive.md): format, compatibility, run metadata and what survives a killed process |
 

@@ -1,4 +1,4 @@
-/* Two panes on the blueprint surface: the failing run keeps the danger edge, the passing one the success edge. */
+/* Two panes on the reader surface: the failing run keeps the danger edge, the passing one the success edge. */
 
 .tabs { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 
@@ -11,7 +11,7 @@
   border-bottom: 2px solid transparent;
   background: none;
   color: var(--muted);
-  font: var(--weight-semibold) var(--text-meta) var(--font-ui);
+  font: var(--weight-semibold) var(--text-title) var(--font-ui);
   cursor: pointer;
 }
 
@@ -20,7 +20,7 @@
 
 .panel { padding: var(--space-4); display: grid; gap: var(--space-4); }
 
-.ask { margin: 0; color: var(--muted); font-size: var(--text-meta); }
+.ask { margin: 0; color: var(--muted); font-size: var(--text-title); }
 
 .panes {
   display: grid;
@@ -44,10 +44,10 @@
 
 .paneHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 
-.role { font-size: var(--text-meta); font-weight: var(--weight-bold); }
+.role { font-size: var(--text-title); font-weight: var(--weight-bold); }
 
-.succeeded { color: var(--success); font: var(--weight-semibold) var(--text-micro) var(--font-ui); }
-.failed { color: var(--danger); font: var(--weight-semibold) var(--text-micro) var(--font-ui); }
+.succeeded { color: var(--success); font: var(--weight-semibold) var(--text-strong) var(--font-ui); }
+.failed { color: var(--danger); font: var(--weight-semibold) var(--text-strong) var(--font-ui); }
 
 .who { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
 
@@ -57,11 +57,11 @@
   padding: 0;
   background: none;
   color: var(--text);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
   overflow-wrap: anywhere;
 }
 
-.elapsed { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.elapsed { color: var(--dim); font: var(--text-strong) var(--font-mono); }
 
 .records { margin: 0; padding: 0; display: grid; gap: var(--space-1); list-style: none; }
 
@@ -83,17 +83,17 @@
   border-radius: var(--radius-chip);
   background: var(--blueprint-soft);
   color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
   line-height: 1.8;
 }
 
-.recordName { min-width: 0; font-size: var(--text-micro); font-weight: var(--weight-semibold); }
+.recordName { min-width: 0; font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 
 .records .succeeded, .records .failed { margin-left: auto; }
 
 .detail {
   color: var(--muted);
-  font: var(--text-micro)/1.55 var(--font-mono);
+  font: var(--text-strong)/1.55 var(--font-mono);
   overflow-wrap: anywhere;
 }
 
@@ -105,7 +105,7 @@
   gap: var(--space-2);
   border-radius: var(--radius-chip);
   background: var(--blueprint-soft);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
 }
 
 .change strong { color: var(--blueprint); }
@@ -113,6 +113,9 @@
 .archive {
   justify-self: start;
   color: var(--blueprint);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
   font-weight: var(--weight-semibold);
 }
+
+.recordDetails summary { color: var(--blueprint); cursor: pointer; font-size: var(--text-strong); margin-bottom: var(--space-3); }
+.ask, .change { font-size: 1rem; }

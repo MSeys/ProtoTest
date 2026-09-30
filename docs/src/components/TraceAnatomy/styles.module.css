@@ -1,61 +1,25 @@
-/* The test name under the title: a dotted path with no spaces, so it may break anywhere
-   rather than push the head past the frame on a phone. */
-.headMeta { min-width: 0; color: var(--dim); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
+/* The test name under the title stays one line; the whole name is its hint. */
+.headMeta { min-width: 0; overflow: hidden; color: var(--dim); font: var(--text-strong) var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 
-.layers {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+.layers { margin: 0; padding: 0; list-style: none; }
 
-.layer {
-  padding: var(--space-4);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-5);
-  align-items: flex-start;
-}
-
+/* A layer reads as the viewer's phase: its colour mark, its name and time, what it did, its operations. */
+.layer { padding: var(--space-4) var(--space-5); display: grid; gap: var(--space-2); }
 .layer + .layer { border-top: 1px solid var(--border); }
+.layerHead { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
+.marker { width: 10px; height: 10px; flex: none; border-radius: var(--radius-hairline); background: var(--phase); }
+.layerHead strong { font-size: var(--text-title); }
+.when { margin-left: auto; color: var(--muted); font-size: var(--text-strong); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.layerBody { min-width: 0; padding-left: calc(10px + var(--space-2)); }
+.lead { margin: 0; color: var(--muted); line-height: var(--leading); }
 
-.layerHead { flex: 0 1 9rem; min-width: 0; display: grid; gap: 2px; }
-
-.layerBody { flex: 1 1 22rem; min-width: 0; }
-
-.number { color: var(--dim); font: var(--text-micro) var(--font-mono); }
-
-.layerHead strong { font-size: var(--text-strong); }
-
-.when { color: var(--muted); font-size: var(--text-micro); }
-
-.lead { margin: 0 0 var(--space-2); color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
-
-.entries { margin: 0; padding: 0; display: grid; gap: var(--space-1); list-style: none; }
-
-.entry {
-  min-width: 0;
-  padding: var(--space-1) var(--space-2);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-3);
-  border-radius: var(--radius-chip);
-  background: var(--surface-2);
-}
-
-.kind {
-  flex: 0 0 auto;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-chip);
-  background: var(--blueprint-soft);
-  color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
-  line-height: 1.8;
-}
-
-.name { min-width: 0; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
-
-.meta { color: var(--muted); font-size: var(--text-micro); }
+/* Operations as quiet rows: the name, then its kind and what the trace recorded about it. */
+.entries { margin: 0; padding: 0; display: grid; list-style: none; }
+.entry { min-width: 0; padding: var(--space-2) 0; display: grid; gap: 2px; }
+.entry + .entry { border-top: 1px solid var(--border); }
+.name { min-width: 0; font-size: var(--text-title); font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.meta { min-width: 0; color: var(--muted); font-size: var(--text-strong); overflow-wrap: anywhere; }
+.kind { padding: 0; border: 0; background: none; color: color-mix(in srgb, var(--phase) 70%, var(--muted)); font: var(--text-strong) var(--font-mono); }
 
 .blind {
   padding: var(--space-4);
@@ -72,7 +36,7 @@
 .sourceOn, .sourceOff {
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
-  font-size: var(--text-micro);
+  font-size: var(--text-strong);
   line-height: 1.8;
 }
 
@@ -80,10 +44,15 @@
 
 .sourceOff { border: 1px dashed var(--border-strong); color: var(--dim); }
 
-.blindLead { margin: var(--space-3) 0 0; color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
+.blindLead { margin: var(--space-3) 0 0; color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
 
 .blindList { margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-2); list-style: none; }
 
 .blindList li { display: grid; gap: 2px; }
-.blindList strong { font-size: var(--text-meta); }
-.blindList p { margin: 0; color: var(--muted); font-size: var(--text-micro); line-height: var(--leading); }
+.blindList strong { font-size: var(--text-title); }
+.blindList p { margin: 0; color: var(--muted); font-size: var(--text-strong); line-height: var(--leading); }
+
+.recordDetails { margin-top: var(--space-2); }
+.recordDetails summary { width: fit-content; color: var(--blueprint); cursor: pointer; font-size: var(--text-strong); }
+.recordDetails[open] summary { margin-bottom: var(--space-1); }
+.blindLead, .blindList p { font-size: 1rem; }

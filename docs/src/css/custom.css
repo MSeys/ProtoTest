@@ -64,7 +64,7 @@
 }
 
 [data-theme='dark'] {
-  --ifm-color-primary: var(--pt-cyan);
+  --ifm-color-primary: var(--blueprint);
   --ifm-heading-color: var(--pt-white);
 }
 
@@ -73,13 +73,21 @@
 [data-surface] {
   --ifm-font-color-base: var(--text);
   --ifm-font-color-secondary: var(--muted);
+  --ifm-link-color: var(--blueprint);
+  --ifm-link-hover-color: var(--text);
+  --ifm-code-background: var(--blueprint-soft);
+  --ifm-code-color: var(--text);
+  --ifm-table-head-background: var(--surface-2);
+  --ifm-table-head-color: var(--text);
+  --ifm-table-border-color: var(--border);
+  --ifm-table-stripe-background: transparent;
 }
 [data-surface='paper'] {
   --ifm-color-primary: var(--blueprint);
   --ifm-heading-color: var(--pt-navy);
 }
 [data-surface='blueprint'] {
-  --ifm-color-primary: var(--pt-cyan);
+  --ifm-color-primary: var(--blueprint);
   --ifm-heading-color: var(--pt-white);
 }
 
@@ -88,8 +96,12 @@
 :focus-visible { outline: 2px solid var(--blueprint); outline-offset: 2px; }
 
 /* ── Type ─────────────────────────────────────────────────────────────────────────────────── */
-h1, h2, h3, h4 { letter-spacing: -0.02em; }
+h1, h2, h3, h4 { letter-spacing: var(--tracking-display); }
+.markdown h1 { font-size: calc(var(--text-display) * 1.6); line-height: var(--leading-tight); }
+.markdown > h2 { font-size: calc(var(--text-heading) * 1.4); }
+.markdown > h3 { font-size: var(--text-heading); }
 .markdown h2 { margin-top: calc(var(--space-7) + var(--space-3)); }
+.markdown > p, .markdown > ul, .markdown > ol { line-height: var(--leading); }
 
 /* ── Navbar and announcement bar ──────────────────────────────────────────────────────────── */
 .navbar__title {
@@ -98,6 +110,9 @@ h1, h2, h3, h4 { letter-spacing: -0.02em; }
 }
 
 .navbar { box-shadow: 0 1px 0 var(--border); }
+.navbar-sidebar { background: var(--bg); }
+.navbar-sidebar__brand { border-bottom: 1px solid var(--border); background: var(--surface); }
+.navbar-sidebar__back { background: var(--surface-2); color: var(--text); }
 
 /* ── Navbar controls ───────────────────────────────────────────────────────────────────────
    The search field, the theme switch and the GitHub item are one cluster: the same radius and hover box,
@@ -215,6 +230,7 @@ div[class*='announcementBar'] {
   font-size: var(--text-meta);
 }
 div[class*='announcementBar'] a { color: var(--blueprint); }
+div[class*='announcementBar'] .close { color: var(--muted); opacity: 1; }
 
 /* The one chip in the strip, so the notice reads as a status rather than decoration. */
 .announcement-preview {
@@ -223,8 +239,8 @@ div[class*='announcementBar'] a { color: var(--blueprint); }
   margin-right: var(--space-2);
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
-  background: var(--warning-soft);
-  color: var(--warning);
+  background: var(--blueprint-soft);
+  color: var(--blueprint);
   font: var(--weight-semibold) var(--text-micro)/1.8 var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -240,7 +256,7 @@ div[class*='announcementBar'] a { color: var(--blueprint); }
 div[class*='codeBlockTitle'] {
   border-bottom: 1px solid color-mix(in srgb, var(--code-text) 12%, transparent);
   background: var(--surface-sunken);
-  color: var(--code-comment);
+  color: var(--code-namespace);
   font: var(--text-meta) var(--font-mono);
 }
 .theme-code-block button { color: var(--code-punctuation); }
@@ -281,15 +297,31 @@ div[class*='codeBlockTitle'] {
   border: 0;
   border-bottom: 1px solid var(--border);
   color: var(--muted);
-  font-size: var(--text-meta);
+  font-size: var(--text-body);
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.04em;
+  letter-spacing: normal;
   text-align: left;
-  text-transform: uppercase;
+  text-transform: none;
 }
+.markdown table th, .markdown table td { padding: var(--space-4); }
 .markdown table td { border: 0; border-top: 1px solid var(--border); }
 .markdown table tbody tr:first-child td { border-top: 0; }
 .markdown table tr { border: 0; }
+
+/* A figure in running text keeps the same distance to the next paragraph as a code block does. */
+.markdown [data-frame] { margin-bottom: var(--ifm-spacing-vertical); }
+
+/* On a phone a row reads as a short card: its first cell as the title, every other cell under its column's
+   heading (data-label, added at build time by plugins/rehype-table-labels.cjs). Wide pages keep the table. */
+@media (max-width: 700px) {
+  .markdown table:has(td[data-label]) thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .markdown table:has(td[data-label]), .markdown table:has(td[data-label]) tbody, .markdown table:has(td[data-label]) tr, .markdown table:has(td[data-label]) td { display: block; }
+  .markdown table:has(td[data-label]) tr { padding: var(--space-3) var(--space-4); }
+  .markdown table:has(td[data-label]) tr + tr { border-top: 1px solid var(--border); }
+  .markdown table:has(td[data-label]) td { padding: 2px 0; border: 0; }
+  .markdown table:has(td[data-label]) td:first-child { padding-bottom: var(--space-1); font-weight: var(--weight-semibold); }
+  .markdown table:has(td[data-label]) td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: var(--text-strong); font-weight: var(--weight-regular); }
+}
 
 /* ── Admonitions: the viewer's left-edge blocks ──────────────────────────────────────────── */
 .theme-admonition {
@@ -330,7 +362,9 @@ div[class*='codeBlockTitle'] {
   border-radius: var(--radius-control);
   background: var(--surface);
 }
-.pagination-nav__link:hover { border-color: var(--ifm-color-primary); }
+.pagination-nav__link:hover { border-color: var(--blueprint-line); background: var(--surface-2); }
+.pagination-nav__sublabel { color: var(--muted); font-size: var(--text-meta); }
+.pagination-nav__label { font-size: var(--text-title); font-family: var(--font-display); }
 
 /* ── Diagrams ─────────────────────────────────────────────────────────────────────────────────
    Mermaid writes its colours into an id-scoped stylesheet inside each SVG, which outranks any class rule;
@@ -369,21 +403,21 @@ div[class*='codeBlockTitle'] {
 
 /* ── Footer ───────────────────────────────────────────────────────────────────────────────── */
 .footer--dark {
-  --ifm-footer-background-color: var(--pt-navy-deep);
-  --ifm-footer-link-color: color-mix(in srgb, var(--pt-paper) 72%, transparent);
-  --ifm-footer-link-hover-color: var(--pt-white);
-  --ifm-footer-title-color: var(--pt-white);
-  border-top: 1px solid color-mix(in srgb, var(--pt-white) 8%, transparent);
+  --ifm-footer-background-color: var(--surface-2);
+  --ifm-footer-link-color: var(--muted);
+  --ifm-footer-link-hover-color: var(--blueprint);
+  --ifm-footer-title-color: var(--text);
+  border-top: 1px solid var(--border);
 }
 /* On the blueprint surface the page is darker than the footer, so the footer reads as its own band. */
 [data-theme='dark'] .footer--dark { border-top-color: var(--border-strong); }
 .footer__title {
-  color: color-mix(in srgb, var(--pt-paper) 55%, transparent);
+  color: var(--text);
   font: var(--weight-semibold) var(--text-meta) var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.footer__copyright { color: color-mix(in srgb, var(--pt-paper) 55%, transparent); font-size: var(--text-meta); }
+.footer__copyright { color: var(--muted); font-size: var(--text-meta); }
 
 /* Footer marks: a mask takes the link's colour, so one geometry serves both themes. */
 .footer__link-item[href*='github.com']::before {
@@ -400,3 +434,18 @@ div[class*='codeBlockTitle'] {
 
 /* The mark already says the link leaves the site; the arrow would be a second glyph for the same job. */
 .footer__link-item[href*='github.com'] svg { display: none; }
+
+/* ── Mid-width docs ───────────────────────────────────────────────────────────────────────────
+   Between the tablet break and a wide screen the sidebar, the text and the table of contents share about
+   1000px. The sidebar gives way a little, so the text keeps a readable measure. */
+@media (min-width: 997px) and (max-width: 1199px) {
+  :root { --doc-sidebar-width: 260px; }
+}
+
+/* ── Sideways strips ──────────────────────────────────────────────────────────────────────────
+   Tabs that scroll (useStrip): no scrollbar of their own, and a fade on each side that still has more. */
+[data-strip] { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+[data-strip]::-webkit-scrollbar { display: none; }
+[data-strip][data-more='end'] { mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more='start'] { mask-image: linear-gradient(to left, black calc(100% - var(--space-6)), transparent); }
+[data-strip][data-more='both'] { mask-image: linear-gradient(to right, transparent, black var(--space-6), black calc(100% - var(--space-6)), transparent); }

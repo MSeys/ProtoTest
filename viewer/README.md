@@ -10,6 +10,25 @@ Drop a `.prototrace` file on [trace.prototest.dev](https://trace.prototest.dev).
 
 Treat a trace as test output. It can contain application data, so check what was captured before sharing it.
 
+## Read a run
+
+The run leads one test list, with shared search and outcome filters, and splits into views: Overview (Needs attention, with the diagnosis rules `prototest summary` uses, beside what the run could see), Timeline (tests and untraced gaps on the run clock), Operations (the run's own work and tracked items), Details (the run id and every `environment.*` value) and Files.
+
+Each test has four views:
+
+- **Steps** opens on the test body. Setup and teardown are summary rows that expand along a failure. Gaps get their own rows.
+- **Timeline** places every operation on the test clock. Zoom to a phase or search.
+- **State** puts lifelines and changes on that clock. Selecting a change opens its operation and highlights what it touched; selecting an item highlights its operations in Timeline.
+- **Evidence** orders observations, files, findings and moments by time, with the operation that recorded each.
+
+The **Framework** switch beside the view tabs shows, dims or hides framework operations in Steps and Timeline, and the machinery a test ran on in State, and remembers the choice.
+
+The inspector shows request and response, comparisons, state changes, metadata and moment sections. Its section index jumps to each part. Binary bodies recorded as text are marked instead of displayed as broken glyphs.
+
+Test routes are `#/test/<id>/steps|timeline|state|evidence`. Old `story`, `spans` and `files` links remain aliases. A run selection uses `#/?span=<id>` or `#/?kind=<kind>&item=<id>`.
+
+Untraced time is derived by the viewer, not recorded on the wire. A gap inside a phase is shown from 15% of that phase, at least 20 ms, and always from 250 ms. It means no operation was recorded, not that nothing happened.
+
 ## Share a trace
 
 Two query parameters make a trace shareable:

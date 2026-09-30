@@ -4,6 +4,12 @@ const root = document.documentElement;
 function syncTheme() {
   const theme = root.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
   root.setAttribute('data-theme', theme);
+  for (const block of document.querySelectorAll('pre')) {
+    block.setAttribute('data-surface', 'blueprint');
+    block.tabIndex = 0;
+    block.setAttribute('role', 'region');
+    block.setAttribute('aria-label', 'Code example');
+  }
   const logo = document.getElementById('logo');
   if (logo) {
     const src = logo.getAttribute('src');

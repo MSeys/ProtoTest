@@ -1,112 +1,19 @@
-/* The lesson frame: one panel, seven numbered blocks, no palette of its own. */
-
-.shell {
-  margin: var(--space-6) 0;
-  padding: clamp(var(--space-4), 3vw, var(--space-6));
-  display: grid;
-  gap: var(--space-7);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
-}
-
-/* Every block may shrink to the shell's width: one unbreakable line, usually an inline code chip,
-   must never widen the whole lesson past the viewport on a phone. */
+.shell { margin: var(--space-6) 0; font-size: 1rem; line-height: var(--leading); }
 .shell > * { min-width: 0; }
-
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border);
-}
-
-.level {
-  color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
-
-.minutes { color: var(--muted); font-size: var(--text-meta); }
-
-.label {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-  font-size: var(--text-heading);
-  letter-spacing: var(--tracking-display);
-}
-
-.step {
-  color: var(--dim);
-  font: var(--weight-medium) var(--text-meta) var(--font-mono);
-}
-
-.duo {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-  gap: var(--space-6);
-}
-
-.duo > * { min-width: 0; }
-
-.outcome, .before, .learned {
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-2);
-  list-style: none;
-}
-
-.outcome li, .before li, .learned li {
-  position: relative;
-  padding-left: var(--space-5);
-  line-height: 1.6;
-  /* Dotted names and inline code chips break before they push the lesson wide. */
-  overflow-wrap: break-word;
-}
-
-.outcome li::before, .before li::before, .learned li::before {
-  content: '';
-  position: absolute;
-  top: 0.42em;
-  left: 2px;
-  width: 7px;
-  height: 7px;
-  background: var(--blueprint);
-}
-
-.outcome li::before { transform: rotate(45deg); }
-.before li::before { border-radius: 50%; background: var(--muted); }
-.learned li::before { transform: rotate(45deg); background: var(--success); }
-
-.body { min-width: 0; line-height: 1.65; overflow-wrap: break-word; }
+.head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-5); color: var(--muted); font-size: var(--text-title); }
+.head > span:first-child { color: var(--blueprint); font-weight: var(--weight-semibold); }
+.duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface-2); }
+.duo strong { font-family: var(--font-display); }
+.duo ul { margin: var(--space-3) 0 0; padding-left: var(--space-5); }
+.duo li + li { margin-top: var(--space-2); }
+.shell h2 { margin-top: var(--space-7); margin-bottom: var(--space-4); font-size: calc(var(--text-heading) * 1.4); }
+.body { min-width: 0; overflow-wrap: break-word; }
 .body > :first-child { margin-top: 0; }
-
-.next {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-  gap: var(--space-3);
-}
-
-.card {
-  min-width: 0;
-  padding: var(--space-4);
-  display: grid;
-  gap: var(--space-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface-2);
-  color: var(--text);
-  transition: border-color var(--motion-fast) var(--motion-ease);
-  overflow-wrap: break-word;
-}
-
-.card:hover { border-color: var(--blueprint); color: var(--text); text-decoration: none; }
-.card strong { font-size: var(--text-strong); }
-.card span { color: var(--muted); font-size: var(--text-meta); line-height: var(--leading-tight); }
+.body > :last-child { margin-bottom: 0; }
+.body + .body > :first-child { margin-top: var(--space-7); }
+.learned { padding-left: var(--space-5); }
+.learned li + li { margin-top: var(--space-2); }
+.next { display: grid; gap: var(--space-4); }
+.next a { display: grid; gap: var(--space-2); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); }
+.next span { color: var(--muted); font-size: var(--text-title); }
+@media (max-width: 700px) { .duo { grid-template-columns: minmax(0, 1fr); } }

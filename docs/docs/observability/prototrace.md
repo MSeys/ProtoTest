@@ -6,6 +6,7 @@ description: "One portable .prototrace file records every hook, client, request,
 
 import TraceAnatomy from '@site/src/components/TraceAnatomy';
 import TraceDiff from '@site/src/components/TraceDiff';
+import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
 
 # ProtoTrace
 
@@ -59,6 +60,13 @@ The [ProtoTrace viewer](https://trace.prototest.dev) is a static web app. Trace 
 - **State** shows every tracked item with its lifeline and changes. Select a change to jump to the operation that made it.
 - **Spans** is the complete, searchable tree.
 - **The inspector** shows everything one operation recorded: where in your code it started, request and response, JSON as a collapsible tree, the shape a check validated, what it changed, and every item's change trail. The URL holds the selected operation, so a link opens the same operation.
+
+<details>
+<summary>Preview the recorded demo: run, story and check</summary>
+
+<ViewerWalkthrough />
+
+</details>
 
 ### Open your own archive
 

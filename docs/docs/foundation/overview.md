@@ -46,7 +46,7 @@ export const lifecycleLayers = [
 
 # Foundation overview
 
-Everything in ProtoTest sits on a handful of concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. One host per process, one context per test; everything else hangs off these two. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
+ProtoTest is an integration testing foundation for .NET. Its integrations build on the same concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. One host per process, one context per test; everything else hangs off these two. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
 
 ```mermaid
 flowchart TB

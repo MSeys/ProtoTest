@@ -1,5 +1,5 @@
-.headTitle { color: var(--text); font-size: var(--text-strong); font-weight: var(--weight-semibold); }
-.headMeta { color: var(--muted); font: var(--text-meta) var(--font-mono); }
+.headTitle { color: var(--text); font-size: var(--text-title); font-weight: var(--weight-semibold); }
+.headMeta { color: var(--muted); font: var(--text-strong) var(--font-mono); }
 
 .rows { padding: var(--space-2) 0 var(--space-3); container-type: inline-size; }
 
@@ -27,17 +27,17 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--text);
-  font: var(--text-body)/var(--leading) var(--font-mono);
+  font: var(--text-strong)/var(--leading) var(--font-mono);
 }
 
-.noteText { flex: 0 0 auto; color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.noteText { flex: 0 0 auto; color: var(--dim); font: var(--text-body) var(--font-mono); }
 
 /* Badges are the report's coverage chips: mono, square-cornered, tinted by what they say. */
 .badge {
   flex: 0 0 auto;
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
-  font: var(--weight-semibold) var(--text-meta)/var(--leading) var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong)/var(--leading) var(--font-mono);
   white-space: nowrap;
 }
 

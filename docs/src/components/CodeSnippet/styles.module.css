@@ -89,5 +89,5 @@
 
 /* Narrow frames keep the code readable instead of tight: the frame is the query container. */
 @container (max-width: 37.5rem) {
-  .pre { padding: var(--space-4); font-size: var(--text-body); }
+  .pre { padding: var(--space-4); font-size: var(--text-strong); }
 }

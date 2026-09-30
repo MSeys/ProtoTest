@@ -1,7 +1,7 @@
 .verdict { font: var(--weight-bold) var(--text-title) var(--font-display); letter-spacing: var(--tracking-display); }
 .failed { color: var(--danger); }
 .partial { color: var(--warning); }
-.meta { color: var(--muted); font-size: var(--text-meta); }
+.meta { color: var(--muted); font-size: var(--text-strong); }
 
 .body { padding: var(--space-4); display: grid; gap: var(--space-4); }
 
@@ -12,12 +12,12 @@
 .strip .partial { height: 12px; background: var(--outcome-partial); }
 .strip .failed { height: 12px; background: var(--outcome-failed); }
 
-.heading { margin: 0; font: var(--weight-bold) var(--text-strong) var(--font-ui); }
+.heading { margin: 0; font: var(--weight-bold) var(--text-title) var(--font-ui); }
 
 .facts { margin: 0; display: grid; gap: var(--space-3); }
 .facts > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: var(--space-3); }
-.facts dt { color: var(--muted); font-size: var(--text-meta); }
-.facts dd { margin: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.facts dt { color: var(--muted); font-size: var(--text-strong); }
+.facts dd { margin: 0; font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); font-weight: var(--weight-regular); }
 .capability { padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-chip); line-height: 1.8; }

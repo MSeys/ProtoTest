@@ -1,132 +1,33 @@
 import type {ReactNode} from 'react';
 import Link from '@docusaurus/Link';
-
-import Frame from '@site/src/components/Frame';
+import catalog from '@site/src/data/integrations.json';
 import styles from './styles.module.css';
-
-/*
- * The system under test in cross-section, from what a user sees to what reads the evidence, with every
- * capability placed at the depth it reaches. The spine on the left is the one ProtoExecutionContext every depth
- * plugs into: a test that drives the browser and one that reads the database are written the same way.
- */
-
-interface Capability {
-  name: string;
-  does: string;
-  packages: string;
-  to?: string;
-}
-
-interface Depth {
-  label: string;
-  note: string;
-  capabilities: Capability[];
-}
-
-const depths: Depth[] = [
-  {
-    label: 'In front of it',
-    note: 'What a user sees',
-    capabilities: [
-      {name: 'Browser', does: 'Page objects and named flows', packages: 'Web · Playwright · Selenium', to: '/docs/integrations/web'},
-    ],
-  },
-  {
-    label: 'At its boundary',
-    note: 'What it exposes',
-    capabilities: [
-      {name: 'REST', does: 'One traced client per API', packages: 'Rest', to: '/docs/integrations/rest'},
-      {name: 'GraphQL', does: 'Shapes as selections', packages: 'GraphQL', to: '/docs/integrations/graphql'},
-      {name: 'gRPC', does: 'Calls and streams', packages: 'Grpc', to: '/docs/integrations/grpc'},
-      {name: 'Contracts', does: 'Coverage of the API document', packages: 'OpenApi', to: '/docs/integrations/openapi'},
-    ],
-  },
-  {
-    label: 'Inside it',
-    note: 'The application itself',
-    capabilities: [
-      {name: 'In-process host', does: 'No deployed environment', packages: 'AspNetCore', to: '/docs/integrations/aspnetcore'},
-      {name: 'Its own telemetry', does: 'Values the app reports', packages: 'OpenTelemetry', to: '/docs/observability/opentelemetry'},
-    ],
-  },
-  {
-    label: 'Behind it',
-    note: 'What it writes to',
-    capabilities: [
-      {name: 'Database', does: 'The store the app uses', packages: 'Sql · EntityFrameworkCore', to: '/docs/integrations/sql'},
-      {name: 'Messaging', does: 'Publish, then await events', packages: 'Messaging · RabbitMq', to: '/docs/integrations/messaging'},
-      {name: 'Documents', does: 'The workbooks it generates', packages: 'Sheets', to: '/docs/integrations/sheets'},
-    ],
-  },
-  {
-    label: 'Around the run',
-    note: 'What the run brings',
-    capabilities: [
-      {name: 'Test data', does: 'Provisioned, with defaults', packages: 'Data', to: '/docs/integrations/data'},
-      {name: 'Infrastructure', does: 'Containers owned by the run', packages: 'Testcontainers', to: '/docs/foundation/infrastructure'},
-    ],
-  },
-  {
-    label: 'After the run',
-    note: 'What reads the evidence',
-    capabilities: [
-      {name: 'CLI', does: 'Summary, index, verify, feedback', packages: 'Cli', to: '/docs/agent-workflows/cli'},
-      {name: 'Traces', does: 'The archive and its reader', packages: 'Traces', to: '/docs/observability/prototrace'},
-      {name: 'MCP server', does: 'Four read-only tools over the runs', packages: 'Mcp', to: '/docs/agent-workflows/setup'},
-      {name: 'Diagnosis', does: 'The summary and failure context', packages: 'Diagnosis', to: '/docs/agent-workflows/diagnosis'},
-      {name: 'Verification', does: 'Compares two reports for regressions', packages: 'Verification', to: '/docs/agent-workflows/verification'},
-      {name: 'Feedback', does: 'Uploads the trace, posts the digest', packages: 'Feedback', to: '/docs/continuous-integration'},
-      {name: 'Analyzers', does: 'Warnings for code outside the lifecycle', packages: 'Analyzers', to: '/docs/project/analyzers'},
-      {name: 'Templates', does: 'Scaffolds a suite, already composed', packages: 'Templates', to: '/docs/getting-started/installation'},
-      {name: 'Reporting', does: 'The JSON and HTML report sinks', packages: 'Reporting', to: '/docs/observability/reporting'},
-    ],
-  },
-];
-
-function Card({capability}: {capability: Capability}): ReactNode {
-  const body = (
-    <>
-      <strong>{capability.name}</strong>
-      <span className={styles.does}>{capability.does}</span>
-      <code className={styles.packages}>{capability.packages}</code>
-    </>
-  );
-  return capability.to ? (
-    <Link className={styles.card} to={capability.to}>
-      {body}
-    </Link>
-  ) : (
-    <div className={styles.card}>{body}</div>
-  );
-}
-
-export default function CapabilityIndex(): ReactNode {
-  const count = depths.reduce((sum, depth) => sum + depth.capabilities.length, 0);
+export default function CapabilityIndex({group}: {group: keyof typeof catalog}): ReactNode {
   return (
-    <Frame surface="page"
-      head={
-        <>
-          <code className={styles.context}>ProtoExecutionContext</code>
-          <span className={styles.meta}>{count} capabilities, one context</span>
-        </>
-      }
-      foot={<>Every package is ProtoTest.*; compose the ones your suite needs.</>}>
-      <ol className={styles.depths}>
-        {depths.map((depth) => (
-          <li key={depth.label} className={styles.depth}>
-            <div className={styles.label}>
-              <i className={styles.node} aria-hidden="true" />
-              <strong>{depth.label}</strong>
-              <span>{depth.note}</span>
-            </div>
-            <div className={styles.cards}>
-              {depth.capabilities.map((capability) => (
-                <Card key={capability.name} capability={capability} />
+    <ul className={styles.catalog}>
+      {catalog[group].map((item) => (
+        <li key={item.name}>
+          <div className={styles.title}>
+            <strong>{item.name}</strong>
+            <span>{item.packages.length === 0 ? 'Built in' : item.preview ? 'Preview' : 'Supported'}</span>
+          </div>
+          <p>{item.does}</p>
+          {item.packages.length > 0 && (
+            <div className={styles.packages}>
+              {item.packages.map((name) => (
+                <code key={name}>{name}</code>
               ))}
             </div>
-          </li>
-        ))}
-      </ol>
-    </Frame>
+          )}
+          <nav className={styles.links} aria-label={`${item.name} documentation`}>
+            {item.links.map((link) => (
+              <Link key={link.to} to={link.to}>
+                {link.label} →
+              </Link>
+            ))}
+          </nav>
+        </li>
+      ))}
+    </ul>
   );
 }

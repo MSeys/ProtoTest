@@ -1,6 +1,7 @@
 import {useId, useRef, useState, type KeyboardEvent, type ReactNode} from 'react';
 
 import CodeSnippet from '@site/src/components/CodeSnippet';
+import CopyCode from '@site/src/components/CopyCode';
 import Frame from '@site/src/components/Frame';
 import styles from './styles.module.css';
 
@@ -27,62 +28,72 @@ export default function TabbedCode({tabs, label}: TabbedCodeProps): ReactNode {
   const id = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const [activeId, setActiveId] = useState(tabs[0]?.id);
-  const [copyState, setCopyState] = useState('Copy code');
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
   if (!active) return null;
 
   function activate(index: number): void {
     setActiveId(tabs[index].id);
-    setCopyState('Copy code');
   }
 
   function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
-    const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length
-      : event.key === 'ArrowLeft' ? (index - 1 + tabs.length) % tabs.length
-      : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null;
+    const next =
+      event.key === 'ArrowRight'
+        ? (index + 1) % tabs.length
+        : event.key === 'ArrowLeft'
+          ? (index - 1 + tabs.length) % tabs.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? tabs.length - 1
+              : null;
     if (next === null) return;
     event.preventDefault();
     activate(next);
     buttons.current[next]?.focus();
   }
 
-  async function copy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(active.code.trim());
-      setCopyState('Copied');
-    } catch {
-      setCopyState('Could not copy');
-    }
-  }
-
   return (
     <Frame
+      kind="code"
       head={
         <>
-        {tabs.length === 1 ? <strong className={styles.title}>{active.label}</strong> : <div className={styles.tabs} role="tablist" aria-label={label ?? "Code examples"}>
-          {tabs.map((tab, index) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              id={`${id}-tab-${tab.id}`}
-              aria-controls={`${id}-panel`}
-              tabIndex={tab.id === active.id ? 0 : -1}
-              ref={(button) => { buttons.current[index] = button; }}
-              className={`${styles.tab} ${tab.id === active.id ? styles.tabActive : ''}`}
-              onClick={() => activate(index)}
-              onKeyDown={(event) => navigate(event, index)}
-              aria-selected={tab.id === active.id}>
-              {tab.label}
-            </button>
-          ))}
-        </div>}
-        <button type="button" className={styles.copy} onClick={copy}>{copyState}</button>
-        <span className={styles.srOnly} role="status">{copyState === 'Copy code' ? '' : copyState}</span>
+          {tabs.length === 1 ? (
+            <strong className={styles.title}>{active.label}</strong>
+          ) : (
+            <div className={styles.tabs} role="tablist" aria-label={label ?? 'Code examples'}>
+              {tabs.map((tab, index) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  id={`${id}-tab-${tab.id}`}
+                  aria-controls={`${id}-panel`}
+                  tabIndex={tab.id === active.id ? 0 : -1}
+                  ref={(button) => {
+                    buttons.current[index] = button;
+                  }}
+                  className={`${styles.tab} ${tab.id === active.id ? styles.tabActive : ''}`}
+                  onClick={() => activate(index)}
+                  onKeyDown={(event) => navigate(event, index)}
+                  aria-selected={tab.id === active.id}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <CopyCode text={active.code} />
         </>
       }
-      foot={active.footnote}>
-      <div className={styles.body} id={`${id}-panel`} role={tabs.length > 1 ? 'tabpanel' : 'region'} aria-labelledby={tabs.length > 1 ? `${id}-tab-${active.id}` : undefined} aria-label={tabs.length === 1 ? active.filename : undefined}>
+      foot={active.footnote}
+    >
+      <div
+        className={styles.body}
+        id={`${id}-panel`}
+        role={tabs.length > 1 ? 'tabpanel' : 'region'}
+        aria-labelledby={tabs.length > 1 ? `${id}-tab-${active.id}` : undefined}
+        aria-label={tabs.length === 1 ? active.filename : undefined}
+      >
         <div className={styles.filename}>{active.filename}</div>
         <CodeSnippet code={active.code} language={active.language} regionLabel={active.filename} scroll />
       </div>

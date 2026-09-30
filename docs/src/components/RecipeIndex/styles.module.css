@@ -1,0 +1,5 @@
+.recipes { display: grid; gap: var(--space-4); margin: var(--space-6) 0; }
+.recipes a { display: grid; gap: var(--space-2); padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--text); }
+.recipes a:hover { text-decoration: none; border-color: var(--blueprint); }
+.recipes strong { font: var(--weight-semibold) var(--text-heading) var(--font-display); }
+.recipes span { color: var(--muted); }

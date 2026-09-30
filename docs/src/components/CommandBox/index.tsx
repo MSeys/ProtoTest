@@ -1,5 +1,6 @@
 import {useId, useState, type ReactNode} from 'react';
 
+import CopyCode from '@site/src/components/CopyCode';
 import styles from './styles.module.css';
 
 export interface CommandBoxRunner {
@@ -26,31 +27,15 @@ interface CommandBoxProps {
  * commands for the runner they use. The visible label reports what happened, and a status line announces it.
  */
 export default function CommandBox({title, commands, runners}: CommandBoxProps): ReactNode {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [runnerId, setRunnerId] = useState(runners?.[0]?.id ?? '');
   const baseId = useId();
   const lines = runners?.find((runner) => runner.id === runnerId)?.commands ?? commands;
-
-  async function copy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(lines.join('\n'));
-      setState('copied');
-    } catch {
-      setState('failed');
-    }
-    window.setTimeout(() => setState('idle'), 2000);
-  }
 
   return (
     <div className={styles.box} data-surface="blueprint">
       <div className={styles.head}>
         <span className={styles.title}>{title}</span>
-        <button type="button" className={styles.copy} onClick={copy}>
-          {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy'}
-          <span className={styles.status} role="status" aria-live="polite">
-            {state === 'copied' ? 'Commands copied to the clipboard.' : ''}
-          </span>
-        </button>
+        <CopyCode text={lines.join('\n')} label="Copy commands" />
       </div>
       {runners ? (
         <div className={styles.runners} role="group" aria-labelledby={`${baseId}-label`}>
@@ -66,7 +51,6 @@ export default function CommandBox({title, commands, runners}: CommandBoxProps):
                 checked={runner.id === runnerId}
                 onChange={() => {
                   setRunnerId(runner.id);
-                  setState('idle');
                 }}
               />
               <span>{runner.label}</span>

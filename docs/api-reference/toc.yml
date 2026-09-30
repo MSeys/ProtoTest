@@ -3,3 +3,7 @@ items:
   href: index.md
 - name: .NET namespaces
   href: _generated/toc.yml
+- name: Docs
+  href: https://prototest.dev/docs/
+- name: Trace viewer
+  href: https://trace.prototest.dev

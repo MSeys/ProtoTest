@@ -1,8 +1,8 @@
-.title { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
+.title { font-size: var(--text-title); font-weight: var(--weight-semibold); }
 
-.verdict { padding: var(--space-3) var(--space-5) 0; color: var(--text); font-size: var(--text-body); }
+.verdict { padding: var(--space-3) var(--space-5) 0; color: var(--text); font-size: var(--text-title); }
 
-.delta { color: var(--muted); font-size: var(--text-micro); }
+.delta { color: var(--muted); font-size: var(--text-strong); }
 
 .once { color: var(--muted); }
 .once strong { color: var(--text); }
@@ -21,7 +21,7 @@
 @container (max-width: 36rem) {
   .side + .side { border-left: 0; border-top: 1px solid var(--border); }
 }
-.sideLabel { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.sideLabel { color: var(--muted); font-size: var(--text-title); font-weight: var(--weight-semibold); }
 
 .figure { display: flex; align-items: baseline; gap: var(--space-2); }
 .figure strong {
@@ -30,9 +30,9 @@
   letter-spacing: var(--tracking-display);
   font-variant-numeric: tabular-nums;
 }
-.figure span { color: var(--muted); font-size: var(--text-body); }
+.figure span { color: var(--muted); font-size: var(--text-title); }
 .sideWith .figure strong { color: var(--blueprint); }
-.context { margin-bottom: var(--space-3); color: var(--dim); font-size: var(--text-meta); }
+.context { margin-bottom: var(--space-3); color: var(--dim); font-size: var(--text-title); }
 
 /* Hatched plumbing, solid scenario, one scale for both: the empty tail on the ProtoTest side is what stops
    being written. */
@@ -66,15 +66,15 @@
   border-bottom: 1px solid var(--border);
 }
 
-.docSide { color: var(--text); font-size: var(--text-body); font-weight: var(--weight-semibold); }
-.docName { min-width: 0; color: var(--muted); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
+.docSide { color: var(--text); font-size: var(--text-title); font-weight: var(--weight-semibold); }
+.docName { min-width: 0; color: var(--muted); font: var(--text-strong) var(--font-mono); overflow-wrap: anywhere; }
 
 .docScope {
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
   background: var(--surface);
   color: var(--muted);
-  font-size: var(--text-micro);
+  font-size: var(--text-strong);
   font-weight: var(--weight-semibold);
   line-height: 1.8;
 }
@@ -107,7 +107,7 @@
   border-top: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--muted);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
   cursor: pointer;
   transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
@@ -123,7 +123,7 @@
   border-top: 1px solid var(--border);
   background: transparent;
   color: var(--blueprint);
-  font-size: var(--text-meta);
+  font-size: var(--text-title);
   font-weight: var(--weight-semibold);
   text-align: left;
   cursor: pointer;
@@ -138,11 +138,11 @@
   border-top: 1px solid var(--border);
 }
 
-.contrast { color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
+.contrast { color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
 
 .owned { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 
-.ownedLabel { color: var(--muted); font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.ownedLabel { color: var(--muted); font-size: var(--text-title); font-weight: var(--weight-semibold); }
 
-.ownedItem { color: var(--text); font-size: var(--text-meta); }
+.ownedItem { color: var(--text); font-size: var(--text-title); }
 .ownedItem + .ownedItem { padding-left: var(--space-4); border-left: 1px solid var(--border); }

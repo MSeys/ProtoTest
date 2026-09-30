@@ -1,6 +1,6 @@
 /* The test name under the title: a dotted path with no spaces, so it may break anywhere
    rather than push the head past the frame on a phone. */
-.headMeta { min-width: 0; color: var(--dim); font: var(--text-micro) var(--font-mono); overflow-wrap: anywhere; }
+.headMeta { min-width: 0; color: var(--dim); font: var(--text-strong) var(--font-mono); overflow-wrap: anywhere; }
 
 .layers {
   margin: 0;
@@ -22,13 +22,13 @@
 
 .layerBody { flex: 1 1 22rem; min-width: 0; }
 
-.number { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+.number { color: var(--dim); font: var(--text-strong) var(--font-mono); }
 
-.layerHead strong { font-size: var(--text-strong); }
+.layerHead strong { font-size: var(--text-title); }
 
-.when { color: var(--muted); font-size: var(--text-micro); }
+.when { color: var(--muted); font-size: var(--text-strong); }
 
-.lead { margin: 0 0 var(--space-2); color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
+.lead { margin: 0 0 var(--space-2); color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
 
 .entries { margin: 0; padding: 0; display: grid; gap: var(--space-1); list-style: none; }
 
@@ -49,13 +49,13 @@
   border-radius: var(--radius-chip);
   background: var(--blueprint-soft);
   color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-micro) var(--font-mono);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
   line-height: 1.8;
 }
 
-.name { min-width: 0; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
+.name { min-width: 0; font-size: var(--text-title); font-weight: var(--weight-semibold); }
 
-.meta { color: var(--muted); font-size: var(--text-micro); }
+.meta { color: var(--muted); font-size: var(--text-strong); }
 
 .blind {
   padding: var(--space-4);
@@ -72,7 +72,7 @@
 .sourceOn, .sourceOff {
   padding: 0 var(--space-2);
   border-radius: var(--radius-chip);
-  font-size: var(--text-micro);
+  font-size: var(--text-strong);
   line-height: 1.8;
 }
 
@@ -80,10 +80,14 @@
 
 .sourceOff { border: 1px dashed var(--border-strong); color: var(--dim); }
 
-.blindLead { margin: var(--space-3) 0 0; color: var(--muted); font-size: var(--text-meta); line-height: var(--leading); }
+.blindLead { margin: var(--space-3) 0 0; color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
 
 .blindList { margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-2); list-style: none; }
 
 .blindList li { display: grid; gap: 2px; }
-.blindList strong { font-size: var(--text-meta); }
-.blindList p { margin: 0; color: var(--muted); font-size: var(--text-micro); line-height: var(--leading); }
+.blindList strong { font-size: var(--text-title); }
+.blindList p { margin: 0; color: var(--muted); font-size: var(--text-strong); line-height: var(--leading); }
+
+.recordDetails { margin-top: var(--space-4); }
+.recordDetails summary { color: var(--blueprint); cursor: pointer; font-size: var(--text-strong); margin-bottom: var(--space-3); }
+.lead, .blindLead, .blindList p { font-size: 1rem; }

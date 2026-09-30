@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 
 import CodeSnippet from '@site/src/components/CodeSnippet';
+import CopyCode from '@site/src/components/CopyCode';
 import Frame from '@site/src/components/Frame';
 import styles from './styles.module.css';
 
@@ -26,15 +27,20 @@ interface AnnotatedCodeProps {
 export default function AnnotatedCode({filename, code, callouts, foot}: AnnotatedCodeProps): ReactNode {
   return (
     <Frame
+      kind="figure"
       head={
-        <span className={styles.head}>
-          <strong>{filename}</strong>
-          <small>
-            {callouts.length} {callouts.length === 1 ? 'note' : 'notes'}
-          </small>
-        </span>
+        <>
+          <span className={styles.head}>
+            <strong>{filename}</strong>
+            <small>
+              {callouts.length} {callouts.length === 1 ? 'note' : 'notes'}
+            </small>
+          </span>
+          <CopyCode text={code} />
+        </>
       }
-      foot={foot}>
+      foot={foot}
+    >
       <CodeSnippet
         code={code}
         showLineNumbers
@@ -44,7 +50,9 @@ export default function AnnotatedCode({filename, code, callouts, foot}: Annotate
       <ol className={styles.notes}>
         {callouts.map((callout, index) => (
           <li key={callout.line}>
-            <span className={styles.n} aria-hidden="true">{index + 1}</span>
+            <span className={styles.n} aria-hidden="true">
+              {index + 1}
+            </span>
             <div>
               <strong>{callout.title}</strong>
               <p>{callout.note}</p>

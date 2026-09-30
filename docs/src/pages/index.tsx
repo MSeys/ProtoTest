@@ -66,7 +66,7 @@ public sealed class Setup : ProtoTestAssembly
         // In front of it, behind it, and what the run leaves behind.
         builder.AddWeb();
         builder.AddSql(_ => new SqliteConnection("Data Source=northstar.db"));
-        builder.ConfigureTracing(trace => trace.OutputPath = "northstar.prototrace");
+        // Tracing stays on its default: each run writes TestResults/prototest-{runId}.prototrace.
         builder.AddSink<HtmlReportSink>();
     }
 }`,

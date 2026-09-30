@@ -7,7 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 $repository = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repository "samples/Northstar.ProtoTest/Northstar.ProtoTest.csproj"
-$trace = Join-Path $repository "samples/Northstar.ProtoTest/bin/$Configuration/net8.0/TestResults/Northstar.ProtoTest/northstar.prototrace"
+$traceDir = Join-Path $repository "samples/Northstar.ProtoTest/bin/$Configuration/net8.0/TestResults"
+$traceFilter = "prototest-*.prototrace"
 $destinationDirectory = Join-Path $repository "viewer/public/demos"
 $destination = Join-Path $destinationDirectory "prototest-demo.prototrace"
 $runStartedAtUtc = [DateTime]::UtcNow
@@ -31,7 +32,8 @@ New-Item -ItemType Directory -Force -Path $destinationDirectory | Out-Null
 
 # Both files come from this run: the destination is deleted first so a stale committed trace can never
 # pass the copy, and the source is deleted so a run that writes no trace fails instead of reusing one.
-Remove-Item -LiteralPath $destination, $trace -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $traceDir $traceFilter) -Force -ErrorAction SilentlyContinue
 
 $arguments = @(
     "test", $project,
@@ -66,8 +68,9 @@ foreach ($name in $intentionalFailureNames) {
         throw "The demo run did not exercise the intentional failure '$name'."
     }
 }
-if (-not (Test-Path -LiteralPath $trace)) { throw "ProtoTest did not write the expected trace: $trace" }
-
+$traceFiles = @(Get-ChildItem -Path $traceDir -Filter $traceFilter -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending)
+if ($traceFiles.Count -eq 0) { throw "ProtoTest did not write the expected trace: $(Join-Path $traceDir $traceFilter)" }
+$trace = $traceFiles[0].FullName
 $traceFile = Get-Item -LiteralPath $trace
 if ($traceFile.LastWriteTimeUtc -lt $runStartedAtUtc.AddSeconds(-1)) {
     throw "The test run did not produce a fresh ProtoTrace archive."

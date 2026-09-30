@@ -49,8 +49,6 @@ public sealed class Setup : ProtoTestAssembly
         builder
             .ConfigureTracing(trace =>
             {
-                trace.OutputPath = Path.Combine(
-                    "TestResults", "Northstar.ProtoTest", "northstar.prototrace");
                 trace.ActivitySources.Add("Northstar.Domain");
             })
             .ConfigureRedaction(redaction => redaction.AddSensitiveName("OwnerToken"))

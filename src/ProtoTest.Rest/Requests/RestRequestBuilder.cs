@@ -337,7 +337,8 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
                     Method: method.Method,
                     RouteTemplate: routeTemplate,
                     StatusCode: (int)responseMessage.StatusCode,
-                    ResponseBody: diagnosticBody,
+                    // Binary bodies stay bytes in the attachment; the observation keeps no decoded text.
+                    ResponseBody: IsTextMediaType(responseMediaType) ? diagnosticBody : string.Empty,
                     Headers: headersDict,
                     RequestUri: ProtoHttpDiagnosticSanitizer.SanitizeUri(request.RequestUri, attachmentOptions),
                     Duration: stopwatch.Elapsed

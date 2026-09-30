@@ -98,6 +98,53 @@ public sealed class RestBinaryBodyTests
     }
 
     [Test]
+    public async Task BinaryResponseObservation_ShouldCarryNoDecodedBody()
+    {
+        var expected = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0xFF, 0x00, 0x01, 0x80 };
+        var handler = new TestHttpMessageHandler
+        {
+            ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(expected)
+            }
+        };
+        handler.ResponseToReturn.Content.Headers.ContentType =
+            new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        var builder = new ProtoHostBuilder();
+        builder.AddRest(rest => rest.CaptureAttachments().AddClient(
+            "Files",
+            "https://files.test",
+            http => http.ConfigurePrimaryHttpMessageHandler(() => handler)));
+        await using var host = builder.Build();
+        var context = await host.StartTestAsync("binary observation", "20033", TestMethods.Placeholder);
+
+        try
+        {
+            using var response = await context.Rest("Files").GetAsync("/image.png");
+
+            response.Should.HaveHttpStatus(HttpStatusCode.OK);
+
+            var observation = (RestResponseData)context.RecordedObservations.Single().Data!;
+            Assert.Multiple(() =>
+            {
+                Assert.That(observation.ResponseBody, Is.Empty);
+                Assert.That(observation.Headers["Content-Type"], Does.Contain("image/png"));
+            });
+
+            var responseAttachment = context.Attachments.Single(attachment => attachment.Name.EndsWith("-response"));
+            Assert.Multiple(async () =>
+            {
+                Assert.That(responseAttachment.MediaType, Is.EqualTo("image/png"));
+                Assert.That(await responseAttachment.ReadAllBytesAsync(), Is.EqualTo(expected));
+            });
+        }
+        finally
+        {
+            await host.CompleteTestAsync();
+        }
+    }
+
+    [Test]
     public async Task TextBodies_ShouldKeepSanitizedAttachmentAndJsonCodeSection()
     {
         const string json = """{"name":"Matthias"}""";
@@ -140,6 +187,9 @@ public sealed class RestBinaryBodyTests
                 Assert.That(body.Language, Is.EqualTo("json"));
                 Assert.That(body.Content, Does.Contain("\"id\": 1"));
             });
+
+            var observation = (RestResponseData)context.RecordedObservations.Single().Data!;
+            Assert.That(observation.ResponseBody, Does.Contain("\"id\": 1"));
         }
         finally
         {

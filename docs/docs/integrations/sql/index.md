@@ -6,9 +6,24 @@ description: "A database connection each test owns, optionally wrapped in a tran
 
 # SQL
 
+`ProtoTest.Sql` gives each test a database connection it owns. Writes made through that connection disappear at teardown:
+
+```csharp
+builder.AddSql(
+    services => new NpgsqlConnection(connectionString),
+    sql => sql.Isolation = SqlIsolation.Transaction);
+
+// in a test
+context.Orders.Add(new Order { Reference = "ORD-1" });
+await context.SaveChangesAsync();
+// the row is there for the test, and gone after it: the transaction rolls back.
+```
+
+Run it with `dotnet test`. A green run prints the passing test, and the trace lands at `TestResults/prototest-{runId}.prototrace` with a `sql.connection.open` operation in setup and its release at teardown. The isolation promise behind that rollback is spelled out under [Isolation](#isolation).
+
 ## What it adds
 
-`ProtoTest.Sql` gives each test a database connection it owns: opened before the test, optionally wrapped in a transaction that is rolled back when the test ends, and disposed with the test. `ProtoTest.Sql.EntityFrameworkCore` builds Entity Framework Core contexts on that same connection, and `ProtoTest.Sql.Testcontainers` owns a PostgreSQL server for the run. Use it when tests write to a store they control and must leave no rows behind. When the store belongs to a deployed environment, test through the application APIs instead.
+`ProtoTest.Sql` opens that connection before the test, optionally wraps it in a transaction that is rolled back when the test ends, and disposes it with the test. `ProtoTest.Sql.EntityFrameworkCore` builds Entity Framework Core contexts on that same connection, and `ProtoTest.Sql.Testcontainers` owns a PostgreSQL server for the run. Use it when tests write to a store they control and must leave no rows behind. When the store belongs to a deployed environment, test through the application APIs instead.
 
 Writes made through the connection ProtoTest owns disappear at teardown:
 
@@ -18,14 +33,6 @@ Writes made through the connection ProtoTest owns disappear at teardown:
 | Through the application's own connection | commits | commits |
 
 See [Isolation](#isolation) for the promise and its guard.
-
-## Stores other than SQL
-
-This page is relational: `ProtoTest.Sql` owns a `DbConnection` per test. When the store is MongoDB, Redis, Elasticsearch or anything else without ADO.NET, pick one of three options:
-
-1. **Test through the application APIs.** When the store belongs to a deployed environment rather than the test, drive it through the application's REST, GraphQL or gRPC surface and assert on what comes back. Nothing here is needed.
-2. **Register a raw client.** When the test must reach the store directly, register the client as an ordinary scoped service on the host builder and resolve it in the test. There is no per-test transaction or rollback; provision what the test needs and release it in teardown or with a [provisioner](../data/provisioners.md).
-3. **Write an adapter that follows the SQL rule.** When several suites need the same owned-connection shape, package it like `ProtoTest.Sql` does: a host builder extension that registers the client scoped, a test hook that opens and releases it, and the same honest capability rule. `SqlAddressRule.DeclaredKeys` and `SqlAddressRule.IsInert` carry the address decision, and `AddEntityFrameworkCore` is the canonical example to copy (see [For package authors](#for-package-authors)).
 
 ## Install
 
@@ -225,6 +232,14 @@ sql.connection.open · NpgsqlConnection (Setup)
 ## The demo's wiring
 
 The sample suite composes its own domain over the connection ProtoTest owns, with `SqlIsolation.None` because the in-process application keeps its own connection. See the composition in [`samples/Northstar.ProtoTest/Setup.cs`](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Setup.cs).
+
+## Stores other than SQL
+
+This page is relational: `ProtoTest.Sql` owns a `DbConnection` per test. When the store is MongoDB, Redis, Elasticsearch or anything else without ADO.NET, pick one of three options:
+
+1. **Test through the application APIs.** When the store belongs to a deployed environment rather than the test, drive it through the application's REST, GraphQL or gRPC surface and assert on what comes back. Nothing here is needed.
+2. **Register a raw client.** When the test must reach the store directly, register the client as an ordinary scoped service on the host builder and resolve it in the test. There is no per-test transaction or rollback; provision what the test needs and release it in teardown or with a [provisioner](../data/provisioners.md).
+3. **Write an adapter that follows the SQL rule.** When several suites need the same owned-connection shape, package it like `ProtoTest.Sql` does: a host builder extension that registers the client scoped, a test hook that opens and releases it, and the same honest capability rule. `SqlAddressRule.DeclaredKeys` and `SqlAddressRule.IsInert` carry the address decision, and `AddEntityFrameworkCore` is the canonical example to copy (see [For package authors](#for-package-authors)).
 
 ## Skip
 

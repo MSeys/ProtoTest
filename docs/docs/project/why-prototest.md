@@ -16,13 +16,21 @@ Integration testing gave me plenty of those problems.
 
 Integration testing gets hard for larger applications, such as multi-tenant services. There is infrastructure to start, users and tenants to create, authentication to arrange, data to clean up and different services to talk to.
 
-At some point more of the test is about that setup than the behavior it is meant to check.
+At some point more of the test is about that setup than the behavior it is meant to check. My focus has always been clean and readable code. I wanted common application setup outside the test, while setup that matters to the scenario should remain visible:
 
-```text
-BEFORE: test = 60% setup, 40% scenario | AFTER: setup in host and attributes, test = scenario
+```csharp
+// Before: the test builds the world, then checks one thing.
+var client = new HttpClient { BaseAddress = new Uri("http://localhost:5000") };
+var token = await SignInAsTestUser(client);
+var tenant = await CreateTenant(client, token);
+var response = await client.PostAsync("/api/projects", content);
+
+// After: the host and attributes built the world. The test is the scenario.
+using var response = await Proto.Context.Rest()
+    .Body(new { product = "notebook", quantity = 2 })
+    .PostAsync("/api/orders");
+response.Should.HaveHttpStatus(HttpStatusCode.Created);
 ```
-
-My focus has always been clean and readable code. I wanted common application setup outside the test, while setup that matters to the scenario should remain visible.
 
 ## I had built a testing framework before
 
@@ -38,13 +46,7 @@ ProtoTest was built from scratch, but the vision did not start from scratch.
 
 There are already good libraries for HTTP, browsers, containers and most other things ProtoTest works with. I did not build ProtoTest to replace them.
 
-Each integration handled setup, auth and diagnostics on its own. Setup, authentication, cleanup and diagnostics were handled differently or had to be connected by the test project.
-
-```text
-ISLANDS: HTTP setup != browser setup != broker setup | FOUNDATION: one host, context, lifecycle, trace
-```
-
-ProtoTest gives those integrations the same host, test context and lifecycle. They can use setup that already happened and write their operations to the same trace.
+Each integration handled setup, auth and diagnostics on its own. Setup, authentication, cleanup and diagnostics were handled differently or had to be connected by the test project. ProtoTest gives those integrations the same host, test context and lifecycle. They can use setup that already happened and write their operations to the same trace. The [comparison](./compare.md) counts the plumbing per fixture: 35 lines without, 13 with.
 
 The integrations are still opinionated wrappers. They represent how I want to write tests with the libraries underneath them. That will not be the best choice for everyone.
 
@@ -52,13 +54,7 @@ The integrations are still opinionated wrappers. They represent how I want to wr
 
 Moving common setup outside a test makes the scenario easier to read, but it can also hide what happened before the test method ran.
 
-That hurts when a test fails only in CI, fails intermittently, or needs several infrastructure pieces. A failed assertion is often only the final part of the story.
-
-```text
-ASSERTION without context vs TRACE with setup, operations and cleanup around the failure
-```
-
-ProtoTrace exists to show the lifecycle around that failure. It records setup, operations, checks, cleanup and captured evidence from the integrations that took part. The file stays readable to readers from its own era; the [compatibility matrix](../observability/prototrace-archive.md#format-compatibility) states which reader opens which version.
+That hurts when a test fails only in CI, fails intermittently, or needs several infrastructure pieces. A failed assertion is often only the final part of the story. ProtoTrace exists to show the lifecycle around that failure: setup, operations, checks, cleanup and captured evidence from every integration that took part. [Open the sample trace](https://trace.prototest.dev/?demo=1) to see one: a run of the sample suite, with four failing tests and one partial one. The file stays readable to readers from its own era; the [compatibility matrix](../observability/prototrace-archive.md#format-compatibility) states which reader opens which version.
 
 Playwright tracing was a large inspiration, but I wanted the trace to cover more than browser actions.
 

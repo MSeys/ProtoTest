@@ -41,7 +41,7 @@ public static IProtoHostBuilder AddSheets(
     Action<SheetsOptions>? configure = null);
 ```
 
-`AddSheets` registers the `Sheets` capability (`ProtoCapabilityKinds.Document`), a singleton `SheetsOptions` built from the callback and then bound from `ProtoTest:Sheets`, and the `SheetsCoverageCollector`. Repeats are no-ops: the first options callback wins, the first collector instance wins, and the capability descriptor dedupes.
+`AddSheets` registers the `Sheets` capability (`ProtoCapabilityKinds.Document`), a singleton `SheetsOptions` built from the callback and then bound from `ProtoTest:Sheets`, and the `SheetsCoverageCollector`. A repeated `AddSheets` composes: every options callback runs in registration order before `ProtoTest:Sheets` binds over the result, while the collector registers once and the capability descriptor dedupes.
 
 ### Options and keys
 

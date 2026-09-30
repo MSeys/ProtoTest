@@ -7,6 +7,11 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+### Fixes
+
+- GraphQL: a fluent upload argument fails when the document is built instead of rendering as a literal. [GraphQL](https://prototest.dev/docs/integrations/graphql)
+- Docs: a repeated `AddSheets` composes its options callbacks instead of keeping the first. [Sheets](https://prototest.dev/docs/integrations/sheets)
+
 ## [1.1.0] - 2026-09-29
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the

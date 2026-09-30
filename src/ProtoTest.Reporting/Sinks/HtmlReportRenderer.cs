@@ -120,6 +120,7 @@ internal sealed partial class HtmlReportRenderer
               <div class="empty-state" id="emptyState" hidden><strong>No matching entries</strong><span>Try another search or filter.</span></div>
             </section>
             </main>
+            <footer class="report-footer"><span>For the full trace, drop the run&apos;s <code>.prototrace</code> file at <a href="https://trace.prototest.dev">trace.prototest.dev</a>.</span></footer>
             """);
         _html.Append("<script>").Append(HtmlReportAssets.Script).Append("</script>");
         _html.Append("</body></html>");

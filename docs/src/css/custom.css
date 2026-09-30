@@ -419,3 +419,10 @@ div[class*='codeBlockTitle'] {
 
 /* The mark already says the link leaves the site; the arrow would be a second glyph for the same job. */
 .footer__link-item[href*='github.com'] svg { display: none; }
+
+/* ── Mid-width docs ───────────────────────────────────────────────────────────────────────────
+   Between the tablet break and a wide screen the sidebar, the text and the table of contents share about
+   1000px. The sidebar gives way a little, so the text keeps a readable measure. */
+@media (min-width: 997px) and (max-width: 1199px) {
+  :root { --doc-sidebar-width: 260px; }
+}

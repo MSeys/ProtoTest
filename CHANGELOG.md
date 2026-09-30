@@ -197,6 +197,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the agent workflows document the feedback webhook payload, the configuration page lists every section's keys, and the template page shows what the scaffold creates. [CLI](https://prototest.dev/docs/agent-workflows/cli)
 - the reference pages gain the recorded trace walks, the decision figures and the triage tables; the longest pages split into child pages (web page coverage, messaging adapters, gRPC calls, the ProtoTrace archive, the CI providers). [Docs](https://prototest.dev/docs/)
 - the home opens on the blueprint hero with the journey as test, composition and trace, then proves three claims with real artefacts: the plumbing each fixture stops writing, the failing check as the viewer shows it, and one model across integrations; the starter includes the working directory and runner options; the integration pages open with a shown test and keep reference detail below the tasks. [Docs](https://prototest.dev/docs/)
+- Start here opens with one paragraph and four starting points (try it, learn it, weigh it, use it) in two columns, and the sidebar narrows between tablet and wide screens so the text keeps its measure. [Docs](https://prototest.dev/docs/)
 - the READMEs follow one shape per kind, from the root to the package pages. [Docs](https://prototest.dev/docs/)
 - Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
 

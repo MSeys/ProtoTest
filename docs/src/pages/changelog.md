@@ -264,6 +264,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 ### Breaking changes
 
+These are the 1.0 to 1.1 migration changes; from 1.1 onward the 1.x surface stays additive.
+
 - Core: `AddClientFrom` is removed from the REST and GraphQL builders.
   - Register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver ([Clients](https://prototest.dev/docs/foundation/clients)).
 - Core: registration, observation and runner implementation types are internal; use the public APIs.

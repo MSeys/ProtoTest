@@ -11,7 +11,7 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
-## 1.1.0 - 2026-09-29
+## 1.1.0 - 2026-09-30
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
 CLI), the devices family (WebSocket and MQTT), the topology integrations (Aspire, WireMock,
@@ -321,8 +321,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 ## 1.0.0 - 2026-09-19
 
-**ProtoTest 1.0 is here.** What began as a stubborn idea — that an integration test should read like the
-scenario it describes while the framework quietly owns everything around it — is now a stable foundation
+**ProtoTest 1.0 is here.** What began as a stubborn idea, that an integration test should read like the
+scenario it describes while the framework quietly owns everything around it, is now a stable foundation
 for .NET 8, 9 and 10. One host, one execution context and one explicit lifecycle; the test runner you
 already use; and every integration sharing the same assertions, evidence and coverage, all the way down to
 a portable trace you can open and read. Every package ships together at 1.0.0, documented, tested, and

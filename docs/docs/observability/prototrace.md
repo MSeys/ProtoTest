@@ -157,7 +157,7 @@ A suite can name more values sensitive. `ConfigureRedaction` adds names to the d
 builder.ConfigureRedaction(redaction => redaction.AddSensitiveName("OwnerToken"));
 ```
 
-The names travel with the host: a second host in the same process keeps the defaults only. `ProtoTest:Redaction` binds the same names from configuration. See [Configuration](../getting-started/configuration.md) for which source wins.
+The names travel with the host: a second host in the same process keeps the defaults only. `ProtoTest:Redaction` binds the same names from configuration. See [Configuration](../getting-started/configuration.md) for which source wins. Attachment and diagnostic JSON keeps its own per-protocol list (`SensitiveJsonProperties` on each protocol's attachment options), so a name added here reaches state values and finding metadata, not those bodies.
 
 ### A walk through one test
 

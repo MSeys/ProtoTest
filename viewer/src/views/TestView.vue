@@ -10,9 +10,7 @@ import Tabs from "../ui/Tabs.vue";
 import VerdictBar from "../ui/VerdictBar.vue";
 import PhaseBand from "../ui/PhaseBand.vue";
 import OutcomePill from "../ui/OutcomePill.vue";
-import Panel from "../ui/Panel.vue";
-import FileList from "../ui/FileList.vue";
-import type { FileEntry } from "../ui/FileList.vue";
+import EvidenceView from "./EvidenceView.vue";
 
 /*
  * One test: who it is and how it ended, why it did not pass, and the views onto what it did. The views
@@ -31,7 +29,6 @@ const props = defineProps<{
 const emit = defineEmits<{ selectSpan: [span: Span | undefined]; selectItem: [item: Item]; artifact: [artifact: Artifact]; tab: [id: string] }>();
 
 const itemSelection = computed(() => props.selectedItem ? { kind: props.selectedItem.kind, id: props.selectedItem.id } : undefined);
-const files = computed<FileEntry[]>(() => [...props.test.artifacts.values()].map(artifact => ({ artifact, detail: artifact.description })));
 
 /* Every outcome short of pass and skip says why, even when no operation failed. */
 const explains = computed(() => props.test.outcome !== "succeeded" && props.test.outcome !== "skipped");
@@ -68,9 +65,7 @@ const explains = computed(() => props.test.outcome !== "succeeded" && props.test
       <StepsView v-if="view === 'steps'" :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
       <StateView v-else-if="view === 'state'" :test="test" :selected="itemSelection" :selected-span="selectedSpan?.id"
                  @select-item="emit('selectItem', $event)" @select-span="emit('selectSpan', $event)" />
-      <Panel v-else-if="view === 'files'" title="Files" subtitle="Everything this test attached, in the order it produced them." pad="none">
-        <FileList :entries="files" @open="emit('artifact', $event)" />
-      </Panel>
+      <EvidenceView v-else-if="view === 'evidence'" :test="test" @select="emit('selectSpan', $event)" @artifact="emit('artifact', $event)" />
       <TimelineView v-else :test="test" :selected="selectedSpan?.id" @select="emit('selectSpan', $event)" />
     </div>
   </div>

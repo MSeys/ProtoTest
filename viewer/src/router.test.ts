@@ -30,6 +30,11 @@ describe("router addresses", () => {
     expect(parse("#/test/t1/story?span=s1")).toEqual({ name: "test", testId: "t1", view: "steps", selection: { span: "s1" } });
   });
 
+  it("keeps Files links and their selection opening Evidence", () => {
+    expect(parse("#/test/t1/files?span=s1")).toEqual({ name: "test", testId: "t1", view: "evidence", selection: { span: "s1" } });
+    expect(href({ name: "test", testId: "t1", view: "evidence" })).toBe("#/test/t1/evidence");
+  });
+
   it("opens the steps for a view it does not know", () => {
     expect(parse("#/test/t1/nothing")).toMatchObject({ view: "steps" });
   });

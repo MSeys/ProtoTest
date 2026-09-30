@@ -13,8 +13,13 @@ const props = defineProps<{ section: Section; brief?: boolean }>();
 
 const known = ["fields", "code", "checks", "diff"];
 const kind = computed(() => known.includes(props.section.kind) ? props.section.kind : "generic");
+/*
+ * Content that decoded to replacement characters is a binary payload recorded as text (an xlsx body, an
+ * image): shown as what it is, with its length, never as a screen of broken glyphs.
+ */
+const binary = computed(() => Boolean(props.section.content?.includes("\uFFFD")));
 // JSON content opens as a tree; other code is shown as written.
-const isJson = computed(() => props.section.language === "json" && Boolean(props.section.content));
+const isJson = computed(() => !binary.value && props.section.language === "json" && Boolean(props.section.content));
 </script>
 
 <template>
@@ -45,7 +50,8 @@ const isJson = computed(() => props.section.language === "json" && Boolean(props
       </tbody>
     </table>
 
-    <pre v-if="(kind === 'code' || kind === 'generic') && section.content" class="code"><code>{{ section.content }}</code></pre>
+    <p v-if="binary" class="binary">Binary content, recorded as {{ section.content?.length }} characters of text. Open the attached file to see it.</p>
+    <pre v-else-if="(kind === 'code' || kind === 'generic') && section.content" class="code"><code>{{ section.content }}</code></pre>
     <p v-if="!section.items.length && !section.content" class="empty">Recorded without content.</p>
   </section>
 </template>
@@ -92,4 +98,5 @@ h3 small { color: var(--dim); font-size: var(--text-micro); font-weight: var(--w
   font: var(--text-micro)/var(--leading) var(--font-mono);
 }
 .empty { color: var(--dim); font-size: var(--text-meta); }
+.binary { padding: var(--space-2) var(--space-3); border: 1px dashed var(--border-strong); border-radius: var(--radius-chip); color: var(--muted); font-size: var(--text-body); }
 </style>

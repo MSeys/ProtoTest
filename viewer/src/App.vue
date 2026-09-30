@@ -197,7 +197,7 @@ const testTabs = computed(() => {
   const test = selectedTest.value;
   const current = route.value;
   if (!test || current.name !== "test") return [];
-  const views: [TestViewId, string][] = [["steps", "Steps"], ["timeline", "Timeline"], ["state", "State"], ["files", "Files"]];
+  const views: [TestViewId, string][] = [["steps", "Steps"], ["timeline", "Timeline"], ["state", "State"], ["evidence", "Evidence"]];
   return views.map(([id, label]) => ({ id, label, href: href({ name: "test", testId: test.id, view: id, selection: current.selection }) }));
 });
 

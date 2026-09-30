@@ -1,10 +1,10 @@
 import { ref } from "vue";
 
-export type TestView = "steps" | "timeline" | "state" | "files";
-export const testViews: TestView[] = ["steps", "timeline", "state", "files"];
+export type TestView = "steps" | "timeline" | "state" | "evidence";
+export const testViews: TestView[] = ["steps", "timeline", "state", "evidence"];
 
 /** Names a view had before, so a link shared then still opens the view it meant. */
-const viewAliases: Record<string, TestView> = { story: "steps", spans: "timeline" };
+const viewAliases: Record<string, TestView> = { story: "steps", spans: "timeline", files: "evidence" };
 
 /** What the inspector shows: an operation, or a tracked item by kind and id. */
 export type Selection = { span: string } | { item: { kind: string; id: string } };

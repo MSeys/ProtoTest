@@ -9,6 +9,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Features
 
+- Viewer: Evidence brings observations, files, findings and moments into time order with the operation that recorded each; details show their metadata and sections, a section index jumps through an operation, and binary bodies are marked instead of drawn as broken text (`#/test/<id>/files` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
 - Viewer: one test list on every screen, led by the run, with one filter for every list and a path from the run to the open operation; each test is a link. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - Viewer: a test's Steps open on the test body: setup and teardown fold into one line that says what they did, time with no recorded operation gets its own row, and the verdict names the failure with the rule `prototest summary` uses (`#/test/<id>/story` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - Viewer: the Timeline replaces Spans: every operation on the test's clock, zoomed per phase, with framework machinery dimmed or hidden, moments and evidence marked on their bars, and untraced time drawn through the rows (`#/test/<id>/spans` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)

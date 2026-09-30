@@ -119,16 +119,20 @@ public sealed class RestResponse : ProtoHttpResponse, IProtoBinaryContent
 
     internal RestResponse AssertHttpStatus(HttpStatusCode expectedStatusCode, bool negated)
     {
+        var mediaType = RawResponse.Content?.Headers.ContentType?.MediaType;
         AssertStatus(
             ProtoRestBuilder.Protocol.TraceSource,
             expectedStatusCode,
             negated,
             // The failure message must not exceed either limit: the shared base helper keeps the
-            // protocol's response section bound and the attachment redaction rules.
+            // protocol's response section bound and the attachment redaction rules. Binary bodies
+            // stay out of the message; an empty body reads as a bare status mismatch.
             () => new RestStatusAssertionException(
                 expectedStatusCode,
                 StatusCode,
-                ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions(ProtoRestBuilder.ProtocolName)),
+                ProtoMediaTypes.IsTextMediaType(mediaType)
+                    ? ProtoHttpDiagnosticSanitizer.SanitizeBody(Content, ResolveStatusDiagnosticOptions(ProtoRestBuilder.ProtocolName))
+                    : string.Empty,
                 negated));
         return this;
     }

@@ -68,7 +68,10 @@ public class RestResponseTests
     [Test]
     public void Should_HaveHttpStatus_Should_Throw_When_StatusCode_Mismatches()
     {
-        var rawResponse = new HttpResponseMessage(HttpStatusCode.NotFound);
+        var rawResponse = new HttpResponseMessage(HttpStatusCode.NotFound)
+        {
+            Content = new StringContent("Not Found Error", System.Text.Encoding.UTF8, "text/plain")
+        };
         var response = new RestResponse(rawResponse, "Not Found Error", TimeSpan.FromMilliseconds(100));
 
         var ex = Assert.Throws<RestStatusAssertionException>(() => response.Should.HaveHttpStatus(HttpStatusCode.OK));

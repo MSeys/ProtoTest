@@ -4,7 +4,7 @@ Shared container-resource support used by ProtoTest's Testcontainers packages, a
 
 Use it directly to start an application image with the run, or when building another run-scoped container integration.
 
-`ProtoContainerResource<TContainer>` handles start-once and release-once behaviour. Register a resource as a target's `UseContainer(...)` provider when the host should start it and expose values such as a connection string (the legacy `AddInfrastructure(piece, keys)` overload keeps the same start behaviour for one piece). The technology packages (`ProtoTest.Sql.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers`, `ProtoTest.Devices.Mqtt.Testcontainers`) build on this contract: run-scoped start-once, `TryStart` reporting instead of throwing, and `UseContainer(...)` chain providers.
+`ProtoContainerResource<TContainer>` handles start-once and release-once behaviour. Register a resource as a target's `UseContainer(...)` provider when the host should start it and expose values such as a connection string. The technology packages (`ProtoTest.Sql.Testcontainers`, `ProtoTest.Messaging.RabbitMq.Testcontainers`, `ProtoTest.Devices.Mqtt.Testcontainers`) build on this contract: run-scoped start-once, `TryStart` reporting instead of throwing, and `UseContainer(...)` chain providers.
 
 `ApplicationContainer` starts an application image as run infrastructure and publishes the mapped address as `ProtoTest:Applications:{application}:BaseUrl`, so the application's REST clients, browser sessions and the readiness probe resolve that one container:
 
@@ -25,11 +25,7 @@ builder
 
 The published address is `http://{hostname}:{mapped port}`; the default readiness check waits for the declared port to accept a connection, and the `configure` callback adds container build options or a Testcontainers wait strategy. A machine without a container runtime reports the reason through `TryStart`, so the suite can skip instead of failing.
 
-A container can also be a provider of a target chain: `UseContainer(PostgresDatabase.Container())` adds
-the container behind the Docker probe (`DockerProbe.IsAvailable()`), so a configured or AppHost
-provider earlier in the chain wins and the container starts only when the environment cannot serve the
-target. The legacy `AddInfrastructure(piece, keys)` registration keeps the all-configured skip rule for
-suites that declare no chain.
+`UseContainer(PostgresDatabase.Container())` adds the container behind the Docker probe (`DockerProbe.IsAvailable()`), so a configured or AppHost provider earlier in the chain wins and the container starts only when the environment cannot serve the target.
 
 The package does not depend on a specific Testcontainers module. Technology packages supply their own module container (for example `PostgresDatabase`); `ApplicationContainer` builds on the Testcontainers core library.
 

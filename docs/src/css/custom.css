@@ -308,6 +308,18 @@ div[class*='codeBlockTitle'] {
 .markdown table tbody tr:first-child td { border-top: 0; }
 .markdown table tr { border: 0; }
 
+/* On a phone a row reads as a short card: its first cell as the title, every other cell under its column's
+   heading (data-label, added at build time by plugins/rehype-table-labels.cjs). Wide pages keep the table. */
+@media (max-width: 700px) {
+  .markdown table:has(td[data-label]) thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .markdown table:has(td[data-label]), .markdown table:has(td[data-label]) tbody, .markdown table:has(td[data-label]) tr, .markdown table:has(td[data-label]) td { display: block; }
+  .markdown table:has(td[data-label]) tr { padding: var(--space-3) var(--space-4); }
+  .markdown table:has(td[data-label]) tr + tr { border-top: 1px solid var(--border); }
+  .markdown table:has(td[data-label]) td { padding: 2px 0; border: 0; }
+  .markdown table:has(td[data-label]) td:first-child { padding-bottom: var(--space-1); font-weight: var(--weight-semibold); }
+  .markdown table:has(td[data-label]) td:not(:first-child)[data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: var(--text-strong); font-weight: var(--weight-regular); }
+}
+
 /* ── Admonitions: the viewer's left-edge blocks ──────────────────────────────────────────── */
 .theme-admonition {
   --admonition-color: var(--blueprint);

@@ -59,6 +59,8 @@ export default async function createConfig(): Promise<Config> {
           editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
           // Read from git: a page says when it last changed, which matters while the docs move with the code.
           showLastUpdateTime: true,
+          // Table cells carry their column heading, so a phone can read a row as a card.
+          rehypePlugins: [require('./plugins/rehype-table-labels.cjs')],
           // One set of pages: the site documents the current release only, so `docs/docs` serves `/docs`
           // directly and a release cuts no versioned snapshot.
         },
@@ -87,6 +89,7 @@ export default async function createConfig(): Promise<Config> {
         editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
         showLastUpdateTime: true,
         remarkPlugins: [require('./plugins/remark-learn-outline.cjs')],
+        rehypePlugins: [require('./plugins/rehype-table-labels.cjs')],
       },
     ],
     [

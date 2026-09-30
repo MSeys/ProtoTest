@@ -69,12 +69,12 @@ export default function ModesComparison(): ReactNode {
               <td>
                 <strong>{row.mode}</strong>
               </td>
-              <td>{row.api}</td>
-              <td>{row.workers}</td>
-              <td>
-                {row.store}; {row.broker.charAt(0).toLowerCase() + row.broker.slice(1)}
+              <td data-label="API">{row.api}</td>
+              <td data-label="Workers">{row.workers}</td>
+              <td data-label="Store and broker">
+                {row.store}; {row.broker}
               </td>
-              <td>{row.counts}</td>
+              <td data-label="Counts">{row.counts}</td>
             </tr>
           ))}
         </tbody>

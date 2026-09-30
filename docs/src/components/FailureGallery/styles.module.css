@@ -46,12 +46,8 @@
 
 .toggle:hover { background: var(--hover); }
 
-.mode {
-  color: var(--blueprint);
-  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
-}
+/* The kind of question, as a quiet label over it: a word, not a banner. */
+.mode { color: var(--muted); font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 
 .ask { font: var(--weight-semibold) var(--text-title) var(--font-display); line-height: var(--leading-tight); }
 
@@ -73,17 +69,17 @@
 
 .chevron {
   position: absolute;
-  top: 50%;
+  top: calc(var(--space-4) + var(--space-3));
   right: var(--space-4);
   width: 8px;
   height: 8px;
   border-right: 1.5px solid var(--muted);
   border-bottom: 1.5px solid var(--muted);
-  transform: translateY(-50%) rotate(45deg);
+  transform: rotate(45deg);
   transition: transform var(--motion-fast) var(--motion-ease);
 }
 
-.cardOpen .chevron { transform: translateY(-50%) rotate(-135deg); }
+.cardOpen .chevron { transform: rotate(-135deg); }
 
 .panel {
   display: grid;

@@ -65,6 +65,8 @@ The report groups items into sections:
 
 An integration's own kind gets a section too, titled after the kind. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
 
+A quiet footer points at the ProtoTrace viewer: drop the run's `.prototrace` file at `https://trace.prototest.dev` for the full trace.
+
 ### Occurrences
 
 Every coverage and observation row carries its own occurrence count. The summary's **Occurrences** card adds those per branch: each top-level coverage unit contributes its hit count once, and observations contribute their counts. Units nested under another unit (an OpenAPI response and its properties under the endpoint) are that unit's breakdown of the same calls, so they add nothing again. An aggregate row (a GraphQL type, `IsCovered` null) contributes nothing itself and does not hide the units below it. Findings and gate verdicts are recorded once rather than observed repeatedly, so they never inflate the count.

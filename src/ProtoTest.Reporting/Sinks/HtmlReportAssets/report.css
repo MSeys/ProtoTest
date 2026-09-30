@@ -249,6 +249,11 @@ main { width: min(1240px, 100% - var(--space-7)); margin: 0 auto var(--space-7);
 .empty-state strong { font-size: var(--text-body); }
 .empty-state span { color: var(--muted); font-size: var(--text-meta); }
 
+/* Quiet footer: a next step for the local file, not a banner. */
+.report-footer { padding: var(--space-4) 0 var(--space-2); color: var(--muted); font-size: var(--text-micro); text-align: center; }
+.report-footer code { font-family: var(--font-mono); font-size: inherit; }
+.report-footer a { color: var(--blueprint); }
+
 @media (max-width: 1000px) {
   .topbar { grid-template-columns: minmax(0, 1fr) auto; }
   .run-state { display: none; }

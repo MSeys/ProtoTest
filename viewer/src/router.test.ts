@@ -7,6 +7,14 @@ describe("router addresses", () => {
     expect(href({ name: "run" })).toBe("#/");
   });
 
+  it("round trips run operations and tracked items", () => {
+    const operation = { name: "run" as const, selection: { span: "release/1" } };
+    const item = { name: "run" as const, selection: { item: { kind: "broker", id: "main bus" } } };
+    expect(href(operation)).toBe("#/?span=release%2F1");
+    expect(parse(href(operation))).toEqual(operation);
+    expect(parse(href(item))).toEqual(item);
+  });
+
   it("names a test view", () => {
     expect(href({ name: "test", testId: "t1", view: "steps" })).toBe("#/test/t1/steps");
   });

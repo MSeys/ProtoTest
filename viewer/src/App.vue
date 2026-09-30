@@ -149,12 +149,13 @@ const view = computed<TestViewId>(() => route.value.name === "test" ? route.valu
 // The selection lives in the address, so a link to a failing check survives a reload and a share.
 const selectedSpan = computed<Span | undefined>(() => {
   const current = route.value;
-  if (current.name !== "test" || !current.selection || !("span" in current.selection)) return undefined;
-  return selectedTest.value?.byId.get(current.selection.span);
+  if (!current.selection || !("span" in current.selection)) return undefined;
+  const id = current.selection.span;
+  return current.name === "test" ? selectedTest.value?.byId.get(id) : run.value?.spans.find(span => span.id === id);
 });
 const selectedItem = computed<Item | undefined>(() => {
   const current = route.value;
-  if (current.name !== "test" || !current.selection || !("item" in current.selection)) return undefined;
+  if (!current.selection || !("item" in current.selection)) return undefined;
   const { kind, id } = current.selection.item;
   return [...(selectedTest.value?.items ?? []), ...(run.value?.items ?? [])].find(item => item.kind === kind && item.id === id);
 });
@@ -163,7 +164,7 @@ const viewHost = ref<HTMLElement>();
 watch(() => [route.value.name === "test" ? route.value.testId : "", view.value], () => {
   void nextTick(() => viewHost.value?.scrollTo({ top: 0 }));
 });
-const inspecting = computed(() => Boolean(selectedTest.value && (selectedSpan.value || selectedItem.value)));
+const inspecting = computed(() => Boolean(!missingTestId.value && (selectedSpan.value || selectedItem.value)));
 
 /*
  * The list is a column where it fits and a drawer where it does not. Beside docked details on a screen
@@ -224,18 +225,17 @@ const trail = computed<Crumb[]>(() => {
   const crumbs: Crumb[] = [{ label: fileName.value || "Run", href: "#/", title: `${fileName.value}: the run` }];
   const test = selectedTest.value;
   const current = route.value;
-  if (!test || current.name !== "test") return crumbs;
-  crumbs.push({ label: `${pad(test.number)} ${testTitle(test)}`, href: href({ name: "test", testId: test.id, view: current.view }) });
+  if (test && current.name === "test") crumbs.push({ label: `${pad(test.number)} ${testTitle(test)}`, href: href({ name: "test", testId: test.id, view: current.view }) });
   const selected = selectedSpan.value?.name ?? (selectedItem.value ? itemTitle(selectedItem.value) : undefined);
   if (selected) crumbs.push({ label: selected, href: href(current) });
   return crumbs;
 });
 
 function openPicker() { fileInput.value?.click(); }
-function showTest(test: TestTrace) {
+function showTest(test: TestTrace, selection?: { span: string }) {
   const current = route.value;
   // Switching test keeps the view the reader chose; only a first visit lands on the steps.
-  navigate({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "steps", selection: landing(test) });
+  navigate({ name: "test", testId: test.id, view: current.name === "test" ? current.view : "steps", selection: selection ?? landing(test) });
   // On a narrow screen the test list is a drawer: picking a test is the reason it was opened.
   if (!railFits.value) railOpen.value = false;
 }
@@ -245,12 +245,12 @@ function showRun() {
 }
 function selectSpan(span: Span | undefined) {
   const current = route.value;
-  if (current.name !== "test") return;
+  if (span?.test && span.test !== selectedTest.value) { showTest(span.test, { span: span.id }); return; }
+  if (span && current.name === "test" && run.value?.spans.includes(span)) { navigate({ name: "run", selection: { span: span.id } }); return; }
   replace({ ...current, selection: span ? { span: span.id } : undefined });
 }
 function selectItem(item: Item) {
   const current = route.value;
-  if (current.name !== "test") return;
   replace({ ...current, selection: { item: { kind: item.kind, id: item.id } } });
 }
 function readArtifact(artifact: Artifact) {
@@ -448,7 +448,8 @@ const problemTitle = computed(() => ({
         <template v-else>
           <!-- Cached so returning from a test keeps the run list instead of rebuilding it; deactivation detaches its DOM. -->
           <KeepAlive>
-            <RunView v-if="!selectedTest" :run="run" :file-name="fileName" @select="showTest" @artifact="openArtifact = $event" />
+            <RunView v-if="!selectedTest" :run="run" :file-name="fileName" :selected-span="selectedSpan" :selected-item="selectedItem"
+                     @select="showTest" @span="selectSpan" @item="selectItem" @artifact="openArtifact = $event" />
           </KeepAlive>
           <TestView v-if="selectedTest" :test="selectedTest" :view="view" :tabs="testTabs"
                     :selected-span="selectedSpan" :selected-item="selectedItem"
@@ -460,7 +461,7 @@ const problemTitle = computed(() => ({
       <ColumnResizer v-if="inspecting && inspectorDocks" class="inspector-resizer" label="Resize the details"
                      :min="inspectorResize.min" :max="inspectorResize.max" :now="inspectorResize.width.value" edge="trailing"
                      @start="inspectorResize.start" @nudge="inspectorResize.nudge" @reset="inspectorResize.reset" />
-      <Inspector v-if="selectedTest && inspecting" :test="selectedTest" :span="selectedSpan" :item="selectedItem"
+      <Inspector v-if="inspecting" :test="selectedTest ?? run" :span="selectedSpan" :item="selectedItem"
                  @select="selectSpan" @item="selectItem" @artifact="openArtifact = $event" @close="selectSpan(undefined)" />
       <button v-if="inspecting && !inspectorDocks" class="inspector-handle" type="button"
               aria-label="Resize the details" title="Drag to resize, tap to expand"

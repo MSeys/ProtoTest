@@ -9,6 +9,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ### Features
 
+- Viewer: the run names attention with the diagnosis rules, marks untraced gaps on its timeline, lists every environment value and the run id, and opens run operations and tracked items in the inspector. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
 - Viewer: Evidence brings observations, files, findings and moments into time order with the operation that recorded each; details show their metadata and sections, a section index jumps through an operation, and binary bodies are marked instead of drawn as broken text (`#/test/<id>/files` links still open). [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 
 - Viewer: one test list on every screen, led by the run, with one filter for every list and a path from the run to the open operation; each test is a link. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)

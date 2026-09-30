@@ -10,28 +10,27 @@ const viewAliases: Record<string, TestView> = { story: "steps", spans: "timeline
 export type Selection = { span: string } | { item: { kind: string; id: string } };
 
 export type Route =
-  | { name: "run" }
+  | { name: "run"; selection?: Selection }
   | { name: "test"; testId: string; view: TestView; selection?: Selection };
 
 export const route = ref<Route>(parse(location.hash));
 
 export function parse(hash: string): Route {
   const match = /^#\/test\/([^/?#]+)(?:\/([a-z]+))?(?:\?(.*))?/.exec(hash);
-  if (!match) return { name: "run" };
-  const named = viewAliases[match[2] ?? ""] ?? match[2] ?? "";
-  const view = (testViews as string[]).includes(named) ? named as TestView : "steps";
   // The selection belongs in the address: a link to a failure has to survive a reload and a share.
-  const query = new URLSearchParams(match[3] ?? "");
+  const query = new URLSearchParams(match ? match[3] ?? "" : /^#\/\?(.*)$/.exec(hash)?.[1] ?? "");
   const span = query.get("span") ?? query.get("entry");
   const kind = query.get("kind");
   const id = query.get("item");
   const selection: Selection | undefined = span ? { span } : kind && id ? { item: { kind, id } } : undefined;
+  if (!match) return selection ? { name: "run", selection } : { name: "run" };
+  const named = viewAliases[match[2] ?? ""] ?? match[2] ?? "";
+  const view = (testViews as string[]).includes(named) ? named as TestView : "steps";
   return { name: "test", testId: decodeURIComponent(match[1]), view, selection };
 }
 
 export function href(next: Route): string {
-  if (next.name === "run") return "#/";
-  const base = `#/test/${encodeURIComponent(next.testId)}/${next.view}`;
+  const base = next.name === "run" ? "#/" : `#/test/${encodeURIComponent(next.testId)}/${next.view}`;
   const selection = next.selection;
   if (!selection) return base;
   const query = "span" in selection

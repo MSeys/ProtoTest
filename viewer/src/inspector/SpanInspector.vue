@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { Artifact, Item, Span, TestTrace } from "../trace/model";
+import type { Artifact, Item, Run, Span, TestTrace } from "../trace/model";
 import { shapeMismatches } from "../trace/model";
 import { formatBytes, formatDuration, formatOffset, firstCheckValue, isCheck, itemKindLabel, itemTitle, jsonLiteral, shortType, sourceLabels, tone } from "../trace/format";
 import { shapeTreeOf } from "../trace/shapes";
@@ -16,7 +16,7 @@ import { sourceLocation } from "../trace/sources";
  * the checks on it, what it sent and got back, what it changed, what it left as evidence. The identity -
  * name, kind, outcome - sits in the inspector's head above this.
  */
-const props = defineProps<{ span: Span; test: TestTrace }>();
+const props = defineProps<{ span: Span; test: TestTrace | Run }>();
 const emit = defineEmits<{ select: [span: Span]; item: [item: Item]; artifact: [artifact: Artifact] }>();
 
 const checks = computed(() => props.span.children.filter(isCheck));

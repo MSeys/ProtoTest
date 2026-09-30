@@ -81,7 +81,6 @@ public sealed class McpConfigurationTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(unknown!.Message, Does.Contain("--verbose"));
-            Assert.That(unknown.Message, Does.Contain("usage: prototest-mcp"));
             Assert.That(missing!.Message, Does.Contain("needs a value"));
         }
     }
@@ -97,6 +96,22 @@ public sealed class McpConfigurationTests
         {
             Assert.That(exit, Is.EqualTo(2));
             Assert.That(error.ToString(), Does.Contain("--nope"));
+            Assert.That(error.ToString(), Does.Contain("usage: prototest-mcp"));
+        }
+    }
+
+    [Test]
+    public async Task StdioHost_ShouldPrintUsageForHelpAndExitTwo()
+    {
+        using var error = new StringWriter();
+
+        var exit = await McpHost.RunAsync(["--help"], error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exit, Is.EqualTo(2));
+            Assert.That(error.ToString(), Does.Contain("--help"));
+            Assert.That(error.ToString(), Does.Contain(ProtoTestMcpOptions.Usage));
         }
     }
 }

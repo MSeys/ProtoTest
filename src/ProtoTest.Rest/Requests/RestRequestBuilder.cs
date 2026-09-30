@@ -202,13 +202,26 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
 
             if (attachmentOptions?.CaptureRequestBodies == true)
             {
-                var requestBody = await request.Content.ReadAsStringAsync(ct);
                 var mediaType = request.Content.Headers.ContentType?.MediaType;
-                Context.AddAttachment(
-                    $"{attachmentPrefix}-request",
-                    ProtoHttpDiagnosticSanitizer.SanitizeBody(requestBody, attachmentOptions),
-                    mediaType ?? "text/plain",
-                    attachmentDescription);
+                if (IsTextMediaType(mediaType))
+                {
+                    var requestBody = await request.Content.ReadAsStringAsync(ct);
+                    Context.AddAttachment(
+                        $"{attachmentPrefix}-request",
+                        ProtoHttpDiagnosticSanitizer.SanitizeBody(requestBody, attachmentOptions),
+                        mediaType ?? "text/plain",
+                        attachmentDescription);
+                }
+                else
+                {
+                    // Binary bodies stay bytes: decoding them to text would lose data.
+                    var requestBytes = await request.Content.ReadAsByteArrayAsync(ct);
+                    Context.AddAttachment(
+                        $"{attachmentPrefix}-request",
+                        requestBytes,
+                        mediaType ?? "application/octet-stream",
+                        attachmentDescription);
+                }
             }
         }
 
@@ -277,7 +290,7 @@ public sealed class RestRequestBuilder : ProtoHttpRequestBuilder<RestResponse, R
             }
             responseFacts.Add(new("length", $"{bodyBytes.Length} B"));
             traceOperation.AddSection(new ProtoTraceSection("Response", ProtoTraceSectionKind.Fields, responseFacts));
-            if (!string.IsNullOrWhiteSpace(diagnosticBody))
+            if (IsTextMediaType(responseMediaType) && !string.IsNullOrWhiteSpace(diagnosticBody))
             {
                 traceOperation.AddSection(new ProtoTraceSection(
                     "Body",

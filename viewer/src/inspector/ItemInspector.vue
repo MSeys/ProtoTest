@@ -4,6 +4,8 @@ import type { Change, Item, Run, Span, TestTrace } from "../trace/model";
 import { formatOffset, sourceLabels } from "../trace/format";
 import JsonView from "./JsonView.vue";
 import { isJsonLike } from "./json";
+import DetailCard from "../ui/DetailCard.vue";
+import PropertyList from "../ui/PropertyList.vue";
 
 /*
  * One tracked item: what it holds at the end, how it got there, and which operations touched it. The keys
@@ -31,6 +33,7 @@ function display(key: string, value: string | null | undefined): string {
 }
 
 const state = computed(() => Object.entries(props.item.state).map(([key, value]) => ({ key, label: shortKey(key), value })));
+const stateMeta = computed(() => [namespace.value.slice(0, -1), `${state.value.length} ${state.value.length === 1 ? "property" : "properties"}`].filter(Boolean).join(" · "));
 
 interface Difference {
   key: string;
@@ -59,19 +62,15 @@ const opening = (change: Change, index: number) => index === 0 && differences(ch
 
 <template>
   <div class="item-inspector">
-    <section class="block">
-      <h3>State at the end<small v-if="namespace">{{ namespace.slice(0, -1) }}</small></h3>
-      <dl v-if="state.length" class="fields">
-        <template v-for="entry in state" :key="entry.key">
-          <dt :title="entry.key">{{ entry.label }}</dt>
-          <dd :class="{ null: entry.value === null }">
-            <JsonView v-if="isJsonLike(entry.value)" :value="entry.value" :open-depth="0" />
-            <template v-else>{{ display(entry.key, entry.value) }}</template>
-          </dd>
+    <DetailCard v-if="state.length" title="State at the end" :meta="stateMeta" plain>
+      <PropertyList :entries="state">
+        <template #value="{ entry }">
+          <JsonView v-if="isJsonLike(entry.value)" :value="entry.value" :open-depth="0" />
+          <template v-else>{{ display(entry.key, entry.value) }}</template>
         </template>
-      </dl>
-      <p v-else class="empty">No state was recorded for this item.</p>
-    </section>
+      </PropertyList>
+    </DetailCard>
+    <p v-else class="empty">No state was recorded for this item.</p>
 
     <section class="block">
       <h3>How it changed</h3>
@@ -127,15 +126,10 @@ const opening = (change: Change, index: number) => index === 0 && differences(ch
 <style scoped>
 .item-inspector { min-width: 0; display: grid; gap: var(--space-5); }
 .block { min-width: 0; display: grid; gap: var(--space-2); }
-h3 { display: flex; align-items: baseline; gap: var(--space-2); color: var(--muted); font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(--weight-semibold); letter-spacing: 0; }
-h3 small { color: var(--dim); font: var(--text-micro) var(--font-mono); }
+h3 { color: var(--muted); font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(--weight-semibold); letter-spacing: 0; }
 
-/* Properties read as a two-column list: the short key, then the value as text. */
-.fields, .diff { margin: 0; display: grid; grid-template-columns: minmax(72px, max-content) minmax(0, 1fr); column-gap: var(--space-4); }
-.fields dt, .fields dd { min-width: 0; padding: var(--space-1) 0; border-top: 1px solid var(--border); }
-.fields dt { color: var(--muted); font-size: var(--text-meta); overflow-wrap: anywhere; }
-.fields dd { margin: 0; overflow-wrap: anywhere; font-size: var(--text-meta); }
-.fields dd.null, .fields dd .null { color: var(--dim); }
+/* A change's values: the short key, then what it was and what it became. */
+.diff { margin: 0; display: grid; grid-template-columns: fit-content(40%) minmax(0, 1fr); column-gap: var(--space-4); }
 .empty, .unchanged { color: var(--dim); font-size: var(--text-meta); }
 
 /* The trail: one dot per change on a thin line, the time beside it, and what changed under its name. */

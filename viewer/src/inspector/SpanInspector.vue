@@ -10,6 +10,9 @@ import JsonView from "./JsonView.vue";
 import SourceView from "./SourceView.vue";
 import { isJsonLike } from "./json";
 import { sourceLocation } from "../trace/sources";
+import PropertyList from "../ui/PropertyList.vue";
+
+const pairs = (record: Record<string, string | null>) => Object.entries(record).map(([key, value]) => ({ key, value }));
 
 /*
  * Everything one operation recorded, in the order a reader asks for it: what went wrong, what was compared,
@@ -160,9 +163,7 @@ function jump(id: string) {
         <template v-if="item.type === 'observation'">
           <p><strong>Observed</strong> {{ item.kind }} <span class="muted">on {{ item.target }}</span></p>
           <JsonView v-if="item.data" :value="item.data" :label="item.identifier ?? item.kind" :open-depth="0" />
-          <dl v-if="Object.keys(item.metadata).length" class="facts-list">
-            <template v-for="(value, key) in item.metadata" :key="key"><dt>{{ key }}</dt><dd>{{ value ?? "null" }}</dd></template>
-          </dl>
+          <PropertyList v-if="Object.keys(item.metadata).length" :entries="pairs(item.metadata)" mono inline />
         </template>
         <template v-else-if="item.type === 'attachment'">
           <button v-if="item.artifact" type="button" class="link-row file" :disabled="Boolean(item.artifact.error)"
@@ -175,9 +176,7 @@ function jump(id: string) {
         </template>
         <template v-else>
           <p><strong>{{ item.status }} finding</strong> {{ item.message }}</p>
-          <dl v-if="findingFacts(item).length" class="facts-list">
-            <template v-for="[key, value] in findingFacts(item)" :key="key"><dt>{{ key }}</dt><dd>{{ value }}</dd></template>
-          </dl>
+          <PropertyList v-if="findingFacts(item).length" :entries="findingFacts(item).map(([key, value]) => ({ key, value }))" inline />
         </template>
       </div>
     </section>
@@ -190,9 +189,7 @@ function jump(id: string) {
         <small>{{ moment.kind }}</small>
         <div v-if="moment.error || Object.keys(moment.attributes).length || moment.sections.length" class="moment-detail">
           <pre v-if="moment.error" class="moment-error">{{ moment.error.message }}</pre>
-          <dl v-if="Object.keys(moment.attributes).length" class="facts-list">
-            <template v-for="(value, key) in moment.attributes" :key="key"><dt>{{ key }}</dt><dd>{{ value ?? "null" }}</dd></template>
-          </dl>
+          <PropertyList v-if="Object.keys(moment.attributes).length" :entries="pairs(moment.attributes)" mono inline />
           <SectionView v-for="section in moment.sections" :key="section.label" :section="section" />
         </div>
       </div>
@@ -216,16 +213,12 @@ function jump(id: string) {
       <summary>Attributes <small>{{ attributeCount }}</small></summary>
       <section v-for="[group, entries] in attributeGroups" :key="group" class="attribute-group">
         <h4>{{ group }}</h4>
-        <dl>
-          <template v-for="[key, attribute] in entries" :key="key">
-            <dt>{{ key }}</dt>
-            <dd>
-              <JsonView v-if="isJsonLike(attribute)" :value="attribute" :open-depth="0" />
-              <span v-else-if="attribute === null" class="null">null</span>
-              <template v-else>{{ attribute }}</template>
-            </dd>
+        <PropertyList :entries="entries.map(([key, value]) => ({ key, value }))" mono inline>
+          <template #value="{ entry }">
+            <JsonView v-if="isJsonLike(entry.value)" :value="entry.value" :open-depth="0" />
+            <template v-else>{{ entry.value ?? "null" }}</template>
           </template>
-        </dl>
+        </PropertyList>
       </section>
     </details>
   </div>
@@ -297,9 +290,6 @@ h3 { color: var(--muted); font-family: var(--font-ui); font-size: var(--text-met
 .index button { flex: none; height: 22px; padding: 0 var(--space-1); border: 0; background: transparent; color: var(--muted); font-size: var(--text-meta); }
 .index button:hover { color: var(--text); text-decoration: underline; }
 .index button.hot { color: var(--danger); }
-.facts-list { margin: 0; display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 0 var(--space-3); }
-.facts-list dt, .facts-list dd { min-width: 0; margin: 0; padding: 2px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; font: var(--text-meta)/var(--leading) var(--font-mono); }
-.facts-list dt { color: var(--muted); }
 .moment-detail { grid-column: 2 / -1; display: grid; gap: var(--space-2); padding-bottom: var(--space-2); }
 .moment-error { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--danger); font: var(--text-meta)/var(--leading) var(--font-mono); }
 /* What a reader rarely needs sits folded at the end, one quiet line each. */
@@ -314,9 +304,4 @@ h3 { color: var(--muted); font-family: var(--font-ui); font-size: var(--text-met
 .attributes { padding-top: var(--space-3); border-top: 1px solid var(--border); }
 .attribute-group { margin-top: var(--space-3); }
 .attribute-group h4 { margin: 0 0 var(--space-1); color: var(--muted); font-family: var(--font-ui); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
-.attribute-group dl { margin: 0; display: grid; grid-template-columns: minmax(88px, 34%) minmax(0, 1fr); gap: 0 var(--space-3); }
-.attribute-group dt, .attribute-group dd { min-width: 0; padding: var(--space-1) 0; border-top: 1px solid var(--border); font-size: var(--text-micro); overflow-wrap: anywhere; }
-.attribute-group dt { color: var(--muted); font-family: var(--font-mono); }
-.attribute-group dd { margin: 0; font-family: var(--font-mono); }
-.attribute-group .null { color: var(--dim); }
 </style>

@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { Section } from "../trace/model";
 import JsonView from "./JsonView.vue";
 import DetailCard from "../ui/DetailCard.vue";
+import PropertyList from "../ui/PropertyList.vue";
 import { useClipboard } from "../ui/useClipboard";
 
 /*
@@ -25,10 +26,16 @@ const isJson = computed(() => !binary.value && props.section.language === "json"
 // Plain code reads in the same card as source and JSON, so every recorded document in the details looks alike.
 const isCode = computed(() => kind.value === "code" && !binary.value && Boolean(props.section.content));
 const { copied, copy } = useClipboard();
+// Fields read as properties, in a card like every other recorded block.
+const isFields = computed(() => (kind.value === "fields" || (kind.value === "generic" && !props.section.content)) && props.section.items.length > 0);
+const fields = computed(() => props.section.items.map(item => ({ key: item.label, value: item.value, tone: item.tone, detail: item.detail })));
 </script>
 
 <template>
   <JsonView v-if="kind === 'code' && isJson" :value="section.content" :label="section.label" :open-depth="1" />
+  <DetailCard v-else-if="isFields" :title="section.label" :meta="kind === 'generic' ? section.kind : `${section.items.length} ${section.items.length === 1 ? 'field' : 'fields'}`" plain>
+    <PropertyList :entries="fields" />
+  </DetailCard>
   <DetailCard v-else-if="isCode" :title="section.label" :meta="section.language ?? undefined">
     <template #tools><button type="button" @click="copy(section.content ?? '')">{{ copied ? "Copied" : "Copy" }}</button></template>
     <pre class="code"><code>{{ section.content }}</code></pre>

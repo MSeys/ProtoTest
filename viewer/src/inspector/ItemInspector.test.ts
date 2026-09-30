@@ -40,10 +40,10 @@ describe("ItemInspector state", () => {
   it("says the shared namespace once and shows values without JSON quotes", () => {
     const { host, unmount } = mount(resource());
 
-    expect(text(host.querySelector("h3 small"))).toBe("resource");
-    expect([...host.querySelectorAll(".fields dt")].map(entry => entry.textContent)).toEqual(["id", "state", "release_ms", "owner"]);
-    expect([...host.querySelectorAll(".fields dd")].map(entry => entry.textContent)).toEqual(["web", "released", "0.3 ms", "null"]);
-    expect(host.querySelector(".fields dd.null")?.textContent).toBe("null");
+    expect(text(host.querySelector(".card header strong"))).toBe("State at the end");
+    expect(text(host.querySelector(".card header small"))).toBe("resource · 4 properties");
+    expect([...host.querySelectorAll(".properties dt")].map(entry => entry.textContent)).toEqual(["id", "state", "release_ms", "owner"]);
+    expect([...host.querySelectorAll(".properties dd")].map(entry => entry.textContent?.trim())).toEqual(["web", "released", "0.3 ms", "null"]);
     unmount();
   });
 });

@@ -4,11 +4,12 @@
  * The head names it, says how big it is and holds its tools; on a narrow panel the tools drop under the name
  * instead of squeezing it.
  */
-defineProps<{ title?: string; meta?: string; mono?: boolean; hint?: string }>();
+/** `plain` gives the body the panel surface, for a list of properties rather than a code document. */
+defineProps<{ title?: string; meta?: string; mono?: boolean; hint?: string; plain?: boolean }>();
 </script>
 
 <template>
-  <section class="card">
+  <section class="card" :class="{ plain }">
     <header>
       <span class="name">
         <strong v-if="title" :class="{ mono }" :title="hint ?? title">{{ title }}</strong>
@@ -22,6 +23,7 @@ defineProps<{ title?: string; meta?: string; mono?: boolean; hint?: string }>();
 
 <style scoped>
 .card { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-sunken); overflow: clip; }
+.card.plain { background: var(--surface); }
 header {
   min-height: var(--row-height);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);

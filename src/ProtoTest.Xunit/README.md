@@ -6,7 +6,17 @@ Connects the ProtoTest lifecycle to xUnit.net v2.
 dotnet add package ProtoTest.Xunit
 ```
 
-Register a `ProtoTestAssembly` as an xUnit collection fixture, add test classes to that collection and use `[ProtoTestFact]` or `[ProtoTestTheory]`.
+Register a `ProtoTestAssembly` as an xUnit collection fixture, add test classes to that collection and use `[ProtoTestFact]` or `[ProtoTestTheory]`:
+
+```csharp
+public class ProtoTestFixture : ProtoTestAssembly
+{
+    protected override void Configure(IProtoHostBuilder builder) { }
+}
+
+[CollectionDefinition("ProtoTest Collection")]
+public class ProtoTestCollection : ICollectionFixture<ProtoTestFixture> { }
+```
 
 Each theory row receives its own ProtoTest lifecycle. xUnit v2 has no native attachment API, so attachment paths are written to the test output.
 

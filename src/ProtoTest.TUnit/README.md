@@ -8,6 +8,21 @@ dotnet add package ProtoTest.TUnit
 
 Register `[assembly: TestExecutor<ProtoTestExecutor>()]` and initialize a `ProtoTestAssembly` from TUnit's assembly hooks. Tests continue to use TUnit's own `[Test]` attribute.
 
+```csharp
+[assembly: TestExecutor<ProtoTestExecutor>()]
+
+public class Setup : ProtoTestAssembly
+{
+    [Before(Assembly)]
+    public static Task AssemblyInitAsync(AssemblyHookContext _)
+        => InitializeAsync(builder => { });
+
+    [After(Assembly)]
+    public static Task AssemblyCleanupAsync(AssemblyHookContext _)
+        => CleanupAsync();
+}
+```
+
 The adapter handles the test context, skip conditions, outcomes and TUnit artifacts.
 
 ## Learn more

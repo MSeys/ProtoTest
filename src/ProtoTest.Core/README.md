@@ -2,7 +2,11 @@
 
 This is the part every ProtoTest integration builds on.
 
-Most test projects get this package through a runner adapter or another ProtoTest package. Install it directly when building an integration or runner adapter of your own.
+Most test projects get this package through a runner adapter or another ProtoTest package. Install it directly when building an integration or runner adapter of your own:
+
+```bash
+dotnet add package ProtoTest.Core
+```
 
 ## Why does Core exist?
 

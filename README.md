@@ -31,7 +31,7 @@ The idea is that integrations don't each live in their own little world. They pa
 
 ProtoTest currently integrates with REST, GraphQL, gRPC, SQL, Entity Framework Core,
 Playwright, Selenium, RabbitMQ, MassTransit, ASP.NET Core, background workers, Testcontainers,
-WireMock, Aspire, MQTT and more.
+WireMock, Aspire, MQTT and more. Some of these are preview; see Supported and preview below.
 
 The integrations cover commonly used infrastructure. A missing one can be added as an integration; see Extend ProtoTest yourself.
 

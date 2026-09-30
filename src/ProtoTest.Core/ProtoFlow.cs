@@ -82,8 +82,10 @@ public sealed class ProtoFlow
     }
 
     /// <summary>
-    /// Runs the steps in order. Cancellation always stops the flow and propagates; step failures are
-    /// returned in <see cref="ProtoFlowResult.Failures"/>, so the caller decides whether to throw.
+    /// Runs the steps in order. Cancelling the flow's token always stops the flow and propagates; in
+    /// collect mode a step that cancels for any other reason is recorded like any failure and the
+    /// remaining steps still run, so teardown never skips cleanup. Step failures are returned in
+    /// <see cref="ProtoFlowResult.Failures"/>, so the caller decides whether to throw.
     /// </summary>
     public async ValueTask<ProtoFlowResult> RunAsync(
         IProtoTraceWriter trace,
@@ -97,6 +99,13 @@ public sealed class ProtoFlow
             try
             {
                 await RunStepAsync(trace, _steps[index], index, cancellationToken);
+            }
+            catch (OperationCanceledException exception)
+                when (_failureMode is ProtoFlowFailureMode.Collect && !cancellationToken.IsCancellationRequested)
+            {
+                // A cancelled teardown step is cleanup that failed, not a stop signal: record it and
+                // run the rest. A cancelled flow token still propagates below.
+                failures.Add(exception);
             }
             catch (OperationCanceledException)
             {

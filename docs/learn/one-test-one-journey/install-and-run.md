@@ -97,10 +97,11 @@ git pull
 The run writes three evidence files under the sample's output folder, next to the SQLite store it created for the run:
 
 ```
-bin/Debug/net8.0/TestResults/Northstar.ProtoTest/
-    northstar.prototrace    every operation, check, state change and artifact
-    report.json             the machine-readable verdict, coverage and traffic
-    report.html             the same report as a page you can open
+bin/Debug/net8.0/TestResults/
+    prototest-{runId}.prototrace    every operation, check, state change and artifact (one file per run)
+    Northstar.ProtoTest/
+        report.json             the machine-readable verdict, coverage and traffic
+        report.html             the same report as a page you can open
 ```
 
 Open `report.html` in a browser for the run's verdict and the routes it covered. Then download the trace and drop it on the [viewer](https://trace.prototest.dev): the run screen lists where the application ran and which capabilities the run composed, and each test opens into its own story.

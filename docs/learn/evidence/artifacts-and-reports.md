@@ -82,7 +82,7 @@ The sample configures both report sinks in one place:
   filename="Setup.cs"
   code={`.ConfigureTracing(trace =>
 {
-    trace.OutputPath = Path.Combine("TestResults", "Northstar.ProtoTest", "northstar.prototrace");
+    trace.ActivitySources.Add("Northstar.Domain");
 })
 .AddSink<JsonReportSink>(sink => sink.OutputPath = Path.Combine(
     "TestResults", "Northstar.ProtoTest", "report.json"))
@@ -92,10 +92,10 @@ The sample configures both report sinks in one place:
     sink.Title = "Northstar Learning demo";
 });`}
   callouts={[
-    {line: 3, title: 'The trace path', note: 'One archive per run. CI points this at its artifact directory instead; the evidence lesson shows how.'},
+    {line: 3, title: 'The application spans', note: 'The domain activity source is captured into the trace. The trace path keeps its default TestResults/prototest-{runId}.prototrace, one archive per run, so a rerun never overwrites the last run.'},
     {line: 5, title: 'Both sinks copied into the archive', note: 'The JSON and HTML reports are written beside the trace and copied into resources/, so one upload carries all three.'},
   ]}
-  foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The paths below <code>TestResults/Northstar.ProtoTest/</code> are the local default.</>}
+  foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The sink paths below <code>TestResults/Northstar.ProtoTest/</code> are the local default.</>}
 />
 
 Both files are written at the end of the run and copied into the archive, so the one artifact a CI job uploads carries the story and the report.

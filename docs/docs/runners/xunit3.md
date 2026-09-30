@@ -26,12 +26,13 @@ ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. T
 }
 ```
 
-With that file in the project or solution directory, run `dotnet test` from that directory, or `dotnet test --project Starter.Tests/Starter.Tests.csproj` from anywhere. Passing the solution as a path argument (`dotnet test Starter.slnx`) resolves through the old VSTest path and can report `Zero tests ran` instead of running them.
+With that file in the project or solution directory, run `dotnet test` from that directory. `dotnet test --project Starter.Tests/Starter.Tests.csproj` and `dotnet test Starter.slnx` work from that directory; from outside it they resolve through the old VSTest path and fail with `VSTest target is no longer supported` instead of running tests.
 
 ```bash
 dotnet test                                            # right: run from the global.json directory
-dotnet test --project Starter.Tests/Starter.Tests.csproj  # right: name the project, from anywhere
-dotnet test Starter.slnx                              # wrong: old VSTest path, can report zero tests
+dotnet test --project Starter.Tests/Starter.Tests.csproj  # right: name the project, from the global.json directory
+dotnet test Starter.slnx                              # right: name the solution, from the global.json directory
+# from outside the global.json directory: cd there first; --project and the solution path fail through the old VSTest path
 ```
 
 ## Register

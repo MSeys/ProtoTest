@@ -53,11 +53,11 @@ The `TUnit` namespace carries TUnit's own `[Test]`, `[Before]` and `[After]`.
 }
 ```
 
-With that file in the project or solution directory, run `dotnet test` from that directory, or `dotnet test --project Starter.Tests/Starter.Tests.csproj` from anywhere. Running from elsewhere without it fails before any test runs: the old VSTest path reports that testing with the VSTest target is no longer supported.
+With that file in the project or solution directory, run `dotnet test` from that directory. `dotnet test --project Starter.Tests/Starter.Tests.csproj` works when the working directory is at or under the `global.json` folder; from outside it, `cd` there first. Running from elsewhere without it fails before any test runs: the old VSTest path reports that testing with the VSTest target is no longer supported.
 
 ```bash
 dotnet test                                               # right: run from the global.json directory
-dotnet test --project Starter.Tests/Starter.Tests.csproj  # right: name the project, from anywhere
+dotnet test --project Starter.Tests/Starter.Tests.csproj  # right: name the project, from at or under the global.json directory
 ```
 
 A test is a normal TUnit test. The executor wraps it. The interception path:

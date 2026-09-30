@@ -72,4 +72,16 @@ describe("TestRail reasons", () => {
     expect(host.querySelector(".rail-row")).toBeTruthy();
     unmount();
   });
+
+  // The status dot is silent, so the open test is marked and every row states its outcome in words.
+  it("marks the selected row as current and names each outcome", () => {
+    const tests = [testTrace(1, "succeeded"), testTrace(2, "failed")];
+    const { host, unmount } = mount(h(TestRail, { tests, selected: tests[1], onSelect: () => {} }));
+
+    const rows = [...host.querySelectorAll(".rail-row")];
+    expect(rows.map(row => row.getAttribute("aria-current"))).toEqual([null, "true"]);
+    expect(rows[0].textContent).toContain("Succeeded");
+    expect(rows[1].textContent).toContain("Failed");
+    unmount();
+  });
 });

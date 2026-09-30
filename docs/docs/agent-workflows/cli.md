@@ -167,7 +167,7 @@ The [feedback action](../continuous-integration/index.md#action-inputs) maps its
 
 ## Webhook payload
 
-The webhook posts the run's diagnosis digest: the same document `prototest summary` prints as text and `get_diagnosis` returns as JSON. It is `POST`ed to `PROTOTEST_FEEDBACK_WEBHOOK_URL` with content type `application/json`, serialized with camel-case property names. A green run is posted too: the digest carries empty failures, so a machine consumer decides what to do with it. Only a missing URL skips.
+The webhook posts the run's diagnosis digest: the same document `prototest summary` prints as text and `get_diagnosis` returns as JSON. It is `POST`ed to `PROTOTEST_FEEDBACK_WEBHOOK_URL` with content type `application/json`, serialized with camel-case property names. A green run is posted too: the digest carries empty failures, so a machine consumer decides what to do with it (`Feedback_ShouldPostTheWebhookForAGreenRun` in `tests/ProtoTest.Feedback.Tests`). Only a missing URL skips.
 
 ```json
 {

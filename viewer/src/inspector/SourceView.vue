@@ -78,7 +78,7 @@ function role(types: string[]): string | undefined {
       <span :title="location.file">{{ fileName(location.file) }}:{{ location.line }}</span>
       <small v-if="location.functionName">{{ location.functionName }}</small>
     </h3>
-    <pre v-if="lines.length"><code><span v-for="line in lines" :key="line.number" class="line" :class="{ current: line.number === location.line }"><b>{{ line.number }}</b><template v-if="line.parts.length"><span v-for="(part, index) in line.parts" :key="index" :class="role(part.types)">{{ part.text }}</span></template><template v-else> </template>
+    <pre v-if="lines.length" tabindex="0" :aria-label="`Source of ${fileName(location.file)} line ${location.line}`"><code><span v-for="line in lines" :key="line.number" class="line" :class="{ current: line.number === location.line }"><b>{{ line.number }}</b><template v-if="line.parts.length"><span v-for="(part, index) in line.parts" :key="index" :class="role(part.types)">{{ part.text }}</span></template><template v-else> </template>
 </span></code></pre>
   </section>
 </template>

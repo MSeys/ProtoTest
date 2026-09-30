@@ -3,7 +3,8 @@ namespace ProtoTest.Core;
 /// <summary>
 /// Names a suite redacts on top of the defaults: every additional name is treated like the entries
 /// of <see cref="ProtoRedactionDefaults.SensitivePropertyNames"/> wherever the run redacts state
-/// values and finding metadata. The section <c>ProtoTest:Redaction</c> binds over code values when
+/// values and finding metadata, while attachment and diagnostic JSON keeps each protocol's
+/// <c>SensitiveJsonProperties</c> list. The section <c>ProtoTest:Redaction</c> binds over code values when
 /// the host is built.
 /// </summary>
 public sealed class ProtoRedactionOptions : IProtoConfigurableOptions

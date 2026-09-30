@@ -38,6 +38,12 @@ public static class MqttDeviceBuilderExtensions
                 nameof(publishTopic));
         }
 
+        // The callback runs here on a probe, so a broker set in code is visible to the capability
+        // decision below; the registration still owns the callback for the run to resolve.
+        var probe = new MqttDeviceOptions();
+        configure?.Invoke(probe);
+        var providedInCode = !string.IsNullOrWhiteSpace(probe.Broker);
+
         ProtoOptionsRegistration.Configure<MqttDeviceOptions>(devices.Services, () => new MqttDeviceOptions(), configure);
         devices.AddTransport<MqttDeviceTransport>(MqttDeviceTransport.TransportName);
 
@@ -75,10 +81,11 @@ public static class MqttDeviceBuilderExtensions
             .WithSetting(MqttDeviceAddress.PublishTopicParameter, publishTopic)
             .WithSetting(MqttDeviceAddress.SubscribeTopicParameter, subscribeTopic);
 
-        // An explicit address or resolver serves without configuration, so the capabilities stay
-        // unconditional; otherwise they follow MqttDeviceOptions.BrokerSetting like every address-driven
-        // integration, so an addressless client whose broker no key can provide drops them.
-        return address is null && resolveAddress is null
+        // An explicit address, a resolver, or a broker set in code serves without configuration,
+        // so the capabilities stay unconditional; otherwise they follow MqttDeviceOptions.BrokerSetting
+        // like every address-driven integration, so an addressless client whose broker no key can
+        // provide drops them.
+        return address is null && resolveAddress is null && !providedInCode
             ? registered.WithAddressKeys(MqttDeviceOptions.BrokerSetting)
             : registered;
     }

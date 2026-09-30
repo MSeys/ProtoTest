@@ -219,6 +219,11 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Aspire: a published connection string is recorded redacted, so credentials never reach the trace, while its address stays readable. [Aspire](https://prototest.dev/docs/integrations/aspire)
 - GraphQL: a fluent upload argument fails when the document is built instead of rendering as a literal. [GraphQL](https://prototest.dev/docs/integrations/graphql)
 - Docs: a repeated `AddSheets` composes its options callbacks instead of keeping the first. [Sheets](https://prototest.dev/docs/integrations/sheets)
+- Core: a cancelled step in a collect-mode flow no longer skips the remaining steps; a cancelled flow token still stops the flow. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Core: an off-flow dispose releases the orphaned test's context before it throws. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
+- Devices: an MQTT broker set through `configure` keeps the device capabilities, so gated tests no longer skip. [Devices](https://prototest.dev/docs/integrations/devices)
+- Web: sessions key by name and application, so the same name under two applications stays distinct. [Web](https://prototest.dev/docs/integrations/web)
+- Samples: the sample and the template write a per-run trace, so a passing rerun cannot overwrite a failed run's evidence. [Learn](https://prototest.dev/learn)
 - WireMock: a run-scoped fake keeps its stubs and request log for the whole run; `Reset()` clears it. [WireMock](https://prototest.dev/docs/integrations/wiremock)
 - WireMock: pinning Humanizer 3.0.10 avoids a `NU1608` next to Aspire. [WireMock](https://prototest.dev/docs/integrations/wiremock)
 - WireMock: `WireMockAssertionException` derives from `ProtoAssertionException`. [WireMock](https://prototest.dev/docs/integrations/wiremock)
@@ -258,6 +263,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Packaging: every package packs again (44), verified in one `eng/pack.ps1` run. [Installation](https://prototest.dev/docs/getting-started/installation)
 
 ### Breaking changes
+
+These are the 1.0 to 1.1 migration changes; from 1.1 onward the 1.x surface stays additive.
 
 - Core: `AddClientFrom` is removed from the REST and GraphQL builders.
   - Register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver ([Clients](https://prototest.dev/docs/foundation/clients)).

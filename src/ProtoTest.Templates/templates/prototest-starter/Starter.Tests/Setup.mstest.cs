@@ -19,7 +19,6 @@ public sealed class Setup : ProtoTestAssembly
     public static Task AssemblyInitializeAsync(TestContext context) =>
         InitializeAsync(builder =>
             builder
-                .ConfigureTracing(trace => trace.OutputPath = "TestResults/Starter.prototrace")
                 .AddApplication("Api", app => app
                     .AddAspNetCoreServer<Program>()
                     .AddRest(rest => rest

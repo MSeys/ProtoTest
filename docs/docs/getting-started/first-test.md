@@ -135,11 +135,13 @@ public sealed class Setup : ProtoTestAssembly
             .AddSink<HtmlReportSink>(sink => sink.OutputPath = "TestResults/report.html")
             .AddApplication("Api", app => app
                 .AddAspNetCoreServer<Program>()
-                .AddRest(rest => rest.AddClient("Api")));
+                .AddRest(rest => rest
+                    .AddClient("Api")
+                    .AddCollector<RestCoverageCollector>()));
 }
 ```
 
-This describes one application, `Api`, that exposes REST. It runs your application **in-process**. No deployed environment and no port are needed. Point it at a real address in an environment by setting `ProtoTest:Applications:Api:BaseUrl`. The sink writes `TestResults/report.html` under the test project's output folder, next to the trace in step 6.
+This describes one application, `Api`, that exposes REST. It runs your application **in-process**. No deployed environment and no port are needed. Point it at a real address in an environment by setting `ProtoTest:Applications:Api:BaseUrl`. The sink writes `TestResults/report.html` under the test project's output folder, next to the trace in step 6. The template names the report after the project (`Shop.html`); this page uses the fixed name `report.html`.
 
 :::tip
 A `[SetUpFixture]` only covers its own namespace and the namespaces below it. Keep your tests in or under `Orders.Tests`.
@@ -220,7 +222,7 @@ builder.ConfigureTracing(trace => trace.OutputPath = "TestResults/orders.prototr
 
 Run the tests, then:
 
-- drop the trace file (`TestResults/orders.prototrace` with the line above, otherwise the default `TestResults/prototest-{runId}.prototrace`) onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of the test, the request and the shape comparison. The file is a binary archive, so open it in the viewer or print it with `prototest summary` ([ProtoTrace](../observability/prototrace.md#open-your-own-archive)); reading it as text shows nothing useful.
+- drop the trace file (`TestResults/orders.prototrace` with the line above, otherwise the default `TestResults/prototest-{runId}.prototrace`) onto [trace.prototest.dev](https://trace.prototest.dev) to see every step of the test, the request and the shape comparison. The file is a binary archive, so open it in the viewer or print it with `prototest summary <file.prototrace>` ([ProtoTrace](../observability/prototrace.md#open-your-own-archive)); reading it as text shows nothing useful.
 - open `TestResults/report.html` for the endpoints the suite exercised. See [Reporting](../observability/reporting.md).
 
 One recorded journey reads like this. The walk below is the sample suite's project journey (`ProjectsJourney.CreatingAProjectReturnsIt`), which follows the same six steps against a real application:

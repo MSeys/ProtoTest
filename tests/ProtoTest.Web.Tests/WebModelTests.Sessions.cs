@@ -149,6 +149,29 @@ public sealed partial class WebModelTests
     }
 
     [Test]
+    public async Task WebSession_ShouldKeySessionsByNameAndApplication()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("web sessions", TestMethods.Placeholder);
+
+        var shop = context.Web("Admin", application: "Shop");
+        var backOffice = context.Web("Admin", application: "BackOffice");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(backOffice, Is.Not.SameAs(shop));
+            Assert.That(context.Web("Admin", application: "Shop"), Is.SameAs(shop));
+            Assert.That(shop.Application, Is.EqualTo("Shop"));
+            Assert.That(backOffice.Application, Is.EqualTo("BackOffice"));
+        });
+
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
     public async Task WebSession_ShouldRetryBackendCreationAfterASynchronousFailure()
     {
         var attempts = 0;

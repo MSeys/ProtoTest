@@ -68,7 +68,7 @@ const itemOrigin = computed(() => {
         </nav>
         <span v-else class="path-label">State of {{ item?.test ? "this test" : "the run" }}</span>
         <span class="actions">
-          <button type="button" class="link" :title="copied ? 'Link copied' : 'Copy a link to this'" @click="copyLink">{{ copied ? "Copied" : "Copy link" }}</button>
+          <button type="button" class="link" aria-live="polite" :title="copied ? 'Link copied' : 'Copy a link to this'" @click="copyLink">{{ copied ? "Copied" : "Copy link" }}</button>
           <AppButton variant="icon" class="close" label="Close details" @click="emit('close')">×</AppButton>
         </span>
       </div>

@@ -92,7 +92,7 @@ public sealed class MyFirstJourney
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~MyFirstJourney"
 ```
 
-3. Open `samples/Northstar.ProtoTest/bin/Debug/<tfm>/TestResults/Northstar.ProtoTest/northstar.prototrace`
+3. Open `samples/Northstar.ProtoTest/bin/Debug/<tfm>/TestResults/prototest-{runId}.prototrace` (each run writes its own file, named after the run id)
    in the [trace viewer](https://trace.prototest.dev). The committed archive
    `l1-first-journey.prototrace` is the sample's own version of this journey: the same layers, one
    REST create and a shape check, with `atlas-...` names and more asserted fields. Compare the shape,
@@ -139,8 +139,8 @@ Set `ProtoTest__Sample__Drills=true` to let the failure drills fail, then read t
 
 ## Evidence
 
-Each run writes `northstar.prototrace`, `report.html` and `report.json` under
-`TestResults/Northstar.ProtoTest/`. Open the report for route coverage and traffic, and drop the
+Each run writes its own `prototest-{runId}.prototrace` under `TestResults/`, plus
+`report.html` and `report.json` under `TestResults/Northstar.ProtoTest/`. Open the report for route coverage and traffic, and drop the
 trace on [trace.prototest.dev](https://trace.prototest.dev) to walk the journeys.
 
 ## Learn more

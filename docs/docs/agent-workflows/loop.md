@@ -11,7 +11,7 @@ The **evidence loop** is fail, evidence, fix, verify, report. One file carries t
 
 ## What the reviewer sees
 
-A failing run leaves three things on the pull request. The shape of the comment, with values from the committed failing fixture:
+A failing run leaves three things on the pull request. The comment below is illustrative; its values come from the committed failing fixture:
 
 ```markdown
 ## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
@@ -24,6 +24,8 @@ A failing run leaves three things on the pull request. The shape of the comment,
     • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
   - at `artifacts/fixture-gen/Program.cs:65`
   - mismatch `$.orderId`: expected 7, actual 42
+
+Coverage: 2/4 (50%)
 
 [Full trace](https://github.com/you/your-repo/actions/runs/1/artifacts/prototest-trace)
 ```
@@ -59,6 +61,8 @@ FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.
   cause: runner-reported failure
 ```
 
+Run ids and timestamps are new on every run; compare the shape, not the values.
+
 [Diagnosis](./diagnosis.md) reads that output line by line. A coding agent reads the same story through the MCP tools ([Setup](./setup.md)), or you can read the whole run in the viewer.
 
 After the fix, run the suite again and compare the two reports.
@@ -83,7 +87,7 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The first line is stdout: the annotations GitHub renders on the pull request. The rest is stderr: one outcome per channel. `--digest` writes the digest JSON to the path you gave it. With no target configured the network channels skip with their reason, so a local run is safe.
+The first line is stdout: the annotations GitHub renders on the pull request. It is the bare form because this failure carries no source location; with one the command reads `::error file=path/to/OrderTests.cs,line=42::message`. The rest is stderr: one outcome per channel. `--digest` writes the digest JSON to the path you gave it. With no target configured the network channels skip with their reason, so a local run is safe.
 
 The [CLI reference](./cli.md#environment-targets) lists every target the comment and the webhook read, and the exit codes.
 

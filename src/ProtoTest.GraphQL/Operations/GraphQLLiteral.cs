@@ -13,6 +13,10 @@ internal static class GraphQLLiteral
         switch (value)
         {
             case null: text.Append("null"); break;
+            case GraphQLUpload:
+                throw new ArgumentException(
+                    "A GraphQLUpload cannot be written as a document literal. Pass the file through shape-driven arguments or Variables(...), which send it as a multipart variable.",
+                    nameof(value));
             case GraphQLEnum enumeration: text.Append(enumeration.Value); break;
             case GraphQLVariableReference variable: text.Append('$').Append(variable.Name); break;
             case string stringValue: WriteString(text, stringValue); break;

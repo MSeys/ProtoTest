@@ -23,9 +23,9 @@ builder.AddMessaging(messaging => messaging
 
 A destination that already exists with that shape, or a repeated declaration, is a no-op.
 
-A queue destination, `ProtoDestination.Queue("billing.session-ended.dlq")`, is consumed as it exists instead of bound to an exchange, which is how a dead-letter queue is awaited: the adapter checks the queue passively, reads it on the test's channel and leaves it in place. The queue form is consumed, never declared, and the delivery carries the queue destination and the transport's routing key. Unlike a tap, a queue consume reads the queue's backlog and removes what it reads, so a queue with another reader is shared: prefer the exchange that feeds it where the suite runs in parallel.
+A queue destination, `ProtoDestination.Queue("billing.session-ended.dlq")`, is consumed as it exists instead of bound to an exchange, which is how a dead-letter queue is awaited: the adapter checks the queue passively and reads it on the test's channel, removing what it reads. The queue itself is never declared, purged or deleted. The queue form is consumed, never declared, and the delivery carries the queue destination and the transport's routing key. Unlike a tap, a queue consume reads the queue's backlog and removes what it reads, so a queue with another reader is shared: prefer the exchange that feeds it where the suite runs in parallel.
 
-A publish can name a routing key with `PublishAsync(exchange, routingKey, payload)`, and An await can select one with `AwaitAsync(exchange, routingKey, predicate)`; the delivery carries it in `message.RoutingKey`. The key is bound on the destination's tap when the keyed await starts, so a direct exchange delivers it.
+A publish can name a routing key with `PublishAsync(exchange, routingKey, payload)`, and an await can select one with `AwaitAsync(exchange, routingKey, predicate)`; the delivery carries it in `message.RoutingKey`. The key is bound on the destination's tap when the keyed await starts, so a direct exchange delivers it.
 
 The RabbitMQ connection is shared for the run, while awaited messages remain isolated per test.
 

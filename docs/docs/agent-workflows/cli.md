@@ -32,7 +32,7 @@ usage: prototest summary <file.prototrace>
 | check a run against a baseline | `verify <baseline.json> <current.json>` | nothing |
 | post the digest | `feedback <file.prototrace> [--digest <path>]` | the `--digest` file, and the posts |
 
-An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`.
+An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`. There is no `--help` verb: `prototest --help` prints the same usage to stderr and exits `1`.
 
 ### summary
 
@@ -52,9 +52,13 @@ FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.
   cause: runner-reported failure
 ```
 
-A run with nothing to report prints two lines and stops:
+Run ids and timestamps are new on every run; compare the shape, not the values.
+
+A run with nothing to report prints the header, the counts and the words `All green.`:
 
 ```text
+ProtoTest trace 2.0 · run 761778e6dc82498a9f9965fa1e6b5a24 · 2026-09-29 06:19:01Z - 2026-09-29 06:19:05Z
+1 tests · 1 succeeded
 All green.
 ```
 
@@ -140,7 +144,7 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The stdout half is the annotation GitHub renders on the pull request, and [The evidence loop](./loop.md#run-it-locally) shows the same command with both streams.
+The stdout half is the annotation GitHub renders on the pull request, and [The evidence loop](./loop.md#run-it-locally) shows the same command with both streams. A failure with a source location renders it as properties (`::error file=path/to/OrderTests.cs,line=42::message`); without one it is the bare `::error::message` form, and run-gate annotations never carry a location.
 
 Every channel reports its outcome on stderr. A channel with no target, or nothing to post, skips. Only a channel that reached its target and failed makes the verb exit `1`. With no target configured the verb is safe to run locally.
 
@@ -203,7 +207,7 @@ The webhook posts the run's diagnosis digest: the same document `prototest summa
 }
 ```
 
-Trimmed: each failure also carries its mismatches, findings and artifacts, each gate its details, and the coverage its report artifact path. A run with no failures posts the same shape with empty `failures`, `gates` and `findings` and no stdout annotations.
+Trimmed: each failure also carries its mismatches, findings and artifacts, each gate its details, and the coverage its report artifact path. A run with no failures posts the same shape with empty `failures`, `gates` and `findings` and no stdout annotations. Run ids, file paths and timestamps differ on every run.
 
 The secret header rules:
 
@@ -246,6 +250,7 @@ flowchart TD
 - The verbs read files. The only writes are the `index` page, the digests beside the traces and the `--digest` file.
 - No network call happens unless a target is configured. A missing target is a named skip, never a failure.
 - The verbs take no other arguments, and there is no verb that reruns a suite, writes a trace or changes an archive.
+- The CLI writes UTF-8 without a BOM and sets the console output encoding, so the `·` separator renders on a default Windows console; redirected output stays parsing-friendly.
 - The digest is built from the written archive after the run, so it reflects what the run recorded ([The evidence loop](./loop.md#limits)).
 - These four verbs are the whole `prototest` surface.
 

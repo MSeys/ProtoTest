@@ -102,7 +102,7 @@ Both files are written at the end of the run and copied into the archive, so the
 
 ## The journey that proves it
 
-`SheetsJourney.TheMonthlyReport_ShouldMatchItsModel` creates a project, downloads the monthly report and reads it as records:
+`SheetsJourney.TheMonthlyReportMatchesItsModel` creates a project, downloads the monthly report and reads it as records:
 
 <AnnotatedCode
   filename="SheetsJourney.cs"

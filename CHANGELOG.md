@@ -5,9 +5,7 @@ All notable changes to ProtoTest are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 All ProtoTest packages share one version; breaking API changes are called out below.
 
-## [Unreleased]
-
-## [1.1.0] - 2026-09-29
+## [1.1.0] - 2026-09-30
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
 CLI), the devices family (WebSocket and MQTT), the topology integrations (Aspire, WireMock,
@@ -128,6 +126,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Docs: the agent workflows document the feedback webhook payload, the configuration page lists every section's keys, and the template page shows what the scaffold creates. [CLI](https://prototest.dev/docs/agent-workflows/cli)
 - Docs: the reference pages gain the recorded trace walks, the decision figures and the triage tables; the longest pages split into child pages (web page coverage, messaging adapters, gRPC calls, the ProtoTrace archive, the CI providers). [Docs](https://prototest.dev/docs/)
 - Samples: Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
+- Core: suites name their own sensitive values (`ConfigureRedaction`, `ProtoTest:Redaction`); state and findings redact them like the defaults. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - Viewer: the viewer stays responsive at 1,000+ tests; search, filter and open times drop. [Benchmarks](https://prototest.dev/docs/project/benchmarks)
 - Viewer: skipped ticks read as planned, focus states and hit targets are restored, and the run header's outcome pill drops under the title on narrow screens. [Trace viewer](https://trace.prototest.dev)
 
@@ -211,6 +210,9 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Testcontainers: container readiness honors the run's readiness policy. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 - Testcontainers: a released container can be started again, and its connection string is cleared. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 - Aspire: an AppHost for a partly configured topology publishes only the missing keys. [Aspire](https://prototest.dev/docs/integrations/aspire)
+- Aspire: a published connection string is recorded redacted, so credentials never reach the trace, while its address stays readable. [Aspire](https://prototest.dev/docs/integrations/aspire)
+- GraphQL: a fluent upload argument fails when the document is built instead of rendering as a literal. [GraphQL](https://prototest.dev/docs/integrations/graphql)
+- Docs: a repeated `AddSheets` composes its options callbacks instead of keeping the first. [Sheets](https://prototest.dev/docs/integrations/sheets)
 - WireMock: a run-scoped fake keeps its stubs and request log for the whole run; `Reset()` clears it. [WireMock](https://prototest.dev/docs/integrations/wiremock)
 - WireMock: pinning Humanizer 3.0.10 avoids a `NU1608` next to Aspire. [WireMock](https://prototest.dev/docs/integrations/wiremock)
 - WireMock: `WireMockAssertionException` derives from `ProtoAssertionException`. [WireMock](https://prototest.dev/docs/integrations/wiremock)
@@ -313,8 +315,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 ## [1.0.0] - 2026-09-19
 
-**ProtoTest 1.0 is here.** What began as a stubborn idea — that an integration test should read like the
-scenario it describes while the framework quietly owns everything around it — is now a stable foundation
+**ProtoTest 1.0 is here.** What began as a stubborn idea, that an integration test should read like the
+scenario it describes while the framework quietly owns everything around it, is now a stable foundation
 for .NET 8, 9 and 10. One host, one execution context and one explicit lifecycle; the test runner you
 already use; and every integration sharing the same assertions, evidence and coverage, all the way down to
 a portable trace you can open and read. Every package ships together at 1.0.0, documented, tested, and

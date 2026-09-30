@@ -25,7 +25,7 @@ Convert one class at a time. Plain tests keep running. The xUnit runbook below i
 - [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
 
 :::danger[Step 3 on v2: the collection attribute is mandatory]
-A converted v2 class without `[Collection(ProtoTestCollection.Name)]` that reaches `Proto.Context` crashes the test host and aborts the whole run. Add it in the same change.
+A converted v2 class without `[Collection(ProtoTestCollection.Name)]` that reaches `Proto.Context` crashes the test host (the recorded behavior) and aborts the whole run. Add it in the same change.
 :::
 
 :::warning[Step 4 on SDK 10 with v3: the MTP opt-in comes first]
@@ -119,8 +119,8 @@ The registration details, outcome mapping and limits are on [xUnit v2](./xunit.m
 
 The same five steps, with NUnit's host hook and attribute swap:
 
-- [ ] **1. Add the package** (`ProtoTest.NUnit`) plus the integration packages the tests use. NUnit needs **4.6.1 or newer**, so update it first when the template pinned an older one. Gate: the solution builds.
-- [ ] **2. Write the host once**: a `[SetUpFixture]` class deriving from `ProtoTestAssembly` with the `Configure` override. Keep it outside any namespace, or it covers only that namespace's subtree. Gate: untouched tests still pass.
+- [ ] **1. Add the package** (`ProtoTest.NUnit`) plus the integration packages the tests use. NUnit needs **4.6.1 or newer**, so update it first when you started from `dotnet new nunit`: it pins an older one, while `dotnet new prototest` already resolves 4.6.1. Gate: the solution builds.
+- [ ] **2. Write the host once**: a `[SetUpFixture]` class deriving from `ProtoTestAssembly` with the `Configure` override. Keep it outside any namespace, or it covers only that namespace's subtree. The `dotnet new prototest` template keeps `Setup` inside the project namespace by design, beside the tests it generates; hoist it out once tests span namespaces. Gate: untouched tests still pass.
 - [ ] **3. Convert one class**: replace `[Test]` with `[ProtoTest]` (it derives from NUnit's `TestAttribute`), keep `[TestFixture]`, and read `Proto.Context` in `[SetUp]`, the body or `[TearDown]`. Gate: converted tests get a trace.
 - [ ] **4. Run `dotnet test`.** Gate: green.
 - [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
@@ -206,9 +206,9 @@ The hooks, the per-row lifecycle and the skip path are on [MSTest](./mstest.md).
 The same five steps, with TUnit's executor instead of an attribute swap:
 
 - [ ] **1. Add the package** (`ProtoTest.TUnit`) plus the integration packages the tests use. Gate: the solution builds.
-- [ ] **2. Write the host once**: register `[assembly: TestExecutor<ProtoTestExecutor>()]` for the assembly, and initialize the host from a class deriving from `ProtoTestAssembly` with `[Before(Assembly)]` calling `InitializeAsync` and `[After(Assembly)]` calling `CleanupAsync`. Gate: untouched tests still pass.
+- [ ] **2. Write the host once**: register `[assembly: TestExecutor<ProtoTestExecutor>()]` for the assembly, and initialize the host from a class deriving from `ProtoTestAssembly` with `[Before(Assembly)]` calling `InitializeAsync` and `[After(Assembly)]` calling `CleanupAsync`. Gate: plain tests still pass (wrapped).
 - [ ] **3. Convert one class**: keep TUnit's `[Test]`; the executor wraps every test in the assembly, so there is no attribute to swap. Move the arrangement into the host and read `Proto.Context` in the body. Gate: converted tests get a trace.
-- [ ] **4. Run `dotnet test`.** Gate: green.
+- [ ] **4. Run `dotnet test`.** On .NET SDK 10 the project needs the Microsoft.Testing.Platform opt-in in `global.json` first, and the command runs from that directory or names the project (see [TUnit](./tunit.md)). Gate: green.
 - [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
 
 Per-class pitfalls: the executor applies to every test in the assembly, so plain tests run wrapped rather than untouched. A source-generated test with no reflection `MethodInfo` runs unwrapped, with no context. The live `TestContext.CancellationToken` feeds the lifecycle, so the test and its hooks observe TUnit's per-test token.

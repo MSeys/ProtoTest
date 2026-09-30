@@ -45,7 +45,7 @@ Use only what your test suite needs. You're not obligated to use everything.
 
 ## Supported and preview
 
-Most suites need only the supported set: Core, one runner (NUnit, xUnit v2, xUnit v3, MSTest, TUnit), and the integrations for REST, GraphQL, gRPC, OpenAPI, ASP.NET Core, Web (Playwright, Selenium), SQL and Entity Framework Core, Messaging and RabbitMQ, Testcontainers, Data, Reporting, Traces and Templates.
+Most suites need only the supported set: Core, one runner (NUnit, xUnit v2, xUnit v3, MSTest, TUnit), and the integrations for REST, GraphQL, gRPC, OpenAPI, ASP.NET Core, Web (Playwright, Selenium), SQL and Entity Framework Core, Messaging and RabbitMQ (each with a Testcontainers companion), Testcontainers, background workers (Hosting), Data, Reporting, Traces and Templates.
 
 Preview packages exist and work, but their surface can change before 1.2: the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli), the devices family (Devices, Devices.WebSocket, Devices.WebSocket.AspNetCore, Devices.Mqtt, Devices.Mqtt.Testcontainers), Sheets, Aspire, WireMock, Messaging.MassTransit and Analyzers. The [integrations map](https://prototest.dev/docs/integrations/overview) marks each one.
 

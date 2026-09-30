@@ -35,7 +35,7 @@ dotnet add package ProtoTest.Sql.EntityFrameworkCore
 dotnet add package ProtoTest.Sql.Testcontainers
 ```
 
-Only `ProtoTest.Sql` is required. Add the Entity Framework Core adapter when tests use a `DbContext`, and the container package when the run should start its own PostgreSQL. ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed.
+Only `ProtoTest.Sql` is required. Add the Entity Framework Core adapter when tests use a `DbContext`, and the container package when the run should start its own PostgreSQL. ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `--framework` is passed.
 
 The snippets assume the namespaces of the types they name: `ProtoTest.Sql`, `ProtoTest.Sql.EntityFrameworkCore`, `System.Data.Common`, your provider (`Npgsql`), and your runner's attribute namespace for `[ProtoTest]` (`ProtoTest.NUnit` for NUnit, listed with the other runners in [runners](../../runners/overview.md)). A missing `ProtoTest.NUnit` turns `[ProtoTest]` into CS0616, not into a skipped test.
 

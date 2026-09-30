@@ -43,6 +43,23 @@ The `TUnit` namespace carries TUnit's own `[Test]`, `[Before]` and `[After]`.
 
 `[assembly: TestExecutor<ProtoTestExecutor>()]` applies the executor to every test in the assembly. Register it there. The class and method forms of `[TestExecutor<T>]` are not part of the supported surface.
 
+**On .NET SDK 10, a TUnit project runs on Microsoft.Testing.Platform.** The `dotnet new prototest` template carries the opt-in:
+
+```json title="global.json"
+{
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
+  }
+}
+```
+
+With that file in the project or solution directory, run `dotnet test` from that directory, or `dotnet test --project Starter.Tests/Starter.Tests.csproj` from anywhere. Running from elsewhere without it fails before any test runs: the old VSTest path reports that testing with the VSTest target is no longer supported.
+
+```bash
+dotnet test                                               # right: run from the global.json directory
+dotnet test --project Starter.Tests/Starter.Tests.csproj  # right: name the project, from anywhere
+```
+
 A test is a normal TUnit test. The executor wraps it. The interception path:
 
 ```text

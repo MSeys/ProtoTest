@@ -31,7 +31,7 @@ workbook.Sheet("Summary").Cell("B1").Should.Be(42.0);
 dotnet add package ProtoTest.Sheets
 ```
 
-ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `-f` is passed. The package builds on OpenXML and brings `ProtoTest.Json` with it for row shape matching.
+ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `--framework` is passed. The package builds on OpenXML and brings `ProtoTest.Json` with it for row shape matching.
 
 ## Compose
 
@@ -41,7 +41,7 @@ public static IProtoHostBuilder AddSheets(
     Action<SheetsOptions>? configure = null);
 ```
 
-`AddSheets` registers the `Sheets` capability (`ProtoCapabilityKinds.Document`), a singleton `SheetsOptions` built from the callback and then bound from `ProtoTest:Sheets`, and the `SheetsCoverageCollector`. Repeats are no-ops: the first options callback wins, the first collector instance wins, and the capability descriptor dedupes.
+`AddSheets` registers the `Sheets` capability (`ProtoCapabilityKinds.Document`), a singleton `SheetsOptions` built from the callback and then bound from `ProtoTest:Sheets`, and the `SheetsCoverageCollector`. A repeated `AddSheets` composes: every options callback runs in registration order before `ProtoTest:Sheets` binds over the result, while the collector registers once and the capability descriptor dedupes.
 
 ### Options and keys
 

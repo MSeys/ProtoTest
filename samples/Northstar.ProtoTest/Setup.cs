@@ -53,6 +53,7 @@ public sealed class Setup : ProtoTestAssembly
                     "TestResults", "Northstar.ProtoTest", "northstar.prototrace");
                 trace.ActivitySources.Add("Northstar.Domain");
             })
+            .ConfigureRedaction(redaction => redaction.AddSensitiveName("OwnerToken"))
             .ConfigureAppConfiguration(settings => ConfigureTests(settings, run))
             .AddSheets()
             .AddNorthstarTestSupport()

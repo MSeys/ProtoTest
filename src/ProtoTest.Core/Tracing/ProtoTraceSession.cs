@@ -11,22 +11,28 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     private readonly ConcurrentDictionary<string, ProtoTestTraceRecorder> _tests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ProtoTestTraceRecorder> _testsByTraceId = new(StringComparer.Ordinal);
     private readonly ConcurrentQueue<ProtoTraceArtifactSource> _runArtifacts = new();
-    private readonly ProtoRunTraceWriter _runWriter = new();
+    private readonly ProtoRunTraceWriter _runWriter;
     private readonly ProtoSpanConverter _converter = new();
     private readonly DateTimeOffset _startedAtUtc = DateTimeOffset.UtcNow;
     private readonly string _runId = Guid.NewGuid().ToString("N");
     private DateTimeOffset? _completedAtUtc;
     private readonly ProtoTraceOptions _options;
+    private readonly IReadOnlyCollection<string>? _additionalSensitiveNames;
     private readonly ProtoRunMetadata _runMetadata;
     private ActivityListener? _activityListener;
     private int _listening;
     private int _runArtifactSequence;
     private int _captureFailureReported;
 
-    public ProtoTraceSession(ProtoTraceOptions? options = null, ProtoRunMetadata? runMetadata = null)
+    public ProtoTraceSession(
+        ProtoTraceOptions? options = null,
+        ProtoRunMetadata? runMetadata = null,
+        ProtoRedactionOptions? redaction = null)
     {
         _options = options ?? new ProtoTraceOptions();
         _runMetadata = runMetadata ?? ProtoRunMetadata.Capture(_options);
+        _additionalSensitiveNames = redaction?.SnapshotAdditionalNames();
+        _runWriter = new ProtoRunTraceWriter(_additionalSensitiveNames);
     }
 
     /// <summary>
@@ -145,7 +151,7 @@ internal sealed class ProtoTraceSession : IProtoTraceSource
     public ProtoTestTraceRecorder StartTest(string name, ProtoTestId testId, MethodInfo method)
     {
         var recorder = new ProtoTestTraceRecorder(
-            testId.Value, name, method, _options, RegisterTrace, _converter.Forget);
+            testId.Value, name, method, _options, RegisterTrace, _converter.Forget, _additionalSensitiveNames);
         if (!_tests.TryAdd(testId.Value, recorder))
         {
             throw new InvalidOperationException(

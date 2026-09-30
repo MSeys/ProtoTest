@@ -2,7 +2,7 @@
 
 > Preview: the surface can change before 1.2.
 
-MQTT transport for `ProtoTest.Devices`: talk to devices over publish/subscribe against a real broker -
+MQTT transport for `ProtoTest.Devices`: talk to devices over publish/subscribe against a real broker:
 Mosquitto in CI, the broker behind the lab.
 
 ```bash
@@ -26,7 +26,7 @@ dotnet add package ProtoTest.Devices.Mqtt.Testcontainers   # a Mosquitto broker 
 ## Limits
 
 - **MQTT 5 over plain TCP.** The transport speaks `mqtt://`; an MQTT 3.1.1-only broker and `mqtts://`
-  come later.
+  are not covered.
 - **One broker connection per device instance.** The test's end disconnects it; an explicit
   `DisconnectAsync` releases it and the next send reconnects. One reader at a time: a second concurrent
   receive fails fast.
@@ -37,8 +37,8 @@ dotnet add package ProtoTest.Devices.Mqtt.Testcontainers   # a Mosquitto broker 
   set through `configure` are shared by every MQTT client; a client that needs its own broker passes
   a resolver, because a configured or container broker wins over the registration's `address:`.
 - **A missing broker fails the device, naming the key.** Without an address, a resolver or
-  `ProtoTest:Devices:Mqtt:Broker`, creating the device fails instead of skipping - a device capability
-  cannot see a broker configuration supplies later.
+  `ProtoTest:Devices:Mqtt:Broker`, creating the device fails instead of skipping. A device capability
+  cannot see a broker that configuration supplies later.
 - **The transport moves frames only.** Message kinds, commands and coverage are the suite's protocol
   code (a catalog implements `IProtoDeviceProtocol`).
 

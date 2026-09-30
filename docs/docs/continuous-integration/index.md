@@ -73,9 +73,9 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The `::error` lines are the check annotations. The channel lines are the per-channel outcome; each one names why it skipped or failed.
+The `::error` lines are the check annotations, shown here in the bare form: this failure carries no source location, while one that does renders `::error file=path/to/OrderTests.cs,line=42::message`. The channel lines are the per-channel outcome; each one names why it skipped or failed.
 
-The same digest reaches a reviewer as a pull request comment. The shape of the comment, with values from the committed failing fixture:
+The same digest reaches a reviewer as a pull request comment. The comment below is illustrative; its values come from the committed failing fixture:
 
 ```markdown
 ## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
@@ -89,7 +89,7 @@ The same digest reaches a reviewer as a pull request comment. The shape of the c
   - at `artifacts/fixture-gen/Program.cs:65`
   - mismatch `$.orderId`: expected 7, actual 42
 
-Coverage: 151/198 (76.26%)
+Coverage: 2/4 (50%)
 
 [Full trace](https://github.com/you/your-repo/actions/runs/123/artifacts/prototest-trace)
 ```

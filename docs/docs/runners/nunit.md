@@ -51,7 +51,7 @@ public class OrderTests
 ```
 
 :::warning[Namespace scoping]
-This is NUnit's own rule. A `[SetUpFixture]` outside any namespace applies to the whole assembly, while one inside a namespace applies only to that namespace and its children. If tests in another namespace cannot find the host, move the setup class to cover that namespace.
+This is NUnit's own rule. A `[SetUpFixture]` outside any namespace applies to the whole assembly, while one inside a namespace applies only to that namespace and its children. If tests in another namespace cannot find the host, move the setup class to cover that namespace. The `dotnet new prototest` template keeps its `Setup` inside the project namespace by design, beside the tests it generates.
 :::
 
 ```text

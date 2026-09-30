@@ -46,7 +46,7 @@ export const installTabs = [
 One command starts a running suite. The template builds it, runs it and reports on it.
 
 ```bash
-dotnet new install ProtoTest.Templates
+dotnet new install ProtoTest.Templates::1.1.0
 dotnet new prototest -n Shop
 cd Shop
 dotnet test

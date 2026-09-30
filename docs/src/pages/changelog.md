@@ -363,6 +363,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the tab strip is one tablist with a roving focus and arrow keys. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - the run strip names each tick with the test it opens, and the inspector resizer takes arrow keys. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - tertiary text on hover rows meets WCAG AA in both themes. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- the inspector frames source, validated shapes, JSON bodies and code in one card with the same head, opens attached files from a row like the other links, and keeps its path and section index on one line. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 
 #### Docs and samples
 

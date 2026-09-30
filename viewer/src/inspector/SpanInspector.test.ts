@@ -78,7 +78,7 @@ describe("SpanInspector shape comparison", () => {
     await nextTick();
 
     expect(headings(host)).not.toContain("Expected against actual");
-    expect(host.querySelector(".shape header strong")?.textContent).toBe("Validated document");
+    expect(host.querySelector(".card header strong")?.textContent).toBe("Validated document");
     unmount();
   });
 });
@@ -166,6 +166,35 @@ describe("SpanInspector evidence and index", () => {
     section.scrollIntoView = scroll;
     buttons[0].click();
     expect(scroll).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+});
+
+// A file the operation attached opens like every other row in the details; one it could not store says so.
+describe("SpanInspector attachments", () => {
+  const artifact = { id: "a1", name: "body.json", mediaType: "application/json", sizeBytes: 21, archivePath: "artifacts/a1", description: null, error: null };
+
+  it("opens an attached file from its row", async () => {
+    const opened = vi.fn();
+    const call = span({ evidence: [{ type: "attachment", at: 1, name: "body.json", artifact, span: null }] as Span["evidence"] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]), onArtifact: opened }));
+    await nextTick();
+
+    const row = host.querySelector<HTMLButtonElement>("button.link-row.file");
+    expect([...row!.children].map(part => part.textContent)).toEqual(["File", "body.json", "application/json, 21 B"]);
+    row!.click();
+    expect(opened).toHaveBeenCalledWith(artifact);
+    unmount();
+  });
+
+  it("disables the row of a file that could not be stored", async () => {
+    const call = span({ evidence: [{ type: "attachment", at: 1, name: "shot.png", artifact: { ...artifact, error: "Not in the archive" }, span: null }] as Span["evidence"] });
+    const { host, unmount } = mount(h(SpanInspector, { span: call, test: testTrace([call]) }));
+    await nextTick();
+
+    const row = host.querySelector<HTMLButtonElement>("button.link-row.file");
+    expect(row?.disabled).toBe(true);
+    expect(row?.textContent).toContain("Unavailable");
     unmount();
   });
 });

@@ -2,6 +2,8 @@
 import { computed } from "vue";
 import type { Section } from "../trace/model";
 import JsonView from "./JsonView.vue";
+import DetailCard from "../ui/DetailCard.vue";
+import { useClipboard } from "../ui/useClipboard";
 
 /*
  * A section by its kind: fields as a definition list, code as a readable block, checks with their verdict,
@@ -20,10 +22,17 @@ const kind = computed(() => known.includes(props.section.kind) ? props.section.k
 const binary = computed(() => Boolean(props.section.content?.includes("\uFFFD")));
 // JSON content opens as a tree; other code is shown as written.
 const isJson = computed(() => !binary.value && props.section.language === "json" && Boolean(props.section.content));
+// Plain code reads in the same card as source and JSON, so every recorded document in the details looks alike.
+const isCode = computed(() => kind.value === "code" && !binary.value && Boolean(props.section.content));
+const { copied, copy } = useClipboard();
 </script>
 
 <template>
   <JsonView v-if="kind === 'code' && isJson" :value="section.content" :label="section.label" :open-depth="1" />
+  <DetailCard v-else-if="isCode" :title="section.label" :meta="section.language ?? undefined">
+    <template #tools><button type="button" @click="copy(section.content ?? '')">{{ copied ? "Copied" : "Copy" }}</button></template>
+    <pre class="code"><code>{{ section.content }}</code></pre>
+  </DetailCard>
   <section v-else class="section" :class="`is-${kind}`">
     <h3>{{ section.label }}<small v-if="kind === 'generic'">{{ section.kind }}</small></h3>
 
@@ -89,7 +98,7 @@ h3 small { color: var(--dim); font-size: var(--text-micro); font-weight: var(--w
 
 .code {
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-chip);
   background: var(--surface-sunken);
   color: var(--text-on-sunken);

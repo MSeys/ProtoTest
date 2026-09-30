@@ -61,7 +61,7 @@ const itemOrigin = computed(() => {
     <header class="head">
       <div class="top">
         <nav v-if="span && path.length" class="path" aria-label="Where this ran">
-          <button v-for="ancestor in path" :key="ancestor.id" type="button" @click="emit('select', ancestor)">{{ ancestor.name }}</button>
+          <button v-for="ancestor in path" :key="ancestor.id" type="button" :title="ancestor.name" @click="emit('select', ancestor)">{{ ancestor.name }}</button>
         </nav>
         <span v-else-if="span" class="path-label">{{ span.phase.charAt(0).toUpperCase() + span.phase.slice(1) }} phase</span>
         <nav v-else-if="origin" class="path" aria-label="Where this came from">
@@ -127,9 +127,11 @@ const itemOrigin = computed(() => {
 .actions :deep(.close) { width: 28px; height: 28px; }
 .link { height: 28px; padding: 0 var(--space-3); border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: var(--text-micro); transition: color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease); }
 .link:hover { border-color: var(--border); color: var(--text); }
-.path { min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.path button { padding: 0; border: 0; background: transparent; color: var(--muted); font-size: var(--text-micro); text-align: left; transition: color var(--motion-fast) var(--motion-ease); }
-.path button:not(:last-child)::after { content: "/"; margin-left: var(--space-1); color: var(--dim); }
+.path { min-width: 0; display: flex; gap: var(--space-1); overflow: hidden; white-space: nowrap; }
+.path button { min-width: 3ch; flex: 0 1 auto; padding: 0; overflow: hidden; border: 0; background: transparent; color: var(--muted); font-size: var(--text-micro); text-align: left; text-overflow: ellipsis; transition: color var(--motion-fast) var(--motion-ease); }
+.path button:last-child { flex-shrink: 0; max-width: 100%; }
+/* The separator leads the next step, so it stays visible when a step is cut short. */
+.path button + button::before { content: "/"; margin-right: var(--space-1); color: var(--dim); }
 .path button:hover { color: var(--text); text-decoration: underline; }
 .path-label { color: var(--muted); font-size: var(--text-micro); font-weight: var(--weight-semibold); }
 

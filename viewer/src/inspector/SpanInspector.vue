@@ -159,11 +159,13 @@ function jump(id: string) {
           </dl>
         </template>
         <template v-else-if="item.type === 'attachment'">
-          <p><strong>Attached</strong> {{ item.name }}</p>
-          <button v-if="item.artifact" type="button" class="open" :disabled="Boolean(item.artifact.error)"
-                  @click="item.artifact && emit('artifact', item.artifact)">
-            {{ item.artifact.error ? item.artifact.error : `Open ${item.artifact.mediaType}, ${formatBytes(item.artifact.sizeBytes)}` }}
+          <button v-if="item.artifact" type="button" class="link-row file" :disabled="Boolean(item.artifact.error)"
+                  :title="item.artifact.error ?? `Open ${item.name}`" @click="item.artifact && emit('artifact', item.artifact)">
+            <span class="change">File</span>
+            <span>{{ item.name }}</span>
+            <small>{{ item.artifact.error ? "Unavailable" : `${item.artifact.mediaType}, ${formatBytes(item.artifact.sizeBytes)}` }}</small>
           </button>
+          <p v-else><strong>Attached</strong> {{ item.name }} <span class="muted">with no file</span></p>
         </template>
         <template v-else>
           <p><strong>{{ item.status }} finding</strong> {{ item.message }}</p>
@@ -259,8 +261,8 @@ h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(
 
 .evidence { min-width: 0; display: grid; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); }
 .evidence p { font-size: var(--text-meta); overflow-wrap: anywhere; }
-.open { justify-self: start; height: var(--row-height); padding: 0 var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface-2); font-size: var(--text-micro); }
-.open:hover:not(:disabled) { border-color: var(--blueprint); }
+.link-row:disabled { cursor: not-allowed; opacity: .6; }
+.link-row:disabled:hover { border-color: transparent; }
 .moment { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: var(--space-2); font-size: var(--text-meta); }
 .moment .offset, .moment small { color: var(--muted); font-size: var(--text-micro); }
 /* A moment that went wrong reads as such; an informational one stays quiet. */
@@ -275,12 +277,14 @@ h3 { font-family: var(--font-ui); font-size: var(--text-meta); font-weight: var(
   margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
   padding: var(--space-2) var(--space-4);
   display: flex;
-  flex-wrap: wrap;
   gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.index button { height: 22px; padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-pill); background: transparent; color: var(--muted); font-size: var(--text-meta); }
+.index button { flex: none; height: 22px; padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-pill); background: transparent; color: var(--muted); font-size: var(--text-meta); }
 .index button:hover { border-color: var(--blueprint); color: var(--text); }
 .index button.hot { border-color: var(--danger); color: var(--danger); }
 .facts-list { margin: 0; display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 0 var(--space-3); }

@@ -6,19 +6,29 @@ description: "Publish a message, then await the one that matters with a predicat
 
 # Messaging
 
-## What it adds
-
-Each test gets a broker client. Publish a message, then await the matching message with a predicate and a timeout.
+Each test gets a broker client. Publish a message, then await the matching message with a predicate and a timeout:
 
 ```csharp
-var messages = Proto.Context.Messaging();
+[ProtoTest]
+public async Task Paying_an_invoice_publishes_an_event()
+{
+    var messages = Proto.Context.Messaging();
 
-await messages.PublishAsync("invoice.paid", """{"id":42}""", contentType: "application/json");
+    await messages.PublishAsync("invoice.paid", """{"id":42}""", contentType: "application/json");
 
-var message = await messages.AwaitAsync(
-    "invoice.paid",
-    candidate => candidate.Payload!.Contains("\"id\":42"));
+    var message = await messages.AwaitAsync(
+        "invoice.paid",
+        candidate => candidate.Payload!.Contains("\"id\":42"));
+
+    message.Should.MatchShape(new { id = 42 });
+}
 ```
+
+Run it with `dotnet test`. A green run prints the passed test. Failing to arrive is a `TimeoutException` and a test failure, not a sleep.
+
+## What it adds
+
+Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
 
 | Package | Does |
 | --- | --- |
@@ -26,8 +36,6 @@ var message = await messages.AwaitAsync(
 | `ProtoTest.Messaging.RabbitMq` | a real RabbitMQ broker as the adapter |
 | `ProtoTest.Messaging.RabbitMq.Testcontainers` | a broker container owned by the run |
 | `ProtoTest.Messaging.MassTransit` | the application's in-process MassTransit harness as the adapter |
-
-Failing to arrive is a `TimeoutException` and a test failure, not a sleep. Without an adapter the client runs against an in-memory broker, so the API works anywhere; `ProtoTest.Messaging.RabbitMq` replaces it with RabbitMQ, `ProtoTest.Messaging.RabbitMq.Testcontainers` owns a broker for the whole run, and `ProtoTest.Messaging.MassTransit` bridges the surface to an in-process application's MassTransit test harness - or, through its `MassTransitEnvelope` helper, speaks the MassTransit wire envelope over any adapter, published applications included.
 
 ## Which brokers
 
@@ -60,30 +68,9 @@ builder.AddMessaging(messaging => messaging.UseMassTransit<Program>()); // the a
 
 ```csharp
 IProtoHostBuilder AddMessaging(this IProtoHostBuilder builder, Action<ProtoMessagingBuilder>? configure = null);
-
-ProtoMessagingBuilder UseBroker(this ProtoMessagingBuilder messaging,
-    Func<IServiceProvider, IProtoMessageBroker> factory, params string[] addressKeys);
-
-ProtoMessagingBuilder UseBrokerWhenInProcess(this ProtoMessagingBuilder messaging,
-    Func<IServiceProvider, IProtoMessageBroker> factory, string application, params string[] configuredKeys);
-
-ProtoMessagingBuilder CaptureAttachments(this ProtoMessagingBuilder messaging,
-    Action<MessagingAttachmentOptions>? configure = null);
-
-ProtoMessagingBuilder Tap(this ProtoMessagingBuilder messaging,
-    params string[] destinations);
-
-ProtoMessagingBuilder Declare(this ProtoMessagingBuilder messaging,
-    params string[] destinations);
-
-ProtoMessagingBuilder UseRabbitMq(this ProtoMessagingBuilder messaging,
-    Action<RabbitMqOptions>? configure = null);
-
-ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messaging,
-    string application = "Default");
 ```
 
-`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it. `UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address. `UseBrokerWhenInProcess` declares it only while the named application is served in-process, which is the direction the MassTransit bridge needs: the application's provider chain winner decides, so a loopback, container or AppHost application drops the capability, and a host whose application declares no chain keeps the configured-keys rule (a configured `BaseUrl` means the application runs published with no test harness here).
+`UseBroker` is the adapter seam; `UseRabbitMq` and `UseMassTransit` are the built-in implementations of it.
 
 `Tap` declares the destinations this suite awaits, in code, so an adapter can bind each test's tap during setup. See [Destinations](#destinations). `Declare` declares the destinations this suite owns, in code, so an adapter creates them during setup before any tap binds. See [Suite-owned topology](#suite-owned-topology).
 
@@ -95,85 +82,9 @@ A repeated `AddMessaging` call runs its `configure` callback again, so a later c
 A configured adapter is what makes the `Broker` capability true. The in-memory default registers none, so `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips where no real broker is configured instead of passing against the double (see [skip conditions](../../foundation/skip-conditions.md)).
 :::
 
-### Options and keys
-
-| Key | Option | Type | Default |
-| --- | --- | --- | --- |
-| `ProtoTest:Messaging:DefaultTimeout` | `MessagingOptions.DefaultTimeout` | `TimeSpan` | 10 seconds |
-| `ProtoTest:Messaging:Destinations` | `MessagingOptions.Destinations` | `IList<string>` | empty |
-| `ProtoTest:Messaging:DeclaredDestinations` | `MessagingOptions.DeclaredDestinations` | `IList<string>` | empty |
-| `ProtoTest:Messaging:Attachments:CapturePublishedPayloads` | `MessagingAttachmentOptions.CapturePublishedPayloads` | `bool` | `true` |
-| `ProtoTest:Messaging:Attachments:CaptureReceivedPayloads` | `MessagingAttachmentOptions.CaptureReceivedPayloads` | `bool` | `true` |
-| `ProtoTest:Messaging:Attachments:RedactSensitiveData` | `JsonDiagnosticOptions.RedactSensitiveData` | `bool` | `true` |
-| `ProtoTest:Messaging:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
-| `ProtoTest:Messaging:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
-| `ProtoTest:Messaging:RabbitMq:ConnectionString` | `RabbitMqOptions.ConnectionString` | `string` | `amqp://guest:guest@localhost:5672/` |
-
-`MessagingAttachmentOptions` derives from `JsonDiagnosticOptions` and binds from `ProtoTest:Messaging:Attachments`; `RabbitMqOptions` binds from `ProtoTest:Messaging:RabbitMq`. Code configuration runs first and the configuration section binds over it. For the connection string the order is: an explicit configuration value wins, then the value a started container filled, then your code callback or the default. `Destinations` and `DeclaredDestinations` are lists, so configuration adds its entries after the code-declared ones and the set a test prepares or declares is deduped.
-
-`ProtoTest:Messaging:Broker` is **not** a library option. The [demo](../../getting-started/environments.md) reads it itself (`ProtoTest:Messaging:Broker=container`) to decide whether to register a container; the messaging packages never look at that key.
-
-### The test-side API
-
-```csharp
-public static ProtoMessageClient Messaging(this ProtoExecutionContext context, string? name = null);
-```
-
-```csharp
-Task PublishAsync(string destination, string? payload = null,
-    IReadOnlyDictionary<string, string?>? headers = null, string? contentType = null,
-    CancellationToken cancellationToken = default);
-
-Task PublishAsync(string destination, string routingKey, string? payload,
-    IReadOnlyDictionary<string, string?>? headers = null, string? contentType = null,
-    CancellationToken cancellationToken = default);
-
-Task<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
-    TimeSpan? timeout = null, CancellationToken cancellationToken = default);
-
-Task<ProtoMessage> AwaitAsync(string destination, string routingKey, Func<ProtoMessage, bool> predicate,
-    TimeSpan? timeout = null, CancellationToken cancellationToken = default);
-```
-
-`AwaitAsync` returns the first message on the destination that matches the predicate; when no timeout is given it uses `MessagingOptions.DefaultTimeout`. `Messaging()` throws when the host was not composed with `AddMessaging`; `Messaging("name")` names the run's broker client (`Default`) or fails with *"No messaging client named '…' is registered. AddMessaging registers the run's broker client under 'Default'; …"*. An empty destination or a null predicate is an argument error. `ProtoMessage` is the broker-agnostic shape every adapter maps onto:
-
-```csharp
-public sealed record ProtoMessage(string Destination, string? Payload = null,
-    IReadOnlyDictionary<string, string?>? Headers = null, string? ContentType = null)
-{
-    public string? RoutingKey { get; init; }
-}
-```
-
-The payload reads are typed: `message.ReadAsJson<T>()` deserializes with `ProtoJsonDefaults.Reader` (case-insensitive property names) and returns `default` for an empty payload; `message.ReadRequired<T>()` and `message.ReadRequired<T>(jsonPath)` return `T` and throw `MessagingAssertionException` naming the destination when the payload is empty, JSON `null`, or the path is missing. The path subset is the shared one (`$`, dot members, `[n]` indices) from [REST responses](../rest/responses.md#reading-one-value-by-path). `Payload` stays available for raw inspection.
-
-#### Routing keys
-
-A routing key names the address a publish takes inside the exchange, and the address a message was delivered under:
-
-```csharp
-// The payload is a required argument on this overload, so it cannot be mistaken for the payload-only one.
-await messages.PublishAsync(CsmsEvents.Exchange, "session.ended", """{"sessionId":"…"}""");
-
-var ended = await messages.AwaitAsync(
-    CsmsEvents.Exchange,
-    "session.ended",
-    message => message.ReadRequired<SessionEnded>().SessionId == sessionId);
-Assert.That(ended.RoutingKey, Is.EqualTo("session.ended"));
-```
-
-`message.RoutingKey` carries the key the transport delivered. The RabbitMQ adapter fills it from the delivery, and the in-memory broker keeps it. A predicate can filter on it. `AwaitAsync(exchange, routingKey, predicate, …)` matches only that key: the RabbitMQ tap binds the key on the destination's queue, so a direct exchange delivers a publish under it, and the in-memory broker filters the history the same way; a message under another key is not consumed and stays for the await that names it. A timeout names both the destination and the routing key, and the `messaging.publish`/`messaging.await` operations record `messaging.routing_key`. Without a routing key the plain overloads publish under the destination itself, and RabbitMQ delivers them the same way.
-
-The key is bound when the keyed await starts, so a direct exchange only delivers a message published after that; a topic exchange's `#` binding catches every key, so pre-binding the destination with `Tap` keeps the act-then-await flow reliable there. MassTransit addresses message contract types rather than broker routing, so its adapter rejects a routing key with an error naming the destination instead of dropping it.
-
-`message.Should.MatchShape(shape)` matches the payload with the same [shape matcher](../rest/responses.md#matchshape) as REST, GraphQL and gRPC. It records an `assert.json.shape` operation with a `messaging.contract.shape` observation on the ambient test context; a mismatch throws `MessagingAssertionException` whose message starts with the destination, keeping the shared `JsonShapeMismatchException` as `InnerException`, and a payload that is empty or not JSON fails the same way naming the destination.
-
-`message.Should.MatchShape(shape, exact: true)` is the exhaustive form: a field present in the payload that the shape does not mention is a mismatch naming that field. A value constraint mentions its whole subtree. The [shape matching page](../../foundation/shape-matching.md#exact-matching) has the rules.
-
-An adapter implements two interfaces: the capability owns the broker resource and the test-side API, and the adapter owns the client technology. The full contract lives on [Adapter contract](./adapters.md).
-
-
 ## The tasks
+
+The `Paying_an_invoice_publishes_an_event` test above is the whole pattern: publish, await the match, assert the shape.
 
 ```mermaid
 sequenceDiagram
@@ -185,24 +96,6 @@ sequenceDiagram
     App->>Broker: publish
     Test->>Broker: AwaitAsync (predicate, timeout)
     Broker-->>Test: match or TimeoutException
-```
-
-```csharp
-builder.AddMessaging();
-
-[ProtoTest]
-public async Task PayingAnInvoicePublishesAnEvent()
-{
-    var messages = Proto.Context.Messaging();
-
-    await messages.PublishAsync("invoice.paid", """{"id":42}""", contentType: "application/json");
-
-    var message = await messages.AwaitAsync(
-        "invoice.paid",
-        candidate => candidate.Payload!.Contains("\"id\":42"));
-
-    message.Should.MatchShape(new { id = 42 });
-}
 ```
 
 ### Going further
@@ -324,6 +217,55 @@ builder.AddMessaging(messaging => messaging.CaptureAttachments());
 ```
 
 A publish attaches `message-publish-{destination}-{sequence}-payload` after the broker call succeeded; a matched await attaches `message-receive-{destination}-{sequence}-payload`. `{sequence}` is the client's per-test capture number, so repeated captures on one destination stay distinct. Payloads are redacted with the shared JSON rules (`password`, `token`, `secret`, … become `[REDACTED]`) and truncated to `MaxDiagnosticBodyLength`; the trace's `Message` section is redacted with the same rules. An explicit content type wins, otherwise a payload starting with `{` or `[` is `application/json` and everything else is `text/plain`. Without `CaptureAttachments` nothing is captured. Capture never fails the operation: a failed capture is a `messaging.attachment.failed` event and the publish or await still succeeds.
+
+### Reference: options and API
+
+| Key | Option | Type | Default |
+| --- | --- | --- | --- |
+| `ProtoTest:Messaging:DefaultTimeout` | `MessagingOptions.DefaultTimeout` | `TimeSpan` | 10 seconds |
+| `ProtoTest:Messaging:Destinations` | `MessagingOptions.Destinations` | `IList<string>` | empty |
+| `ProtoTest:Messaging:DeclaredDestinations` | `MessagingOptions.DeclaredDestinations` | `IList<string>` | empty |
+| `ProtoTest:Messaging:Attachments:CapturePublishedPayloads` | `MessagingAttachmentOptions.CapturePublishedPayloads` | `bool` | `true` |
+| `ProtoTest:Messaging:Attachments:CaptureReceivedPayloads` | `MessagingAttachmentOptions.CaptureReceivedPayloads` | `bool` | `true` |
+| `ProtoTest:Messaging:Attachments:RedactSensitiveData` | `JsonDiagnosticOptions.RedactSensitiveData` | `bool` | `true` |
+| `ProtoTest:Messaging:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
+| `ProtoTest:Messaging:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
+| `ProtoTest:Messaging:RabbitMq:ConnectionString` | `RabbitMqOptions.ConnectionString` | `string` | `amqp://guest:guest@localhost:5672/` |
+
+`MessagingAttachmentOptions` derives from `JsonDiagnosticOptions` and binds from `ProtoTest:Messaging:Attachments`; `RabbitMqOptions` binds from `ProtoTest:Messaging:RabbitMq`. Code configuration runs first and the configuration section binds over it. For the connection string the order is: an explicit configuration value wins, then the value a started container filled, then your code callback or the default. `Destinations` and `DeclaredDestinations` are lists, so configuration adds its entries after the code-declared ones and the set a test prepares or declares is deduped.
+
+`ProtoTest:Messaging:Broker` is **not** a library option. The [demo](../../getting-started/environments.md) reads it itself (`ProtoTest:Messaging:Broker=container`) to decide whether to register a container; the messaging packages never look at that key.
+
+```csharp
+public static ProtoMessageClient Messaging(this ProtoExecutionContext context, string? name = null);
+```
+
+```csharp
+Task PublishAsync(string destination, string? payload = null,
+    IReadOnlyDictionary<string, string?>? headers = null, string? contentType = null,
+    CancellationToken cancellationToken = default);
+Task<ProtoMessage> AwaitAsync(string destination, Func<ProtoMessage, bool> predicate,
+    TimeSpan? timeout = null, CancellationToken cancellationToken = default);
+```
+
+`AwaitAsync` returns the first message on the destination that matches the predicate; when no timeout is given it uses `MessagingOptions.DefaultTimeout`. `Messaging()` throws when the host was not composed with `AddMessaging`. `ProtoMessage` is the broker-agnostic shape every adapter maps onto (`Destination`, `Payload`, `Headers`, `ContentType`, `RoutingKey`). The payload reads are typed: `message.ReadAsJson<T>()` deserializes with `ProtoJsonDefaults.Reader` and returns `default` for an empty payload; `message.ReadRequired<T>()` and `message.ReadRequired<T>(jsonPath)` throw `MessagingAssertionException` naming the destination when the payload is empty, JSON `null`, or the path is missing.
+
+```csharp
+ProtoMessagingBuilder UseBroker(this ProtoMessagingBuilder messaging,
+    Func<IServiceProvider, IProtoMessageBroker> factory, params string[] addressKeys);
+ProtoMessagingBuilder UseBrokerWhenInProcess(this ProtoMessagingBuilder messaging,
+    Func<IServiceProvider, IProtoMessageBroker> factory, string application, params string[] configuredKeys);
+ProtoMessagingBuilder Tap(this ProtoMessagingBuilder messaging, params string[] destinations);
+ProtoMessagingBuilder Declare(this ProtoMessagingBuilder messaging, params string[] destinations);
+ProtoMessagingBuilder UseRabbitMq(this ProtoMessagingBuilder messaging, Action<RabbitMqOptions>? configure = null);
+ProtoMessagingBuilder UseMassTransit<TProgram>(this ProtoMessagingBuilder messaging, string application = "Default");
+```
+
+`UseBroker` declares the `Broker` capability only while at least one of its `addressKeys` can provide an address. `UseBrokerWhenInProcess` declares it only while the named application is served in-process. A repeated `AddMessaging` call runs its `configure` callback again; infrastructure stays idempotent and the first adapter configured wins. When an adapter is configured, `AddMessaging` also registers the `Messaging` capability with kind `broker`.
+
+A routing key names the address a publish takes inside the exchange, and the address a message was delivered under. `AwaitAsync(exchange, routingKey, predicate, …)` matches only that key; without a routing key the plain overloads publish under the destination itself. The key is bound when the keyed await starts, so a direct exchange only delivers a message published after that; pre-bind the destination with `Tap` to keep the act-then-await flow reliable there. MassTransit addresses message contract types rather than broker routing, so its adapter rejects a routing key.
+
+`message.Should.MatchShape(shape)` matches the payload with the same [shape matcher](../rest/responses.md#matchshape) as REST, GraphQL and gRPC; `MatchShape(shape, exact: true)` is the exhaustive form. A mismatch throws `MessagingAssertionException` whose message starts with the destination, keeping the shared `JsonShapeMismatchException` as `InnerException`. An adapter implements two interfaces: the capability owns the broker resource and the test-side API, and the adapter owns the client technology. The full contract lives on [Adapter contract](./adapters.md).
 
 ## Destinations
 

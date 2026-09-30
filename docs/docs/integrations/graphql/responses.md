@@ -6,13 +6,7 @@ description: "Assert on GraphQL responses: data shapes and errors, with the same
 
 # Responses
 
-`ExecuteAsync()`, `ExpectAsync()` and `SubscribeAsync()` return a `GraphQLResponse`. It's `IDisposable`; use `using var`.
-
-GraphQL servers usually answer `200 OK` even when an operation fails, so the interesting part is the `errors` array, not the status code.
-
-## Assertions
-
-All of them return the response, so they chain.
+A GraphQL server usually answers `200 OK` even when an operation fails, so the test asserts on the `errors` array, not the status code:
 
 ```csharp
 using var response = await Proto.Context.GraphQL()
@@ -24,36 +18,16 @@ using var response = await Proto.Context.GraphQL()
 response.Should.HaveErrors().Should.HaveError("UNAUTHORIZED");
 ```
 
-The full signatures, for reference:
+Run it with `dotnet test`. A green run prints the passed test, and the failure names the operation and the error codes. `ExecuteAsync()`, `ExpectAsync()` and `SubscribeAsync()` return a `GraphQLResponse`. It is `IDisposable`; use `using var`.
 
-```csharp
-public GraphQLShouldAssertions Should { get; }
-public GraphQLAssertions ShouldNot { get; }
+## Assertions
 
-public GraphQLResponse HaveHttpStatus(HttpStatusCode expected);                 // on GraphQLAssertions
-public GraphQLResponse HaveNoErrors();                                          // on GraphQLAssertions
-public GraphQLResponse HaveErrors();
-public GraphQLResponse HaveError(string code);                                  // matches extensions.code, case-insensitive
-public GraphQLResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null);  // on GraphQLShouldAssertions
-public GraphQLResponse MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null);  // on GraphQLShouldAssertions
-```
-
-`ShouldNot.HaveHttpStatus(expected)` asserts a different status. The same applies to errors: `ShouldNot.HaveErrors()` checks the same as `Should.HaveNoErrors()`. Shape is positive-only, so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
+All of them return the response, so they chain. `ShouldNot.HaveErrors()` checks the same as `Should.HaveNoErrors()`. Shape is positive-only, so `MatchShape` lives on the `Should` facade and `ShouldNot` has no shape form.
 
 | Assertion | `Should` | `ShouldNot` |
 | --- | --- | --- |
 | status, errors | exact match | negated match |
 | `MatchShape` | match | no form (positive-only) |
-
-```csharp
-using var response = await Proto.Context.GraphQL()
-    .WithoutAuth()
-    .Query("me")
-    .Select(new { id = Gql.Field })
-    .ExecuteAsync();
-
-response.Should.HaveErrors().Should.HaveError("UNAUTHORIZED");
-```
 
 ### Error assertions
 
@@ -117,3 +91,19 @@ The path subset is `$`, dot members and zero-based array indices; a leading memb
 ## Protocol errors
 
 A body that isn't JSON, or that has neither `data` nor `errors`, throws `GraphQLProtocolException` with the sanitized body in `ResponseContent`. That's distinct from a well-formed response that contains errors; those are for you to assert on.
+
+### Reference: signatures
+
+```csharp
+public GraphQLShouldAssertions Should { get; }
+public GraphQLAssertions ShouldNot { get; }
+
+public GraphQLResponse HaveHttpStatus(HttpStatusCode expected);                 // on GraphQLAssertions
+public GraphQLResponse HaveNoErrors();                                          // on GraphQLAssertions
+public GraphQLResponse HaveErrors();
+public GraphQLResponse HaveError(string code);                                  // matches extensions.code, case-insensitive
+public GraphQLResponse MatchShape(object expectedShape, JsonSerializerOptions? options = null);  // on GraphQLShouldAssertions
+public GraphQLResponse MatchShape(object expectedShape, bool exact, JsonSerializerOptions? options = null);  // on GraphQLShouldAssertions
+```
+
+`ShouldNot.HaveHttpStatus(expected)` asserts a different status.

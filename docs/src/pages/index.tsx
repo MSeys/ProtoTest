@@ -106,124 +106,72 @@ const runnerChoices: CommandBoxRunner[] = [
   {id: 'mstest', label: 'MSTest', commands: templateCommands('mstest')},
 ];
 
+const proofPoints = [
+  {
+    to: '/docs/project/benchmarks#opencsms-at-1000-tests',
+    value: '35-36 ms',
+    label: 'per-test median, 1,000-test benchmark',
+  },
+  {
+    to: '/docs/project/benchmarks#the-viewer-at-1000-tests',
+    value: '1.3 s',
+    label: 'viewer cold open, 1,200 tests',
+  },
+  {
+    to: '/docs/getting-started/installation',
+    value: '44 packages',
+    label: 'on NuGet, .NET 8, 9 and 10',
+  },
+];
+
+/*
+ * First screen: the failure-first claim, the command that starts a suite, and the
+ * measured cost beside it. One centered column so the action reads first on every width.
+ */
 function Hero() {
   return (
     <header data-surface="blueprint" className={styles.hero}>
       <div className="container">
         <div className={styles.heroInner}>
-          <div>
-            <div className={styles.eyebrow}>Composable integration testing for .NET</div>
-            <Heading as="h1" className={styles.heroTitle}>
-              Test the whole journey. Trace every layer.
-            </Heading>
-            <p className={styles.heroLead}>
-              An integration test checks the app plus its API, database, broker and browser together.
-              ProtoTest runs it from one shared setup: REST, GraphQL, SQL, messaging, a browser or a
-              spreadsheet share one context, lifecycle, cleanup and trace.
-            </p>
+          <div className={styles.eyebrow}>Composable integration testing for .NET</div>
+          <Heading as="h1" className={styles.heroTitle}>
+            Integration tests that explain their own failures.
+          </Heading>
+          <p className={styles.heroLead}>
+            A journey across your API, database, broker and browser usually fails with nothing to
+            go on. ProtoTest runs it from one shared setup, and every run writes a trace that
+            shows what changed, what was not ready, and which line asserted it.
+          </p>
+          <div className={styles.heroAction}>
             <CommandBox title="Start a project" commands={templateCommands()} runners={runnerChoices} />
             <p className={styles.heroNext}>
               That installs a green suite. <code>dotnet test</code> runs it and writes{' '}
               <code>TestResults/prototest-{'{runId}'}.prototrace</code> plus <code>Shop.html</code>.
             </p>
-            <p className={styles.heroLearn}>
-              <Link to="/learn/">New to integration testing? Start the learning track</Link>
-            </p>
           </div>
-          <TabbedCode tabs={heroTabs} label="Three ways a ProtoTest suite looks" />
+          <div className={styles.heroButtons}>
+            <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
+              Your first test
+            </Link>
+            <Link className={`${styles.btn} ${styles.btnGhost}`} href="https://trace.prototest.dev/?demo=1">
+              Open a failing trace
+            </Link>
+          </div>
+          <ul className={styles.heroProof} aria-label="ProtoTest measured at scale">
+            {proofPoints.map((point) => (
+              <li key={point.value}>
+                <Link to={point.to}>
+                  <strong>{point.value}</strong> {point.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.heroLearn}>
+            <Link to="/learn/">New to integration testing? Start the learning track</Link>
+          </p>
         </div>
       </div>
     </header>
-  );
-}
-
-const proofPoints = [
-  {
-    to: '/docs/project/benchmarks#opencsms-at-1000-tests',
-    value: '35-36 ms',
-    label: 'per-test median in the 1,000-test product benchmark',
-  },
-  {
-    to: '/docs/project/benchmarks#the-viewer-at-1000-tests',
-    value: '1,200 tests',
-    label: 'viewer cold open in about 1.3 s',
-  },
-  {
-    to: '/docs/getting-started/installation',
-    value: '44 packages',
-    label: 'on NuGet, across .NET 8, 9 and 10',
-  },
-];
-
-/*
- * The numbers a reader comparing frameworks asks for first, each linked to the page that measured it.
- * A quiet row, not a card row: the hero already spent the page's boldness.
- */
-function ProofStrip() {
-  return (
-    <section className={styles.proof} aria-label="ProtoTest measured at scale">
-      <div className={`container ${styles.proofInner}`}>
-        <span className={styles.proofLead}>Measured</span>
-        <div className={styles.proofFacts}>
-          {proofPoints.map((point) => (
-            <Link key={point.value} className={styles.proofFact} to={point.to}>
-              <span className={styles.proofValue}>{point.value}</span>
-              <span className={styles.proofLabel}>{point.label}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PathsSection() {
-  return (
-    <section className={`${styles.section} ${styles.sectionAlt}`}>
-      <div className="container">
-        <div className={styles.sectionHead}>
-          <Heading as="h2">Start where you are</Heading>
-          <p>Three starting points. Pick the one that fits your situation.</p>
-        </div>
-        <div className={styles.paths}>
-          <div className={styles.pathCard}>
-            <Heading as="h3">New to integration testing</Heading>
-            <p>
-              Start with the Learn track. It begins with why integration tests get hard and works up to
-              tests you can trust in CI.
-            </p>
-            <Link className={styles.pathLink} to="/learn/">
-              Start learning
-            </Link>
-          </div>
-          <div className={styles.pathCard}>
-            <Heading as="h3">Evaluating ProtoTest</Heading>
-            <p>
-              Where it wins, where the alternatives win, what a run costs, and the questions teams ask
-              before adopting it.
-            </p>
-            <div className={styles.pathLinks}>
-              <Link to="/docs/project/compare">Compare alternatives</Link>
-              <Link to="/docs/project/benchmarks">Cost at scale</Link>
-              <Link to="/docs/project/faq">Adoption questions</Link>
-            </div>
-          </div>
-          <div className={styles.pathCard}>
-            <Heading as="h3">Already have a suite</Heading>
-            <p>
-              Recipes for common journeys, the conversion order for an xUnit suite you already have, and the
-              pages to reach for when a run needs explaining.
-            </p>
-            <div className={styles.pathLinks}>
-              <Link to="/docs/recipes/overview">Recipes</Link>
-              <Link to="/docs/runners/bring-your-existing-suite">Bring an existing xUnit suite</Link>
-              <Link to="/docs/getting-started/migrating-from-1-0">Migrate from 1.0</Link>
-              <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -232,11 +180,10 @@ function FailureSection() {
     <section className={styles.section}>
       <div className="container">
         <div className={styles.sectionHead}>
-          <Heading as="h2">Learn by failure</Heading>
+          <Heading as="h2">When a test fails, the trace answers</Heading>
           <p>
             A passing suite tells you little. A failure shows what changed, what was not ready, or
-            what cleanup hid the cause. The lessons start from those failures. The demo trace records
-            every layer of one failed test.
+            what cleanup hid the cause. Each card below is one recorded failure and its fix.
           </p>
         </div>
         <FailureGallery />
@@ -249,127 +196,101 @@ function TraceSection() {
   return (
     <section className={`${styles.section} ${styles.sectionAlt}`}>
       <div className="container">
-        <div className={styles.featureRow}>
-          <div className={styles.featureCopy}>
-            <Heading as="h2">Following a failed test</Heading>
-            <p>
-              Step through the three views of the demo trace: the run, the failed test story, and
-              the check. You see the changed values, the exception, and the asserting line.
-            </p>
-            <div className={styles.featureLinks}>
-              <Link className={styles.featureLink} href="https://trace.prototest.dev/?demo=1">
-                Open the failing trace →
-              </Link>
-              <Link className={styles.featureLink} to="/docs/observability/prototrace">
-                How ProtoTrace works →
-              </Link>
-            </div>
-          </div>
-          <ViewerWalkthrough />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function AgentExchange() {
-  return (
-    <Frame
-      head={
-        <>
-          <strong>get_failure</strong>
-          <span className={styles.frameMeta}>run 29e344f9 · fixture example</span>
-        </>
-      }
-      foot={
-        <>
-          Trimmed from the committed MCP fixture trace. The tool is read-only and capped; the whole
-          document is on <Link to="/docs/agent-workflows/diagnosis">Diagnosis</Link>.
-        </>
-      }>
-      <CodeSnippet
-        language="json"
-        code={`{
-  "runId": "29e344f9cf54431ca7d8bad3f87a1749",
-  "test": {
-    "testId": "00002",
-    "name": "orders match their shape",
-    "outcome": "failed",
-    "durationMs": 16
-  },
-  "failure": {
-    "kind": "assert.json.shape",
-    "status": "failed",
-    "errorType": "ProtoTest.Json.JsonShapeMismatchException",
-    "errorMessage": "Shape mismatch failed with 1 error(s): [$.orderId]: Values did not match. (Expected: '7', Actual: '42')",
-    "sourceFile": "artifacts/fixture-gen/Program.cs",
-    "sourceLine": 65
-  }
-}`}
-      />
-    </Frame>
-  );
-}
-
-function AgentSection() {
-  return (
-    <section className={styles.section}>
-      <div className="container">
-        <div className={styles.featureRow}>
-          <div className={styles.featureCopy}>
-            <Heading as="h2">Point your agent at the trace</Heading>
-            <p>
-              <code>ProtoTest.Mcp</code> is a local server that reads the <code>.prototrace</code>{' '}
-              archives in a repository. An agent works the evidence loop through four read-only tools:{' '}
-              <code>list_runs</code>, <code>get_failure</code>, <code>get_diagnosis</code> and{' '}
-              <code>get_coverage</code>.
-            </p>
-            <p>
-              Every answer comes from the recorded trace, with size limits. The server opens no port
-              and uploads nothing. It returns the same failure the viewer shows.
-            </p>
-            <Link className={styles.featureLink} to="/docs/agent-workflows/setup">
-              Connect an agent →
-            </Link>
-          </div>
-          <AgentExchange />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CtaSection() {
-  return (
-    <section className={styles.section}>
-      <div className="container">
-        <div className={styles.ctaBanner}>
-          <Heading as="h2">Try the starter project</Heading>
+        <div className={styles.sectionHead}>
+          <Heading as="h2">Follow one failure end to end</Heading>
           <p>
-            The template creates a small ASP.NET Core API and a ProtoTest suite. Run the commands
-            from the <Link to="/docs/getting-started/installation">installation page</Link>, then
-            run the suite. A green run ends like this (abridged), with the trace and the report
-            beside it:
+            Step through the three views of the demo trace: the run, the failed test story, and
+            the check. You see the changed values, the exception, and the asserting line.
           </p>
-          <div className={styles.ctaSnippet}>
-            <CodeSnippet
-              language="text"
-              code={`dotnet test
-Passed! - Failed: 0, Passed: 1 - Shop.Tests.dll
-TestResults/prototest-{runId}.prototrace
-TestResults/Shop.html`}
-            />
-          </div>
-          <p className={styles.ctaRelease}>
-            1.1.0 adds readiness probes and a per-test clock.{' '}
-            <Link to="/changelog">Full list in the changelog →</Link>
-          </p>
-          <div className={styles.heroButtons}>
-            <Link className={`${styles.btn} ${styles.btnPrimary}`} to="/docs/getting-started/first-test">
-              Your first test
-            </Link>
-          </div>
         </div>
+        <ViewerWalkthrough />
+        <div className={styles.agentStrip}>
+          <div className={styles.agentCopy}>
+            <Heading as="h3">Agents read the same trace</Heading>
+            <p>
+              <code>ProtoTest.Mcp</code> is a local server over the <code>.prototrace</code>{' '}
+              archives in a repository, through four read-only tools. It opens no port and uploads
+              nothing. <Link to="/docs/agent-workflows/setup">Connect an agent →</Link>
+            </p>
+          </div>
+          <Frame
+            head={
+              <>
+                <strong>get_failure</strong>
+                <span className={styles.frameMeta}>run 29e344f9 · fixture example</span>
+              </>
+            }
+            foot={
+              <>
+                Trimmed from the committed MCP fixture trace. The whole document is on{' '}
+                <Link to="/docs/agent-workflows/diagnosis">Diagnosis</Link>.
+              </>
+            }>
+            <CodeSnippet
+              language="json"
+              code={`{
+  "test": "orders match their shape",
+  "outcome": "failed",
+  "kind": "assert.json.shape",
+  "error": "[\\$.orderId]: expected 7, actual 42"
+}`}
+            />
+          </Frame>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ComposeSection() {
+  return (
+    <section className={styles.section}>
+      <div className="container">
+        <div className={styles.sectionHead}>
+          <Heading as="h2">One context for the whole journey</Heading>
+          <p>
+            REST, GraphQL, SQL, messaging and the browser share one context, lifecycle, cleanup
+            and trace. The test reads like the scenario; the setup lists what the suite touches.
+          </p>
+        </div>
+        <div className={styles.composeInner}>
+          <TabbedCode tabs={heroTabs} label="A ProtoTest suite: the test, the setup, the trace" />
+        </div>
+        <p className={styles.composeLinks}>
+          <Link to="/docs/getting-started/installation">Installation →</Link>
+          <Link to="/docs/project/compare">How this compares →</Link>
+          <Link to="/docs/project/benchmarks">Cost at scale →</Link>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function PathsRow() {
+  return (
+    <section className={`${styles.section} ${styles.pathsRow}`}>
+      <div className="container">
+        <nav className={styles.pathsNav} aria-label="Start where you are">
+          <span className={styles.pathsLabel}>Start where you are:</span>
+          <Link to="/learn/">Learn track</Link>
+          <Link to="/docs/project/compare">Comparison</Link>
+          <Link to="/docs/recipes/overview">Recipes</Link>
+          <Link to="/docs/getting-started/troubleshooting">Troubleshooting</Link>
+          <Link to="/docs/project/faq">Adoption questions</Link>
+        </nav>
+      </div>
+    </section>
+  );
+}
+
+function CtaStrip() {
+  return (
+    <section className={styles.cta}>
+      <div className="container">
+        <p className={styles.ctaLine}>
+          <strong>Green in minutes:</strong> run the two commands above, then{' '}
+          <code>dotnet test</code>. <Link to="/docs/getting-started/first-test">Your first test →</Link>
+        </p>
       </div>
     </section>
   );
@@ -378,8 +299,8 @@ TestResults/Shop.html`}
 export default function Home(): ReactNode {
   return (
     <Layout
-      title="Test the whole journey. Trace every layer."
-      description="ProtoTest is a foundation for composing .NET integration tests around one context, lifecycle and trace.">
+      title="Integration tests that explain their own failures."
+      description="ProtoTest runs .NET integration tests from one shared setup, and every run writes a trace that explains each failure.">
       <Head>
         <script type="application/ld+json">
           {JSON.stringify({
@@ -395,18 +316,17 @@ export default function Home(): ReactNode {
             codeRepository: 'https://github.com/MSeys/ProtoTest',
             license: 'https://github.com/MSeys/ProtoTest/blob/main/LICENSE',
             description:
-              'A foundation for composing .NET integration tests around one context, lifecycle and trace.',
+              'ProtoTest runs .NET integration tests from one shared setup, and every run writes a trace that explains each failure.',
           })}
         </script>
       </Head>
       <Hero />
       <main>
-        <ProofStrip />
         <FailureSection />
         <TraceSection />
-        <AgentSection />
-        <PathsSection />
-        <CtaSection />
+        <ComposeSection />
+        <PathsRow />
+        <CtaStrip />
       </main>
     </Layout>
   );

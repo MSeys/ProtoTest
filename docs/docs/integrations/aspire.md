@@ -6,6 +6,22 @@ description: "Run an Aspire AppHost with the suite: the run starts it, each reso
 
 # Aspire
 
+`ProtoTest.Aspire` runs an Aspire AppHost with the suite: the run starts it, each resource becomes an application target, and the run releases it.
+
+```csharp
+[ProtoTest]
+public async Task Health_endpoint_answers()
+{
+    var address = Proto.Context.AspireResource("api");
+
+    using var http = new HttpClient();
+    using var response = await http.GetAsync(address);
+    response.EnsureSuccessStatusCode();
+}
+```
+
+Run it with `dotnet test`. A green run prints `Passed Health_endpoint_answers`. The application's REST, GraphQL and gRPC clients resolve the same address, so the journey in [Compose](#compose) calls the resource through the normal client.
+
 ## What it adds
 
 `ProtoTest.Aspire` runs an Aspire AppHost with the suite: the run starts the AppHost's own entry point after the infrastructure registered before it, each declared resource's endpoint is published as its application's `BaseUrl`, and the run stops the AppHost after the reports are written. Per-test contexts and the trace work on top. A test resolves the address and calls it.
@@ -54,6 +70,10 @@ public sealed class AppHostAnchor;
 ```
 
 `AddAspireAppHost` can be called more than once for different AppHosts; repeating the same entry point with the same composition is one AppHost, while the same entry point with different resources throws instead of silently dropping the second registration. Registering one resource under two AppHosts throws the same way.
+
+## The tasks
+
+The `Health_endpoint_answers` test above is the whole pattern: resolve the resource address, call it. `AspireResource` returns the base address the AppHost published for the resource, or the configured address when the run points at a deployed topology. The suite's composition for one AppHost, one probe and one client is in `tests/ProtoTest.Aspire.Tests/AspireAppHostTests.cs`.
 
 ### Serving targets through the chain
 
@@ -112,21 +132,6 @@ The example above wires one AppHost, one probe, and one client.
 
 *The API resource the AppHost starts serves the product dashboard and its public status page.*
 
-## The tasks
-
-```csharp
-[ProtoTest]
-public async Task Health_endpoint_answers()
-{
-    var address = Proto.Context.AspireResource("api");
-
-    using var http = new HttpClient();
-    using var response = await http.GetAsync(address);
-    response.EnsureSuccessStatusCode();
-}
-```
-
-`AspireResource` returns the base address the AppHost published for the resource, or the configured address when the run points at a deployed topology. The application's REST, GraphQL and gRPC clients resolve the same address, so the journey in [Compose](#compose) calls the resource through the normal client. The suite's composition for one AppHost, one probe and one client is in `tests/ProtoTest.Aspire.Tests/AspireAppHostTests.cs`.
 
 ## Options and keys
 

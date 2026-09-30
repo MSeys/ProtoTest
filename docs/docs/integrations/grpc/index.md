@@ -6,9 +6,7 @@ description: "A named gRPC client per test for unary and streaming calls, with m
 
 # gRPC
 
-## What it adds
-
-`ProtoTest.Grpc` gives each test a named gRPC client for unary and streaming calls, with metadata authentication through the shared `[Auth]` pipeline, per-call tracing, and service/method coverage. It follows the same client lifecycle as REST and GraphQL: the client is created during setup and recorded as a client entity, its channel is created lazily on first use, and both are released with the test.
+`ProtoTest.Grpc` gives each test a named gRPC client for unary and streaming calls, with metadata authentication, shape and status assertions, per-call tracing and method coverage.
 
 ```csharp
 [Application("Api", "Grpc:Api")]
@@ -26,7 +24,11 @@ public sealed class OrderTests
 }
 ```
 
-Run it with `dotnet test`. Each call is traced as a `grpc.call` operation with its request and response attached. [Calls and assertions](./calls.md) covers the streaming helpers, the descriptor holder and the assertion facades.
+Run it with `dotnet test`. A green run prints `Passed GetOrder`, and the trace lands at `TestResults/prototest-{runId}.prototrace` with a `grpc.call` operation for the call.
+
+## What it adds
+
+Each test gets a named gRPC client for unary and streaming calls, with metadata authentication through the shared `[Auth]` pipeline, per-call tracing and service/method coverage. The client is created during setup and recorded as a client entity, its channel is created lazily on first use, and both are released with the test.
 
 ## Install
 
@@ -44,78 +46,13 @@ builder.AddApplication("Api", app => app
     .AddGrpc(grpc => grpc.AddClient("Api")));
 ```
 
-```csharp
-IProtoHostBuilder AddGrpc(this IProtoHostBuilder builder, Action<ProtoGrpcBuilder>? configure = null);
-IProtoApplicationBuilder AddGrpc(this IProtoApplicationBuilder application, Action<ProtoGrpcBuilder>? configure = null);
+The channel address comes from, in order: the explicit argument to `AddClient`, `ProtoTest:Applications:{app}:Grpc:Address`, the application's `BaseUrl`, or the application's in-process transport when the application is hosted with `AddAspNetCoreServer`.
 
-// On ProtoGrpcBuilder:
-IProtoTargetBuilder AddClient(string name = "Default", string? address = null,
-    Action<GrpcClientOptions>? configure = null);
-IProtoTargetBuilder AddClient(string name,
-    Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> addressResolver,
-    Action<GrpcClientOptions>? configure = null);
-IProtoTargetBuilder AddClient(string name,
-    Func<ProtoExecutionContext, Uri> addressResolver, Action<GrpcClientOptions>? configure = null);
-ProtoGrpcBuilder CaptureAttachments(Action<GrpcAttachmentOptions>? configure = null);
-```
-
-The channel address comes from, in order: the explicit argument to `AddClient`, `ProtoTest:Applications:{app}:Grpc:Address`, the application's `BaseUrl`, or the application's in-process transport when the application is hosted with `AddAspNetCoreServer`. Both application keys resolve with the shared precedence - an address a started piece published wins over configuration - so the client follows the process the run started. An application-scoped client with no address defers resolution to its first call. A resolver overload resolves the address per test:
-
-```csharp
-.AddGrpc(grpc => grpc.AddClient("Api", context => context.Configuration.GetValue<Uri>("Api:Grpc")))
-```
-
-Calling `AddGrpc` twice does not throw. The shared setup runs once. Each callback still adds its clients. A call whose `configure` throws leaves no guard behind. `CaptureAttachments` callbacks also compose: every callback runs in registration order and the known section binds over the result.
-
-### Options and keys
-
-| Key | Option | Type | Default |
-| --- | --- | --- | --- |
-| `ProtoTest:Grpc:Client:Metadata` | `GrpcClientOptions.Metadata` | `IDictionary<string, string>` | empty |
-| `ProtoTest:Grpc:Client:DefaultDeadline` | `GrpcClientOptions.DefaultDeadline` | `TimeSpan?` | `null` |
-| `ProtoTest:Grpc:Client:SensitiveMetadataKeys` | `GrpcClientOptions.SensitiveMetadataKeys` | `List<string>` | `authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `token`, `x-auth-token`, `prototest-user` |
-| `ProtoTest:Grpc:Attachments:CaptureRequestBodies` | `ProtoHttpAttachmentOptions.CaptureRequestBodies` | `bool` | `true` |
-| `ProtoTest:Grpc:Attachments:CaptureResponses` | `ProtoHttpAttachmentOptions.CaptureResponses` | `bool` | `true` |
-| `ProtoTest:Grpc:Attachments:CaptureExpectedShapes` | `ProtoHttpAttachmentOptions.CaptureExpectedShapes` | `bool` | `true` |
-| `ProtoTest:Grpc:Attachments:RedactSensitiveData` | `JsonDiagnosticOptions.RedactSensitiveData` | `bool` | `true` |
-| `ProtoTest:Grpc:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
-| `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
-
-One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. A client's `configure` callback applies to that client only. The fallback client reads the shared section without any named callback. The older `ProtoTest:Grpc` section still binds as a fallback; see [Migrating from 1.0](../../getting-started/migrating-from-1-0.md). `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable.
-
-### API
-
-```csharp
-public static ProtoGrpcClient Grpc(this ProtoExecutionContext context, string? clientName = null);
-```
-
-Inside `[Application]` the test uses the bound client unless you pass a name. Resolution tries `{application}:{name}`, then the name itself. A host-registered client stays reachable from inside an application, and so is a name exactly one other application registered. A name used by two applications needs the qualified form (`App:Client`). A miss lists the registered gRPC client names.
-
-When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written. Otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
-
-```
-explicit AddClient address? → ProtoTest:Applications:{app}:Grpc:Address? → app BaseUrl?
-  → in-process transport? → else fallback client + grpc.client.resolve event
-resolver overload → deferred to first call (null at call time is an error)
-```
-
-The call helpers are constrained to `where TRequest : class, TResponse : class`:
-
-| Helper | Requests | Responses | Returns | Traced |
-| --- | --- | --- | --- | --- |
-| `UnaryAsync` | 1 | 1 | `TResponse` | yes |
-| `ClientStreamingAsync` | N | 1 | `TResponse` | yes, first 10 messages attached |
-| `ServerStreamingAsync` | 1 | N | message list | yes, first 10 messages attached |
-| `Blocking.ServerStreaming`, `Blocking.DuplexStreaming` | … | … | call to drive | no, auth only |
-| `OpenServerStreamingAsync`, `OpenDuplexStreamingAsync` | … | … | call to drive | no, auth only |
-
-Use raw calls only when the traced helpers lack the call shape you need. Signatures, the method-descriptor holder and both assertion facades are on [Calls and assertions](./calls.md).
+Calling `AddGrpc` twice does not throw. The shared setup runs once. Each callback still adds its clients.
 
 ## The tasks
 
-The passing test under [What it adds](#what-it-adds) is the whole pattern: resolve the client, call, assert the shape. [Calls and assertions](./calls.md) holds the streaming helpers, the descriptor holder and the status assertions.
-
-Run it with `dotnet test`. A green run prints the passed test, and the trace lands at `TestResults/prototest-{runId}.prototrace` with a `grpc.call` operation for the call.
+The `GetOrder` test above is the whole pattern: resolve the client, call, assert the shape. [Calls and assertions](./calls.md) holds the streaming helpers, the descriptor holder and the status assertions.
 
 ### Going further
 
@@ -174,6 +111,65 @@ A resolver runs per test with the test context, so an address that only exists a
 ```
 
 The resolver overloads register the client with a deferred address, so initialization succeeds even before the address is known; a resolver returning null at call time is an error. A non-absolute address passed to `AddClient` throws `ArgumentException`.
+
+### Reference: resolution and options
+
+```csharp
+IProtoHostBuilder AddGrpc(this IProtoHostBuilder builder, Action<ProtoGrpcBuilder>? configure = null);
+IProtoApplicationBuilder AddGrpc(this IProtoApplicationBuilder application, Action<ProtoGrpcBuilder>? configure = null);
+
+// On ProtoGrpcBuilder:
+IProtoTargetBuilder AddClient(string name = "Default", string? address = null,
+    Action<GrpcClientOptions>? configure = null);
+IProtoTargetBuilder AddClient(string name,
+    Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> addressResolver,
+    Action<GrpcClientOptions>? configure = null);
+IProtoTargetBuilder AddClient(string name,
+    Func<ProtoExecutionContext, Uri> addressResolver, Action<GrpcClientOptions>? configure = null);
+ProtoGrpcBuilder CaptureAttachments(Action<GrpcAttachmentOptions>? configure = null);
+```
+
+```csharp
+public static ProtoGrpcClient Grpc(this ProtoExecutionContext context, string? clientName = null);
+```
+
+Inside `[Application]` the test uses the bound client unless you pass a name. Resolution tries `{application}:{name}`, then the name itself. A host-registered client stays reachable from inside an application, and so is a name exactly one other application registered. A name used by two applications needs the qualified form (`App:Client`). A miss lists the registered gRPC client names.
+
+When no initialized client matches, the application's in-process transport backs a fallback client, registered so every call shares one channel, and a `grpc.client.resolve` event is written. Otherwise the accessor throws naming the client, `AddAspNetCoreServer`, and `ProtoTest:Applications:{application}:Grpc:Address`. A call that reaches the channel with no address to resolve throws `InvalidOperationException`; a call after the client was disposed throws `ObjectDisposedException`.
+
+```
+explicit AddClient address? → ProtoTest:Applications:{app}:Grpc:Address? → app BaseUrl?
+  → in-process transport? → else fallback client + grpc.client.resolve event
+resolver overload → deferred to first call (null at call time is an error)
+```
+
+The call helpers are constrained to `where TRequest : class, TResponse : class`:
+
+| Helper | Requests | Responses | Returns | Traced |
+| --- | --- | --- | --- | --- |
+| `UnaryAsync` | 1 | 1 | `TResponse` | yes |
+| `ClientStreamingAsync` | N | 1 | `TResponse` | yes, first 10 messages attached |
+| `ServerStreamingAsync` | 1 | N | message list | yes, first 10 messages attached |
+| `Blocking.ServerStreaming`, `Blocking.DuplexStreaming` | … | … | call to drive | no, auth only |
+| `OpenServerStreamingAsync`, `OpenDuplexStreamingAsync` | … | … | call to drive | no, auth only |
+
+Use raw calls only when the traced helpers lack the call shape you need. Signatures, the method-descriptor holder and both assertion facades are on [Calls and assertions](./calls.md).
+
+#### Options and keys
+
+| Key | Option | Type | Default |
+| --- | --- | --- | --- |
+| `ProtoTest:Grpc:Client:Metadata` | `GrpcClientOptions.Metadata` | `IDictionary<string, string>` | empty |
+| `ProtoTest:Grpc:Client:DefaultDeadline` | `GrpcClientOptions.DefaultDeadline` | `TimeSpan?` | `null` |
+| `ProtoTest:Grpc:Client:SensitiveMetadataKeys` | `GrpcClientOptions.SensitiveMetadataKeys` | `List<string>` | `authorization`, `cookie`, `set-cookie`, `x-api-key`, `api-key`, `token`, `x-auth-token`, `prototest-user` |
+| `ProtoTest:Grpc:Attachments:CaptureRequestBodies` | `ProtoHttpAttachmentOptions.CaptureRequestBodies` | `bool` | `true` |
+| `ProtoTest:Grpc:Attachments:CaptureResponses` | `ProtoHttpAttachmentOptions.CaptureResponses` | `bool` | `true` |
+| `ProtoTest:Grpc:Attachments:CaptureExpectedShapes` | `ProtoHttpAttachmentOptions.CaptureExpectedShapes` | `bool` | `true` |
+| `ProtoTest:Grpc:Attachments:RedactSensitiveData` | `JsonDiagnosticOptions.RedactSensitiveData` | `bool` | `true` |
+| `ProtoTest:Grpc:Attachments:MaxDiagnosticBodyLength` | `JsonDiagnosticOptions.MaxDiagnosticBodyLength` | `int` | 65536 (64 KiB) |
+| `ProtoTest:Grpc:Attachments:SensitiveJsonProperties` | `JsonDiagnosticOptions.SensitiveJsonProperties` | `List<string>` | `password`, `token`, `access_token`, `refresh_token`, `secret`, `apiKey`, `api_key`, `authorization`, `cookie`, `connectionString`, `clientSecret`, `client_secret`, `id_token` |
+
+One `ProtoTest:Grpc:Client` section serves every named client; each registration binds it over its code callback. A client's `configure` callback applies to that client only. The fallback client reads the shared section without any named callback. The older `ProtoTest:Grpc` section still binds as a fallback; see [Migrating from 1.0](../../getting-started/migrating-from-1-0.md). `GrpcAttachmentOptions` derives from the shared HTTP attachment options and binds `ProtoTest:Grpc:Attachments`, so there is one global attachment section per registration, not one per client. `GrpcClientOptions.ConfigureMetadata` is a delegate and is not bindable. A call whose `configure` throws leaves no guard behind. `CaptureAttachments` callbacks compose: every callback runs in registration order and the known section binds over the result.
 
 ## In the trace and coverage
 

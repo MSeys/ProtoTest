@@ -52,7 +52,7 @@ cd Shop
 dotnet test
 ```
 
-The run passes. The test project leaves `Shop.Tests/bin/Debug/net10.0/TestResults/Shop.prototrace` and `Shop.html`. Open the report for the run's verdict and the routes it covered, or drop the trace on [trace.prototest.dev](https://trace.prototest.dev).
+The run passes. The test project leaves `Shop.Tests/bin/Debug/net10.0/TestResults/prototest-{runId}.prototrace` and `Shop.html`. Each run writes its own trace, so a rerun never overwrites the previous one. Open the report for the run's verdict and the routes it covered, or drop the trace on [trace.prototest.dev](https://trace.prototest.dev).
 
 ProtoTest ships as small NuGet packages: your runner package, `ProtoTest.Core`, and one package per integration you use. The runner and integration packages target .NET 8, 9 and 10. `ProtoTest.Cli` targets .NET 8 only. `ProtoTest.Analyzers` and `ProtoTest.Templates` are netstandard2.0.
 

@@ -19,6 +19,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoObservationDispatcher _observations;
     private readonly ProtoFindingStore? _findings;
     private readonly ProtoClockRegistry? _clockRegistry;
+    private readonly IReadOnlyCollection<string>? _additionalSensitiveNames;
     private int _disposeStarted;
     private int _findingSequence;
     private int _clientReplacementSequence;
@@ -66,6 +67,9 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         // Resolved once: a teardown finding is recorded after the scope is disposed, so it cannot look
         // the store up lazily any more. The store itself is a root singleton and stays valid.
         _findings = _scope.ServiceProvider.GetService<ProtoFindingStore>();
+        // The run's additional sensitive names, read once for the same reason: teardown findings
+        // redact with the names the host was built with.
+        _additionalSensitiveNames = _scope.ServiceProvider.GetService<ProtoRedactionOptions>()?.SnapshotAdditionalNames();
         _clockRegistry = clockRegistry;
         Trace = trace;
         Clock = clock ?? new ProtoClock();
@@ -227,7 +231,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             {
                 ["context.type"] = typeof(T).FullName,
                 ["context.key"] = key,
-                ["context.value"] = ProtoTraceValueFormatter.Serialize(context)
+                ["context.value"] = ProtoTraceValueFormatter.Serialize(context, _additionalSensitiveNames)
             },
             scope: TestName,
             change: "set");
@@ -493,7 +497,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         var sequence = Interlocked.Increment(ref _findingSequence);
         // One redacted copy serves the report item and the trace record: the evidence boundary applies
         // the policy once, so no axis can carry a name the other hides.
-        var redactedMetadata = WithTestIdentity(ProtoMetadataRedaction.Redact(metadata));
+        var redactedMetadata = WithTestIdentity(ProtoMetadataRedaction.Redact(metadata, _additionalSensitiveNames));
         var item = new ProtoReportItem(
             TargetName: targetName ?? "Test findings",
             Category: category ?? "Finding",
@@ -546,8 +550,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             observation.TargetName,
             observation.Kind,
             observation.Identifier,
-            ProtoTraceValueFormatter.Serialize(observation.Data),
-            ProtoTraceValueFormatter.Serialize(observation.Metadata));
+            ProtoTraceValueFormatter.Serialize(observation.Data, _additionalSensitiveNames),
+            ProtoTraceValueFormatter.Serialize(observation.Metadata, _additionalSensitiveNames));
     }
 
     /// <summary>Convenience overload for recording an observation.</summary>

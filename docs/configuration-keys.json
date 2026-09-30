@@ -13,6 +13,7 @@
     "ProtoTest:Messaging:Attachments",
     "ProtoTest:Messaging:RabbitMq",
     "ProtoTest:Readiness",
+    "ProtoTest:Redaction",
     "ProtoTest:Reporting:Html",
     "ProtoTest:Reporting:Json",
     "ProtoTest:Rest:Attachments",

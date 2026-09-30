@@ -20,7 +20,6 @@ public sealed class Setup : ProtoTestAssembly
 {
     protected override void Configure(IProtoHostBuilder builder) =>
         builder
-            .ConfigureTracing(trace => trace.OutputPath = "TestResults/Starter.prototrace")
             .AddApplication("Api", app => app
                 .AddAspNetCoreServer<Program>()
                 .AddRest(rest => rest

@@ -155,7 +155,7 @@
 .attLabelPartial { color: var(--warning); }
 .attLabelPassed { color: var(--success); }
 
-/* Story view ---------------------------------------------------------------- */
+/* Steps view ---------------------------------------------------------------- */
 
 .story { padding: 0 var(--space-4) var(--space-1); }
 
@@ -188,7 +188,7 @@
 .outcomeDot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .outcome em { color: var(--muted); font-size: var(--text-micro); font-style: normal; font-weight: var(--weight-regular); }
 
-/* The failure card: the check that failed and the document it validated, before anything else. */
+/* The verdict names the check, its call and the first difference. */
 .card {
   margin: var(--space-3) 0 0;
   padding: var(--space-3);
@@ -299,6 +299,9 @@
 .wide { grid-column: span 2; }
 .facts { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
 .duration { color: var(--muted); font-size: var(--text-micro); text-align: right; white-space: nowrap; }
+.stepTrack { grid-column: 3 / -1; position: relative; height: 5px; background: var(--surface-2); }
+.stepTrack i { position: absolute; height: 5px; min-width: 2px; }
+.verdictDetail { font: var(--text-body) var(--font-mono); }
 
 /* Narrow frames stack the row: marker and chip on the first line with the duration, the title
    and facts wrap underneath, the checks keep the full width. */
@@ -310,6 +313,7 @@
   .label, .wide { grid-column: 2 / -1; grid-row: 2; overflow: visible; white-space: normal; }
   .facts { grid-column: 2 / -1; grid-row: 3; overflow: visible; white-space: normal; overflow-wrap: break-word; }
   .checks { grid-column: 2 / -1; }
+  .stepTrack { grid-column: 2 / -1; }
 }
 
 .checks { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: var(--space-1); }
@@ -379,3 +383,33 @@
 .source pre span b { display: inline-block; width: 4ch; margin-right: var(--space-3); color: var(--code-comment); font-weight: var(--weight-regular); text-align: right; }
 .source pre .current { background: var(--code-highlight); box-shadow: inset 2px 0 0 var(--blueprint); }
 .source pre .current b { color: var(--code-text); }
+
+.testExcerpt { padding: 0 var(--space-4) var(--space-2); }
+.testExcerpt .panelLead { margin: var(--space-2) 0; }
+.mockRuler { margin-left: 48%; display: flex; justify-content: space-between; padding-block: var(--space-2); color: var(--muted); font-size: var(--text-meta); border-bottom: 1px solid var(--border); }
+.clockRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--space-3); padding: var(--space-2); border-bottom: 1px solid var(--border); font-size: var(--text-body); }
+.clockRow > span { min-width: 0; overflow-wrap: anywhere; }
+.clockRow small { display: block; color: var(--muted); font-size: var(--text-meta); }
+.clockTrack { position: relative; align-self: center; height: 18px; background: var(--surface-2); }
+.clockTrack i { position: absolute; top: 6px; height: 6px; }
+.clockTrack .gapBar, .stepTrack .gapBar { background: repeating-linear-gradient(135deg, var(--muted) 0, var(--muted) 1px, transparent 1px, transparent 4px); }
+.clockTrack .timeSelected { top: 0; height: 18px; background: var(--blueprint-soft); border-inline: 1px solid var(--blueprint); }
+.clockTrack .mockLife { top: 8px; height: 2px; background: var(--border-strong); }
+.stateTick { position: absolute; top: 3px; height: 12px; width: 4px; background: var(--blueprint); transform: translateX(-50%); }
+.itemSelected { background: var(--blueprint-soft); box-shadow: inset 2px 0 0 var(--blueprint); }
+.evidenceRow { display: grid; grid-template-columns: 64px auto minmax(0, 1fr); align-items: start; gap: var(--space-2); padding-block: var(--space-3); border-bottom: 1px solid var(--border); font-size: var(--text-body); }
+.evidenceRow strong { min-width: 0; overflow-wrap: anywhere; }
+.evidenceRow small { grid-column: 3; color: var(--muted); font-size: var(--text-meta); overflow-wrap: anywhere; }
+.detailsIndex { display: flex; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-meta); }
+.detailsIndex a { border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 0 var(--space-2); color: var(--muted); }
+.runDetails { margin: var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-2); font: var(--text-meta) var(--font-mono); }
+.runDetails dt, .runDetails dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+@container (max-width: 34rem) {
+  .clockRow { grid-template-columns: minmax(0, 1fr); }
+  .mockRuler { margin-left: 0; }
+  .evidenceRow { grid-template-columns: 64px minmax(0, 1fr); }
+  .evidenceRow strong, .evidenceRow small { grid-column: 1 / -1; }
+  .runDetails { grid-template-columns: minmax(0, 1fr); }
+  .runDetails dd { margin-bottom: var(--space-2); }
+}

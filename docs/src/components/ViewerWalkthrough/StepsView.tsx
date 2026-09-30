@@ -3,10 +3,7 @@ import type {CSSProperties, ReactNode} from 'react';
 import styles from './styles.module.css';
 
 /*
- * The viewer's Story view for the failed test: the failure card first - the check and the document it
- * validated - then the lifecycle, framework steps folded, each call carrying its checks. The failure
- * card shows what the viewer's story shows; the recorded source line moves to the Check view, where the
- * viewer's inspector puts it.
+ * Steps for test 12: the verdict, folded lifecycle and the gap before its failing call.
  */
 
 interface Check {
@@ -26,6 +23,8 @@ interface Row {
   folded?: boolean;
   depth?: number;
   failed?: boolean;
+  start?: number;
+  length?: number;
 }
 
 interface Phase {
@@ -46,10 +45,7 @@ const phases: Phase[] = [
     marker: '--phase-setup',
     duration: '46 ms',
     rows: [
-      {chip: 'Framework', tone: '--type-extension', title: '2 extensions', facts: 'ProtoClientInitializerHook, ProtoClientCompletionHook', duration: '738 µs', folded: true},
-      {chip: 'Framework', tone: '--type-extension', title: '4 extensions', facts: 'NorthstarScenarioHook, ProtoHttpAuthLifecycleHook ×2, ApplicationAttribute', duration: '198 µs', folded: true},
-      {chip: 'Extension', tone: '--type-extension', title: 'Before · NorthstarTenantAttribute', duration: '45 ms'},
-      {chip: 'Data', tone: '--type-data', title: 'Provision · ProvisionTenantRequest → TenantResponse', duration: '45 ms', depth: 1},
+      {chip: 'Setup', tone: '--phase-setup', title: 'Setup', facts: 'Clients, tenant provisioning and authentication', duration: '46 ms', folded: true, start: 0, length: 46.325},
     ],
   },
   {
@@ -58,13 +54,16 @@ const phases: Phase[] = [
     duration: '1.11 s',
     failed: true,
     rows: [
-      {chip: 'Data', tone: '--type-data', title: 'Create · IssueInvoiceRequest', duration: '91 ms'},
+      {chip: 'Data', tone: '--type-data', title: 'Create · IssueInvoiceRequest', duration: '91 ms', start: 47.245, length: 90.971},
+      {chip: 'Gap', tone: '--muted', title: '1.01 s with no recorded operation', facts: 'Execution', duration: '1.01 s', start: 138.216, length: 1006.522},
       {
         chip: 'Call',
         tone: '--type-call',
         title: 'REST · GET /api/v1/organization',
         duration: '7.6 ms',
         failed: true,
+        start: 1144.738,
+        length: 7.552,
         checks: [
           {label: 'status · 200 OK', passed: true},
           {label: 'response shape', passed: false},
@@ -77,8 +76,7 @@ const phases: Phase[] = [
     marker: '--phase-teardown',
     duration: '7.4 ms',
     rows: [
-      {chip: 'Framework', tone: '--type-extension', title: '13 framework steps', duration: '1.8 ms', folded: true},
-      {chip: 'Context', tone: '--type-context', title: 'Dispose execution context', duration: '4.3 ms'},
+      {chip: 'Teardown', tone: '--phase-teardown', title: 'Teardown', facts: 'Release owned resources and dispose the context', duration: '7.4 ms', folded: true, start: 1155.097, length: 7.396},
     ],
   },
 ];
@@ -87,7 +85,7 @@ function tone(token: string): CSSProperties {
   return {'--node-color': `var(${token})`} as CSSProperties;
 }
 
-function StoryRow({row}: {row: Row}): ReactNode {
+function StepRow({row}: {row: Row}): ReactNode {
   return (
     <div className={`${styles.row} ${row.failed ? styles.failed : ''}`} style={{'--depth': row.depth ?? 0} as CSSProperties}>
       {row.folded ? <i className={styles.fold} aria-label="folded" /> : <i className={styles.node} style={tone(row.tone)} />}
@@ -97,6 +95,7 @@ function StoryRow({row}: {row: Row}): ReactNode {
       <span className={`${styles.label} ${row.folded ? styles.quiet : ''} ${row.facts ? '' : styles.wide}`}>{row.title}</span>
       {row.facts && <span className={styles.facts}>{row.facts}</span>}
       <span className={styles.duration}>{row.duration}</span>
+      <span className={styles.stepTrack}><i className={row.chip === 'Gap' ? styles.gapBar : undefined} style={{left: `${(row.start ?? 0) / 1162.6093 * 100}%`, width: `${(row.length ?? 0) / 1162.6093 * 100}%`, ...(row.chip === 'Gap' ? {} : {background: `var(${row.tone})`})}} /></span>
       {row.checks && (
         <span className={styles.checks}>
           {row.checks.map((check) => (
@@ -111,7 +110,7 @@ function StoryRow({row}: {row: Row}): ReactNode {
   );
 }
 
-export default function StoryView(): ReactNode {
+export default function StepsView(): ReactNode {
   return (
     <div className={styles.story}>
       <header className={styles.testHead}>
@@ -130,27 +129,16 @@ export default function StoryView(): ReactNode {
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <span className={styles.kind} style={tone('--type-assertion')}>
-            Check
+            Assertion
           </span>
           <strong>Assert response shape</strong>
-          <span className={styles.verdict}>1 mismatch</span>
+          <span className={styles.verdict}>Execution, +1.15 s</span>
           <span className={styles.on}>on REST · GET /api/v1/organization</span>
         </div>
-        <div className={styles.shape}>
-          <div className={styles.shapeHead}>
-            Validated document
-            <small>
-              <b className={styles.matched}>✓ matched</b> <b className={styles.differs}>× expected, then actual</b>
-            </small>
-          </div>
+        <div className={styles.verdictDetail}>
           {mismatches.map((mismatch) => (
             <div key={mismatch.property} className={styles.mismatch}>
-              <b aria-label="mismatch">×</b>
-              <span className={styles.property}>"{mismatch.property}"</span>
-              <span className={styles.colon}>:</span>
-              <s>{mismatch.expected}</s>
-              <i aria-hidden="true">→</i>
-              <strong>{mismatch.actual}</strong>
+              <span>$.{mismatch.property}: expected {mismatch.expected}, got <strong>{mismatch.actual}</strong></span>
             </div>
           ))}
         </div>
@@ -166,7 +154,7 @@ export default function StoryView(): ReactNode {
               <small>{phase.duration}</small>
             </header>
             {phase.rows.map((row) => (
-              <StoryRow key={`${phase.name}-${row.title}`} row={row} />
+              <StepRow key={`${phase.name}-${row.title}`} row={row} />
             ))}
           </section>
         ))}

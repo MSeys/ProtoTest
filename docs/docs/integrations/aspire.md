@@ -165,7 +165,7 @@ run entity aspire · Aspire AppHost · MyApp.AppHost
 └─ aspire.resource.opencsms.address_source = configuration (key already filled, AppHost never started for it)
 ```
 
-The AppHost is run-scoped infrastructure: the trace records an `aspire` run entity named `Aspire AppHost · {assembly}`, the run overview lists an `aspire` capability named for the AppHost assembly, and the entity carries the published endpoints as evidence (`aspire.resource.{resource}.address`, with the endpoint name beside it; a resource whose key configuration already fills carries `aspire.resource.{resource}.address_source = configuration`, and one another provider serves carries `..._source = not selected`). A release failure follows the same path as any other run resource.
+The AppHost is run-scoped infrastructure: the trace records an `aspire` run entity named `Aspire AppHost · {assembly}`, the run overview lists an `aspire` capability named for the AppHost assembly, and the entity carries the published endpoints as evidence (`aspire.resource.{resource}.address`, with the endpoint name beside it; a resource whose key configuration already fills carries `aspire.resource.{resource}.address_source = configuration`, and one another provider serves carries `..._source = not selected`). A published connection string is presence-only evidence (`aspire.resource.{resource}.connection_string = [REDACTED]`): entity state reaches the archive unredacted, so the secret never lands in the trace. A release failure follows the same path as any other run resource.
 
 ## Choosing between a worker and an AppHost
 

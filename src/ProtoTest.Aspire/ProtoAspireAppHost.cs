@@ -426,7 +426,7 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
         return connectionString;
     }
 
-    private Dictionary<string, string?> BuildEvidence(Dictionary<string, string> settings, IConfiguration configuration)
+    internal Dictionary<string, string?> BuildEvidence(Dictionary<string, string> settings, IConfiguration configuration)
     {
         var evidence = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -441,7 +441,12 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
 
             if (settings.TryGetValue(publish.Key, out var value))
             {
-                evidence[$"aspire.resource.{publish.Resource}.{publish.KindTag}"] = value;
+                // Entity state reaches the archive unredacted, so a connection string is evidence
+                // by presence only, never by value.
+                evidence[$"aspire.resource.{publish.Resource}.{publish.KindTag}"] =
+                    publish.Kind == ProtoAspirePublishKind.ConnectionString
+                        ? ProtoUriSanitizer.RedactedValue
+                        : value;
             }
             else if (!ProtoAspireOptions.IsSelected(configuration, publish.Resource))
             {

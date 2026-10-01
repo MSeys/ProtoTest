@@ -71,7 +71,8 @@ The setup class chooses which messaging implementation the run uses. This is its
   code={`private static void ConfigureMessaging(IProtoHostBuilder builder, NorthstarRun run)
 {
     // Registered last so the application exists before messaging binds its taps. The tap is declared
-    // in code so it is bound during setup, not at the first await, and cannot miss the publish.
+    // in code so it is bound during setup, not at the first await, and does not miss a publish that
+    // happens before the test awaits.
     if (run.UsesMessaging)
     {
         builder.AddMessaging(messaging => messaging
@@ -86,9 +87,9 @@ The setup class chooses which messaging implementation the run uses. This is its
     }
 }`}
   callouts={[
-    {line: 5, title: 'One switch', note: 'The run decides per configuration whether it has a broker. The test never asks.'},
-    {line: 9, title: 'Register the RabbitMQ adapter', note: 'The Broker capability requires a configured address or infrastructure that supplies one. Registration alone does not prove the broker is reachable.'},
-    {line: 15, title: 'No adapter, no capability', note: 'The in-memory default keeps the API usable but declares no Broker capability, so a test that needs one skips instead of passing against a double.'},
+    {line: 6, title: 'One switch', note: 'The run decides per configuration whether it has a broker. The test never asks.'},
+    {line: 10, title: 'Register the RabbitMQ adapter', note: 'The Broker capability requires a configured address or infrastructure that supplies one. Registration alone does not prove the broker is reachable.'},
+    {line: 16, title: 'No adapter, no capability', note: 'The in-memory default keeps the API usable but declares no Broker capability, so a test that needs one skips instead of passing against a double.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The skip reason comes from <code>AddCapabilityReason(ProtoCapabilityKinds.Broker, "No broker is configured; ...")</code> in the same file.</>}
 />

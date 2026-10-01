@@ -231,7 +231,8 @@ public sealed class Setup : ProtoTestAssembly
     private static void ConfigureMessaging(IProtoHostBuilder builder, NorthstarRun run)
     {
         // Registered last so the application exists before messaging binds its taps. The tap is declared
-        // in code so it is bound during setup, not at the first await, and cannot miss the publish.
+        // in code so it is bound during setup, not at the first await, and does not miss a publish that
+        // happens before the test awaits.
         if (run.UsesMessaging)
         {
             builder.AddMessaging(messaging => messaging

@@ -42,7 +42,8 @@ internal sealed class ProtoMessageClientInitializer(string name) : IProtoClientI
             _ => consumer.DisposeAsync());
         if (options.Destinations.Count > 0)
         {
-            // Bind the test's taps before it acts: a message published after this point is never missed.
+            // Bind the test's taps before it acts, so a message published after this point is not missed
+            // for lack of a subscription. Delivery itself can still fail at the broker.
             // Tap callbacks and the configuration section can both name a destination, so the set is
             // filtered and deduped here, the one place every adapter reads it. The destinations are
             // prepared concurrently - each tap owns its channel, so the broker round trips overlap -

@@ -135,11 +135,13 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     public long TestNumber => Id.Number;
 
     /// <summary>
-    /// Creates a per-test unique, rerun-stable name for a record that must outlive the test process:
-    /// a tenant, an operator, an account, a customer. The name derives from <see cref="TestId"/>, so
-    /// parallel tests never collide and a rerun against a persistent store reuses the same record.
-    /// Pass <paramref name="sequence"/> when one test creates several records of the same kind; the
-    /// default (<c>0</c>) omits it.
+    /// Creates a name for a record that must outlive the test process, such as a tenant, an operator,
+    /// an account or a customer. The name derives from <see cref="TestId"/>, so parallel tests in one
+    /// host never collide. Across runs or processes, give each a distinct
+    /// <see cref="ProtoTestIdOptions.RunPrefix"/> through <c>ConfigureTestIds</c>; the default prefix is
+    /// random per run. A rerun gets the same name only with an <see cref="IProtoTestIdGenerator"/> that
+    /// derives the id from the test. Pass <paramref name="sequence"/> when one test creates several
+    /// records of the same kind; the default (<c>0</c>) omits it.
     /// </summary>
     /// <example>
     /// <code>

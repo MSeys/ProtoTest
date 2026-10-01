@@ -6,7 +6,8 @@ using ProtoTest.Messaging.Internal;
 /// One test's view of a broker, created by <see cref="IProtoMessageBroker.CreateConsumerAsync"/> during
 /// setup and disposed with the test's teardown. A consumer belongs to exactly one test: it must never be
 /// shared, and its disposal removes whatever the adapter declared for the test (queues, in RabbitMQ's
-/// case), so parallel tests on the same destination cannot steal each other's messages.
+/// case). Each test gets its own tap on an exchange destination, so parallel tests cannot steal each
+/// other's messages there. A queue destination is shared: tests awaiting the same queue compete for it.
 /// </summary>
 public interface IProtoMessageConsumer : IAsyncDisposable
 {

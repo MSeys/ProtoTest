@@ -52,8 +52,9 @@ public sealed class SignedInAsAttribute : ProtoAttribute, IProtoHttpAuthMetadata
     public IReadOnlyList<string> Roles { get; }
 
     /// <summary>
-    /// Gets claims in <c>type=value</c> form, for example <c>new[] { "tenant=northstar" }</c>. Claim
-    /// values are never written to the trace.
+    /// Gets claims in <c>type=value</c> form, for example <c>new[] { "tenant=northstar" }</c>. The
+    /// <c>auth:user</c> trace entity records only the claim types; embedded test source or captured
+    /// content can still contain a value.
     /// </summary>
     public string[] Claims
     {

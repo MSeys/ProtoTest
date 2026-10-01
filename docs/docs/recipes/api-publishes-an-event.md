@@ -43,24 +43,18 @@ public sealed class BrokerJourney
 
         var message = await Proto.Context.Messaging().AwaitAsync(
             "invoice.paid",
-            candidate => candidate.Payload is not null
-                && candidate.Payload.Contains(
-                    $"\"id\":{invoice.Id.ToString(CultureInfo.InvariantCulture)}",
-                    StringComparison.Ordinal),
+            candidate => candidate.MatchesShape(new { id = invoice.Id }),
             TimeSpan.FromSeconds(15));
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(message.ContentType, Is.EqualTo("application/json"));
-            Assert.That(message.Payload, Does.Contain($"\"status\":\"{InvoiceStatuses.Paid}\""));
-        }
+        Assert.That(message.ContentType, Is.EqualTo("application/json"));
+        message.Should.MatchShape(new { id = invoice.Id, status = InvoiceStatuses.Paid });
     }
 }
 ```
 
 `[NorthstarMember]` is the sample suite's own composite attribute. It groups an isolated tenant provisioned through [Data](../integrations/data/index.md) with the authenticator that carries the member's token through REST. `IssueInvoiceAsync` is a shortcut over the same data surface.
 
-The predicate matches this test's invoice id. Parallel tests pay invoices too. The timeout is 15 seconds.
+The predicate picks this test's event with `MatchesShape`, which compares the whole invoice id, because parallel tests pay invoices too. The shape check then reads the id and the status. The timeout is 15 seconds.
 
 :::warning Declare before you await
 `Declare` and `Tap` in setup bind the destination before the test acts. A destination first bound in `AwaitAsync` misses events published before the call. The setup below shows both lines.

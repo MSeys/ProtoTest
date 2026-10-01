@@ -1,6 +1,5 @@
 namespace Northstar.ProtoTest;
 
-using System.Globalization;
 using System.Net;
 using global::NUnit.Framework;
 using global::ProtoTest.Core;
@@ -33,16 +32,10 @@ public sealed class BrokerJourney
 
         var message = await Proto.Context.Messaging().AwaitAsync(
             "invoice.paid",
-            candidate => candidate.Payload is not null
-                && candidate.Payload.Contains(
-                    $"\"id\":{invoice.Id.ToString(CultureInfo.InvariantCulture)}",
-                    StringComparison.Ordinal),
+            candidate => candidate.MatchesShape(new { id = invoice.Id }),
             TimeSpan.FromSeconds(15));
 
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(message.ContentType, Is.EqualTo("application/json"));
-            Assert.That(message.Payload, Does.Contain($"\"status\":\"{InvoiceStatuses.Paid}\""));
-        }
+        Assert.That(message.ContentType, Is.EqualTo("application/json"));
+        message.Should.MatchShape(new { id = invoice.Id, status = InvoiceStatuses.Paid });
     }
 }

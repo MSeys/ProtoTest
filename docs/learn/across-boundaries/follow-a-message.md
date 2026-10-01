@@ -62,30 +62,24 @@ The test issues an invoice with `Proto.Context.Data()`, which creates test data 
 ```csharp
 var message = await Proto.Context.Messaging().AwaitAsync(
     "invoice.paid",
-    candidate => candidate.Payload is not null
-        && candidate.Payload.Contains(
-            $"\"id\":{invoice.Id.ToString(CultureInfo.InvariantCulture)}",
-            StringComparison.Ordinal),
+    candidate => candidate.MatchesShape(new { id = invoice.Id }),
     TimeSpan.FromSeconds(15));
 ```
 
 `Proto.Context.Messaging()` returns the messaging client. `AwaitAsync` takes the destination, a predicate and a timeout. It returns the first available, unconsumed message on `invoice.paid` for which the predicate is true.
 
-The sample searches the payload text for the invoice id. This is a substring check: an expected id of `12` could also match `123`. For strict correlation, parse the JSON and compare the complete id value.
+`MatchesShape` uses the same shape check as the assertion below, but only answers yes or no and records nothing. It compares the whole `id`, so invoice `12` never matches an event for invoice `123`, and a message that is not JSON is simply not this test's event.
 
 If no matching message arrives within 15 seconds, the call throws a `TimeoutException` and the test fails. A failed broker connection can fail it earlier.
 
 ### 4. Assert the message
 
 ```csharp
-using (Assert.EnterMultipleScope())
-{
-    Assert.That(message.ContentType, Is.EqualTo("application/json"));
-    Assert.That(message.Payload, Does.Contain($"\"status\":\"{InvoiceStatuses.Paid}\""));
-}
+Assert.That(message.ContentType, Is.EqualTo("application/json"));
+message.Should.MatchShape(new { id = invoice.Id, status = InvoiceStatuses.Paid });
 ```
 
-These NUnit assertions check the content type and the literal paid-status text. They do not validate the entire JSON payload or prove that another service consumed the event.
+`MatchShape` is the same shape check REST uses: the payload must carry these two fields with these values, and may carry others. It also records a contract observation for coverage. It does not prove that another service consumed the event.
 
 ### 5. See what happens without a broker
 
@@ -120,7 +114,7 @@ Without an adapter, ProtoTest supplies an in-memory messaging double with no `Br
 
 A skip says the required broker capability was unavailable. It provides no evidence that the application published an event.
 
-A successful await says the test received a message satisfying its predicate. The following assertions check its content type and status text. How precisely the test identifies the intended event depends on that predicate.
+A successful await says the test received a message satisfying its predicate. The assertions then check its content type, and its id and status as a shape. How precisely the test identifies the intended event depends on that predicate.
 
 </Checkpoint>
 

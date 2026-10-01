@@ -95,6 +95,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Messaging
 
+- `ProtoMessage.MatchesShape(shape)` picks a message in an `AwaitAsync` predicate with the shared shape matcher: true or false, nothing recorded, false for an empty or non-JSON payload. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - `ProtoDestination.Queue(name)` awaits a named queue; adapters without queues refuse it by name. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - `Declare(...)` or `ProtoTest:Messaging:DeclaredDestinations` declares suite-owned destinations. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - taps gain a code API (`AddMessaging(m => m.Tap(...))`) that pre-binds destinations during setup. [Messaging](https://prototest.dev/docs/integrations/messaging/)

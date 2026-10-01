@@ -28,6 +28,40 @@ public sealed record ProtoMessage(
     public ProtoMessageAssertions Should => new(this);
 
     /// <summary>
+    /// Whether the payload matches the expected shape, through the same matcher as
+    /// <c>Should.MatchShape</c>: the fields the shape names must be there with those values, and others
+    /// may be. Meant for choosing a message in an <c>AwaitAsync</c> predicate, so it records nothing and
+    /// returns <c>false</c> for an empty, non-JSON or differently shaped payload. Assert the chosen
+    /// message with <c>Should.MatchShape</c>.
+    /// </summary>
+    public bool MatchesShape(object expectedShape, JsonSerializerOptions? options = null)
+        => MatchesShape(expectedShape, exact: false, options);
+
+    /// <summary>
+    /// Whether the payload matches the expected shape exactly: a field the shape does not mention makes
+    /// it <c>false</c>. Records nothing; see <see cref="MatchesShape(object, JsonSerializerOptions?)"/>.
+    /// </summary>
+    public bool MatchesShape(object expectedShape, bool exact, JsonSerializerOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(expectedShape);
+        if (string.IsNullOrWhiteSpace(Payload)) return false;
+        try
+        {
+            if (exact) JsonShapeMatcher.AssertExactMatch(Payload, expectedShape, options);
+            else JsonShapeMatcher.AssertMatch(Payload, expectedShape, options);
+            return true;
+        }
+        catch (JsonShapeMismatchException)
+        {
+            return false;
+        }
+        catch (JsonDocumentAssertionException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Deserializes the payload as <typeparamref name="T"/>, or returns <c>default</c> for an empty
     /// payload. Uses <see cref="ProtoJsonDefaults.Reader"/> (case-insensitive property names) unless
     /// <paramref name="options"/> overrides it. A payload of the wrong shape throws

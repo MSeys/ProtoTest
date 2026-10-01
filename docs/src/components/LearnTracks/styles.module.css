@@ -1,0 +1,10 @@
+/* The tracks as a list of cards: two columns on a wide page, one on a phone. */
+.tracks { margin: var(--space-5) 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: var(--space-4); list-style: none; }
+.track { min-width: 0; padding: var(--space-4) var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.head { display: flex; align-items: baseline; gap: var(--space-2); }
+.head strong { font: var(--weight-semibold) var(--text-title) var(--font-display); }
+.head small { margin-left: auto; color: var(--muted); font-size: var(--text-strong); white-space: nowrap; }
+.number { width: 22px; height: 22px; flex: none; display: inline-grid; place-items: center; align-self: center; border-radius: 50%; background: var(--blueprint-soft); color: var(--blueprint); font: var(--weight-bold) var(--text-strong) var(--font-mono); }
+.outcome { margin: 0; color: var(--muted); }
+.lessons { margin: 0; padding-left: var(--space-5); display: grid; gap: 2px; font-size: var(--text-strong); list-style: decimal; }
+.needs { margin: auto 0 0; padding-top: var(--space-2); color: var(--dim); font-size: var(--text-strong); }

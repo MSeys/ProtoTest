@@ -1,0 +1,9 @@
+{
+  "label": "Write good integration tests",
+  "position": 3,
+  "customProps": {
+    "outcome": "Set up the host once, add integrations, sign a test in as a user, and give each test its own data that is cleaned up afterwards.",
+    "time": "About 45 minutes",
+    "needs": "Start"
+  }
+}

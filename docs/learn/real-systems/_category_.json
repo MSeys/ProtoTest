@@ -1,0 +1,9 @@
+{
+  "label": "Real systems",
+  "position": 7,
+  "customProps": {
+    "outcome": "Run the same suite on containers, through Aspire and against a deployed stack, and break things on purpose.",
+    "time": "About 1 hour",
+    "needs": "Reliable tests, and a checkout of OpenCSMS"
+  }
+}

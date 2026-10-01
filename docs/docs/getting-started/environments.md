@@ -10,9 +10,15 @@ import {brokerSkipLayers, brokerSkipReason, brokerSkipSource, brokerSkipTest} fr
 
 # Run one suite in three environments
 
-The same suite runs in three shapes without a code change: **in-process** on a laptop, **container-backed** on a machine with a container runtime, and **published** against a deployed environment. Only the host setup and configuration differ. The journeys, attributes, assertions and reports stay the same.
+You can run the same suite in three ways without changing a test:
 
-The shapes below come from the Northstar.ProtoTest sample suite (`samples/Northstar.ProtoTest`). Its `NorthstarRun` decides all three from configuration:
+- **In-process**: the host starts your application inside the test process. This suits a laptop.
+- **Container-backed**: the host also starts a database or message broker in a container. This needs a machine with Docker.
+- **Published**: the tests call an application that is already deployed.
+
+Only the host setup and the configuration differ. The tests, attributes, assertions and reports stay the same.
+
+The examples below come from the Northstar.ProtoTest sample suite (`samples/Northstar.ProtoTest`). Its `NorthstarRun` class chooses the mode from configuration:
 
 ```csharp
 var run = NorthstarRun.From(configuration);
@@ -32,7 +38,7 @@ var useMessagingContainer = run.OwnsMessagingBroker;
 
 ## In-process
 
-With no `TargetUrl`, the host builds the application in-process and the REST and GraphQL clients reuse its transport. No port is opened:
+When `ProtoTest:TargetUrl` is empty, the host builds the application in-process. The REST and GraphQL clients reuse its transport, so no port is opened:
 
 ```csharp
 if (run.RunsLocalApplications)
@@ -42,7 +48,9 @@ if (run.RunsLocalApplications)
 }
 ```
 
-The sample owns one file SQLite database per run. It is deleted before the run starts. The run hosts the application twice over that store: in-process for the API journeys, and on a loopback listener for the browser journey. The loopback instance is its **own application** (`Northstar web`); the run starts it with `AddLoopbackApplication` and waits for its `/health` address, so the [web sessions](../integrations/web/index.md) follow the published base URL. One address authority per application.
+The sample owns one file-based SQLite database per run and deletes it before the run starts. The run hosts the application twice over that database. One instance is in-process, for the API tests. The other listens on the loopback address, for the browser test.
+
+The loopback instance is its **own application**, named `Northstar web`. The run starts it with `AddLoopbackApplication` and waits for its `/health` address. The [web sessions](../integrations/web/index.md) then follow its published base URL. Each application has one source for its address.
 
 ```csharp
 builder.AddLoopbackApplication(NorthstarTargets.Web, NorthstarProgram.CreateApp);
@@ -56,11 +64,11 @@ flowchart LR
     W --> R["tests read the address\nfrom infrastructure settings"]
 ```
 
-The test-side domain is composed over the same store, so `DomainAccessJourney` runs. No broker is configured, so `BrokerJourney` skips.
+The tests' own domain code uses the same database, so `DomainAccessJourney` runs. No broker is configured, so `BrokerJourney` skips.
 
 ## Container-backed
 
-Setting `ProtoTest:Database=postgres` or `ProtoTest:Messaging:Broker=container` makes the run own the container through [infrastructure](../foundation/infrastructure.md):
+Set `ProtoTest:Database=postgres` or `ProtoTest:Messaging:Broker=container`. The run then starts and owns the container through [infrastructure](../foundation/infrastructure.md):
 
 ```csharp
 builder.AddInfrastructure(
@@ -79,7 +87,9 @@ builder.AddInfrastructure(
     "ConnectionStrings:Northstar");
 ```
 
-The host publishes the started connection strings in `ProtoInfrastructureSettings` for tests and in host settings for both hosted instances. All of them then use the same store or broker. The loopback instance follows the suite's configuration, so the web journey runs in every local mode and skips only when the browser is not installed. A published run skips the loopback and follows the configured `ProtoTest:Applications:{application}:BaseUrl` instead.
+Once the containers start, the host publishes their connection strings. Tests read them from `ProtoInfrastructureSettings`, and both hosted instances read them from host settings. Everything then uses the same database and broker.
+
+The loopback instance follows the suite's configuration. The browser test therefore runs in every local mode and skips only when the browser is not installed. A published run starts no loopback instance and follows the configured `ProtoTest:Applications:{application}:BaseUrl` instead.
 
 ```mermaid
 flowchart LR
@@ -90,7 +100,7 @@ flowchart LR
 
 ## Published
 
-Setting `ProtoTest:TargetUrl` points the suite at a deployed system:
+Set `ProtoTest:TargetUrl` to point the suite at a deployed system:
 
 ```csharp
 if (!run.RunsLocalApplications)
@@ -100,13 +110,13 @@ if (!run.RunsLocalApplications)
 }
 ```
 
-No ASP.NET Core server is registered and no loopback listener is started. HTTP clients connect over the network to `BaseUrl`, and the browser journey follows the same published address when Playwright is available; it skips when the browser is not installed. Connection strings come from configuration, and the test-side domain is composed when `ConnectionStrings:Northstar` is set:
+No ASP.NET Core server is registered and no loopback listener starts. HTTP clients connect over the network to `BaseUrl`. The browser test follows the same address when Playwright is available, and skips when the browser is not installed. Connection strings come from configuration. The tests' own domain code is set up when `ConnectionStrings:Northstar` is set:
 
 ```csharp
 var composeDomainInTests = run.CanComposeDomain;
 ```
 
-The run does not start the application, so the suite cannot assume it is up when the first test runs. `AddHttpReadiness(application)` waits for its published address instead of sleeping in setup, and records the wait in the trace:
+The run does not start the application, so it may not be ready when the first test runs. `AddHttpReadiness(application)` waits for the application's published address instead of sleeping in setup, and records the wait in the trace:
 
 ```csharp
 builder.AddHttpReadiness(NorthstarTargets.Api);   // waits for ProtoTest:Applications:{app}:BaseUrl
@@ -120,21 +130,21 @@ flowchart LR
 ```
 
 :::warning[Readiness probes run in registration order]
-Register the probe **after** the infrastructure that publishes the address. A probe registered first sees no address and records a `readiness.skipped` reason naming the ordering requirement instead of waiting. See [Infrastructure recipes](../foundation/infrastructure-recipes.md#wait-until-it-is-ready) for the full rule.
+Register the probe **after** the infrastructure that publishes the address. A probe registered first sees no address. It records a `readiness.skipped` reason that names the ordering requirement, and does not wait. See [Infrastructure recipes](../foundation/infrastructure-recipes.md#wait-until-it-is-ready) for the full rule.
 :::
 
-An in-process application has no address to wait for, so the probe skips and records the reason.
+An in-process application has no address to wait for, so its probe skips and records the reason.
 
 ## What a skip records
 
-No broker is configured, so `BrokerJourney` skips with the reason the sample declares once in its setup:
+In the in-process mode no broker is configured, so `BrokerJourney` skips. It reports the reason the sample declares once in its setup:
 
 ```text
 Skipped PayingAnInvoicePublishesAnInvoicePaidEvent
   {brokerSkipReason}
 ```
 
-The archive for that run holds the run and nothing else: five entries, two run reports plus manifest, spans and state, and no test record at all.
+The trace for that run holds the run and nothing else. It has five entries: two run reports plus the manifest, spans and state. It has no test record at all.
 
 <TraceAnatomy
   source={brokerSkipSource}
@@ -147,14 +157,17 @@ The archive for that run holds the run and nothing else: five entries, two run r
 ## What does not change
 
 - The journeys and their `[ProtoTest]` tests, attributes, authenticators and provisioners.
-- The runner attribute and assembly setup: one host per process, same lifecycle.
-- The trace and the HTML/JSON reports. Every run produces the same artifacts wherever it ran.
-- Records that outlive the process keep their identity: `Proto.Context.UniqueName("tenant")` derives a deterministic name from the test id. See [Execution context](../foundation/execution-context.md#unique-names) for the rerun rule.
-- [Skip conditions](../foundation/skip-conditions.md): a test that needs something the host does not have skips, so an environment-specific journey is an environment-specific skip, not a failure.
+- The runner attribute and the assembly setup: one host per process, with the same lifecycle.
+- The trace and the HTML and JSON reports. Every run produces the same files wherever it ran.
+- The names of records that outlive the process. `Proto.Context.UniqueName("tenant")` derives a deterministic name from the test id. See [Execution context](../foundation/execution-context.md#unique-names) for the rerun rule.
+- [Skip conditions](../foundation/skip-conditions.md). A test that needs something the host does not have is skipped. A test that suits only one environment therefore skips in the others and does not fail.
 
 ## Only an in-process application can do this
 
-Some things need the application's own process. Against a published environment they are unreachable, and the suite skips them rather than failing:
+<details>
+<summary>Features that only work in-process</summary>
+
+Some features need the application's own process. A published environment cannot offer them, so the suite skips those tests and does not fail them:
 
 | Feature | Why it is in-process only | Suite pattern |
 | --- | --- | --- |
@@ -164,9 +177,11 @@ Some things need the application's own process. Against a published environment 
 | `IGraphQLWebSocketFactory` over the test server | subscriptions ride the in-process WebSocket connection | `[RequiresInProcess]` |
 | Transactional isolation of the application's writes (`SqlIsolation.Transaction` + `ShareConnectionWith`) | the transaction covers only the connection ProtoTest owns; a deployed process cannot share it | `[RequiresInProcess]` |
 
-The test-side domain runs wherever the suite has a store. That includes a container or a configured connection string. `[RequiresCapability(ProtoCapabilityKinds.Store)]` on `DomainAccessJourney` matches the capability `AddSql` registers, so the journey skips exactly when the domain cannot be composed. The sample sets `SqlIsolation.None` for that domain, because its application has its own connection and a test transaction would hide the test's writes from it.
+The tests' own domain code runs wherever the suite has a database, whether from a container or from a configured connection string. `[RequiresCapability(ProtoCapabilityKinds.Store)]` on `DomainAccessJourney` matches the capability that `AddSql` registers. The journey therefore skips exactly when the domain code cannot be set up. The sample sets `SqlIsolation.None` for that domain. Its application has its own connection, and a test transaction would hide the test's writes from it.
 
-For a test that only needs *an* in-process server, `[RequiresInProcess]` is the shorthand: it expands to `[RequiresCapability("server")]` and skips whenever no server capability is registered. See [Skip conditions](../foundation/skip-conditions.md) for the exact evaluation and per-runner limits.
+</details>
+
+For a test that only needs an in-process server, `[RequiresInProcess]` is the shorthand. It expands to `[RequiresCapability("server")]` and skips whenever no server capability is registered. See [Skip conditions](../foundation/skip-conditions.md) for the exact evaluation and the limits for each runner.
 
 ## The sample's switches
 
@@ -178,9 +193,9 @@ For a test that only needs *an* in-process server, `[RequiresInProcess]` is the 
 | `ConnectionStrings:Northstar` | configuration / environment | points the application and the test-side domain at an existing store |
 | `ProtoTest:Messaging:RabbitMq:ConnectionString` | configuration / environment | points the messaging adapter at an existing broker |
 
-All of them work as environment variables with the usual `__` separator (`ProtoTest__TargetUrl`), but only when the suite added an environment-variable source. See [Configuration](./configuration.md) for how configuration sources are added and which value wins, and [Infrastructure](../foundation/infrastructure.md) for what the host starts and when it is released.
+Each key also works as an environment variable, with `__` in place of the colon (`ProtoTest__TargetUrl`). That works only when the suite added an environment-variable source. See [Configuration](./configuration.md) for how to add sources and which value wins. See [Infrastructure](../foundation/infrastructure.md) for what the host starts and when it releases it.
 
-The [recipes](../recipes/overview.md) work in all three modes as they are: [REST, then GraphQL](../recipes/rest-then-graphql.md), [a write that lands in the database](../recipes/write-lands-in-the-database.md) and [API, then browser](../recipes/api-then-browser.md).
+The [recipes](../recipes/overview.md) work in all three modes unchanged: [REST, then GraphQL](../recipes/rest-then-graphql.md), [a write that lands in the database](../recipes/write-lands-in-the-database.md) and [API, then browser](../recipes/api-then-browser.md).
 
 :::note[The same shapes in a product suite]
 OpenCSMS, an independent EV charging platform in its own repository, runs one suite in every shape on this page and one more: an Aspire AppHost that starts the product's own processes. Each target declares its providers in priority order with `UseConfigured()` first, so the environment decides which link serves the store, the broker and the application.

@@ -6,11 +6,11 @@ description: "The first problems a new suite runs into, and what fixes them: the
 
 # Troubleshooting
 
-The problems below are the ones a new suite meets first. Each one starts with the message you see.
+This page covers the problems a new suite meets first. Each one starts with the message you see, so you can search for it.
 
 ## Messages to fix
 
-Copy the quoted message and find it below. Each row names the meaning, the fix and the section that walks it in full.
+Find your message in the table. Each row says what it means, how to fix it, and which section below explains it in full.
 
 | What you see | What it means | Fix | Deep dive |
 | --- | --- | --- | --- |
@@ -27,15 +27,15 @@ Copy the quoted message and find it below. Each row names the meaning, the fix a
 | Docker endpoint or container startup failure | Docker is not running or not reachable | start Docker, or give the suite a connection string instead | [Containers do not start](#containers-do-not-start) |
 | Playwright cannot find a browser executable | the browser was never installed on the machine | set `InstallBrowsers = true`, or drive an installed browser by channel | [The browser does not launch](#the-browser-does-not-launch) |
 | Tests pass separately but fail in a full run | parallel tests share names or state | derive names from the test id | [Tests pass alone and fail together](#tests-pass-alone-and-fail-together) |
-| No `.prototrace`, report or CI artifact | the trace lands where the test process runs, not where CI looks | set an absolute `PROTOTEST_RESULTS` directory | [Where is the trace?](#where-is-the-trace) and [The CI artifact is empty](#the-ci-artifact-is-empty) |
+| No `.prototrace`, report or CI artifact | the trace lands where the test process runs, not where CI looks | write to an absolute directory, for example from a `PROTOTEST_RESULTS` variable your setup reads | [Where is the trace?](#where-is-the-trace) and [The CI artifact is empty](#the-ci-artifact-is-empty) |
 
-The sections below walk each problem in full. ProtoTrace records every hook, request and check in order; [open the trace](../observability/prototrace.md) when a message below does not explain what you see.
+The sections below explain each problem in full. The trace records every hook, request and check in order. If no message here matches what you see, [open the trace](../observability/prototrace.md).
 
 ## I see `ProtoHost is not initialized`
 
 > **No active ProtoHost is available. The runner setup creates it: derive the suite's [SetUpFixture] from ProtoTestAssembly ...**
 
-The runner never ran your setup class, so no host was built. The rest of the message points at the fix, and the adapter's own hint (`Ensure your setup class inherits from ProtoTestAssembly.`, `Register your fixture with [assembly: AssemblyFixture(...)]`, ...) tells you which one. Check the one that applies to your runner:
+The runner never ran your setup class, so no host was built. The rest of the message points at the fix. The adapter adds its own hint, such as `Ensure your setup class inherits from ProtoTestAssembly.` or `Register your fixture with [assembly: AssemblyFixture(...)]`. Check the cause that applies to your runner:
 
 - **NUnit**: the `[SetUpFixture]` only covers its own namespace and the namespaces below it. A test in `Orders.Tests.Api` is covered by a setup in `Orders.Tests`, not by one in `Orders.Tests.Web`. Move the setup up, or out of any namespace to cover the whole assembly.
 - **xUnit v3**: `[assembly: AssemblyFixture(typeof(Setup))]` is missing.
@@ -48,37 +48,42 @@ Each runner's page under [Test runners](../runners/overview.md) shows the comple
 
 > **No active ProtoExecutionContext is available on this flow. Proto.Context only works inside a test body ...**
 
-`Proto.Context` was read outside a ProtoTest test. Usually the test uses the runner's own attribute (`[Test]`, `[Fact]`, `[TestMethod]`) instead of the ProtoTest attribute that opens the context (`[ProtoTest]`, or `[ProtoTestFact]` / `[ProtoTestTheory]` for xUnit). It also happens in code that runs outside the test's async flow, such as a static initializer or a thread started by hand. Pass the `ProtoExecutionContext` along, or, for telemetry that cannot take it, reach the owning test's trace with `ProtoHost.FindTraceWriter(Activity?)`. Off test flows the message also names the alternatives.
+Your code read `Proto.Context` outside a ProtoTest test. There are two usual causes.
+
+- The test uses the runner's own attribute (`[Test]`, `[Fact]`, `[TestMethod]`) instead of the ProtoTest attribute that opens the context. That attribute is `[ProtoTest]`, or `[ProtoTestFact]` and `[ProtoTestTheory]` for xUnit.
+- The code runs outside the test's async flow, for example in a static initializer or a thread you started by hand.
+
+In the second case, pass the `ProtoExecutionContext` along. For telemetry code that cannot take it, reach the owning test's trace with `ProtoHost.FindTraceWriter(Activity?)`. The message also names the alternatives.
 
 ## I see `No application is selected`
 
 > **No application is selected for this test. Apply [Application(name)] or pass a Rest client name to the accessor.**
 
-`Proto.Context.Rest()` without a name uses the selected application's client. Put `[Application("Api")]` on the class or the test, or ask for a client by name: `Proto.Context.Rest("Api")`.
+`Proto.Context.Rest()` with no name uses the client of the selected application. Either put `[Application("Api")]` on the class or the test, or ask for a client by name with `Proto.Context.Rest("Api")`.
 
 > **Application 'Api' has no Rest client registered. Register one in AddApplication or pass a client name to the accessor.**
 
-The application is composed without that protocol. Add it in the setup: `.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api")))`.
+The application was set up without REST. Add REST in the setup: `.AddApplication("Api", app => app.AddRest(rest => rest.AddClient("Api")))`.
 
 > **No HTTP client 'Api' is registered. Register it under the application, back the application with AddAspNetCoreServer, or set 'ProtoTest:Applications:Api:BaseUrl'.**
 
-The client has nowhere to send requests. Either host the application in-process with `AddAspNetCoreServer<Program>()`, or point it at a running one with `ProtoTest:Applications:Api:BaseUrl`. See [Configuration](./configuration.md).
+The client has no address to send requests to. Either host the application in-process with `AddAspNetCoreServer<Program>()`, or point the client at a running application with `ProtoTest:Applications:Api:BaseUrl`. See [Configuration](./configuration.md).
 
 ## The application does not start in-process
 
-- **`Program` is inaccessible.** A minimal-API application's entry point is internal. Add `public partial class Program;` to the application, as in [Your first test](./first-test.md#1-create-the-project).
-- **The application reads configuration the test run does not have.** The in-process server runs the application's own `Program`, with its own `appsettings.json`. Values that come from the environment in production, such as connection strings and secrets, have to come from the test run: from [infrastructure](../foundation/infrastructure.md) that fills them, or from `configureWebHost` on `AddAspNetCoreServer`.
+- **`Program` is inaccessible.** The entry point of a minimal-API application is internal. Add `public partial class Program;` to the application, as in [Your first test](./first-test.md#1-create-the-project).
+- **The application reads configuration the test run does not have.** The in-process server runs the application's own `Program` with its own `appsettings.json`. In production, values such as connection strings and secrets come from the environment. In a test run they must come from somewhere else: either [infrastructure](../foundation/infrastructure.md) that fills them, or `configureWebHost` on `AddAspNetCoreServer`.
 
 ## Containers do not start
 
-Infrastructure such as `PostgresDatabase.Container()` runs on Docker through Testcontainers. When Docker is not running or not reachable, the run fails before the first test, with Testcontainers' own message about the Docker endpoint.
+Infrastructure such as `PostgresDatabase.Container()` runs on Docker through Testcontainers. If Docker is not running or not reachable, the run fails before the first test. The failure carries Testcontainers' own message about the Docker endpoint.
 
 - Start Docker Desktop, or on Linux make sure the current user can reach the Docker socket.
 - On CI, use a runner image with Docker available.
 
 ### Running where Docker is not available
 
-Give the suite a connection string through configuration instead of a container. A test-level skip cannot get in front of it: `AddInfrastructure` starts the container with the host, before any skip condition is evaluated, so a missing runtime fails the run at start. Start the container in the suite fixture instead, before registering anything:
+Give the suite a connection string through configuration instead of a container. A skip on a test does not help here. `AddInfrastructure` starts the container with the host, before any skip condition is evaluated, so a missing runtime fails the run at start. To handle this yourself, start the container in the suite fixture before you register anything:
 
 ```csharp
 var started = PostgresDatabase.TryStart();
@@ -88,15 +93,15 @@ if (!started.Started)
 }
 ```
 
-`PostgresDatabase.TryStart(...)` and `RabbitMqBroker.TryStart(...)` report the failure instead of throwing, so the fixture can fall back, replace the connection string, or skip the suite. When the fixture starts the container itself, register it with `AddResource` so the host still releases it; `AddInfrastructure` is for containers the host starts. `TryStart` blocks the calling thread while the container starts and has no timeout. See [Skip conditions](../foundation/skip-conditions.md).
+`PostgresDatabase.TryStart(...)` and `RabbitMqBroker.TryStart(...)` report a failure instead of throwing. The fixture can then fall back, replace the connection string, or skip the suite. When the fixture starts the container itself, register it with `AddResource` so the host still releases it. `AddInfrastructure` is only for containers the host starts. `TryStart` blocks the calling thread while the container starts, and it has no timeout. See [Skip conditions](../foundation/skip-conditions.md).
 
 ## The browser does not launch
 
-Playwright reports that the browser executable does not exist when it was never installed on the machine. Set `InstallBrowsers = true` to download it before the first launch, or use `Channel = "msedge"` or `"chrome"` to drive a browser that is already installed. On a clean Linux image, the operating-system libraries still come from `playwright.ps1 install --with-deps chromium`. See [Web](../integrations/web/index.md#browsers).
+Playwright reports that the browser executable does not exist when the browser was never installed on the machine. You have two fixes. Set `InstallBrowsers = true` to download the browser before the first launch. Or set `Channel = "msedge"` or `"chrome"` to drive a browser that is already installed. On a clean Linux image, the operating-system libraries still come from `playwright.ps1 install --with-deps chromium`. See [Web](../integrations/web/index.md#browsers).
 
 ## Tests pass alone and fail together
 
-Parallel tests share the application and its data. When two tests create the same customer, order number or email address, one of them fails, but only when they happen to run at the same time.
+Parallel tests share the application and its data. If two tests create the same customer, order number or email address, one of them fails. It fails only when the two happen to run at the same time.
 
 ```mermaid
 flowchart TB
@@ -109,23 +114,23 @@ flowchart TB
     S -->|no| C["Check the shared client:\na Caller-owned client is concurrent."]
 ```
 
-Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` derives a deterministic name from the test id. See [Execution context](../foundation/execution-context.md#unique-names) for the rerun rule:
+Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` builds a name from the test id, so the same test gets the same name on every run. See [Execution context](../foundation/execution-context.md#unique-names) for the rerun rule:
 
 ```csharp
 new { name = Proto.Context.UniqueName("customer") }   // "customer-0042317"
 ```
 
-For a one-off value that does not need to survive the run, `context.TestId` interpolated into the value works too:
+For a one-off value that does not need to survive the run, you can also put `context.TestId` into the value:
 
 ```csharp
 new { email = $"customer-{context.TestId}@example.test" }
 ```
 
-Tests that genuinely cannot run side by side need the runner's own tool: `[NonParallelizable]` on NUnit, a collection on xUnit. See [Concurrency](../foundation/concurrency.md) for what ProtoTest keeps isolated.
+Some tests cannot run side by side. For those, use the runner's own tool: `[NonParallelizable]` on NUnit, or a collection on xUnit. See [Concurrency](../foundation/concurrency.md) for what ProtoTest keeps isolated.
 
 ## Where is the trace?
 
-Without `ConfigureTracing`, the trace goes to `TestResults/prototest-{runId}.prototrace`. Relative paths, that one and your own, resolve against the directory the tests run in, which for `dotnet test` is the test project's output folder: `bin/Debug/net10.0/TestResults/`. Set an absolute path, or one built from an environment variable, to collect it from CI.
+Without `ConfigureTracing`, the run writes the trace to `TestResults/prototest-{runId}.prototrace`. A relative path, whether that default or your own, resolves against the directory the tests run in. For `dotnet test` that is the test project's output folder, such as `bin/Debug/net10.0/TestResults/`. To collect the trace from CI, set an absolute path, or one built from an environment variable.
 
 ```text
 bin/Debug/net10.0/TestResults/*.prototrace   (where dotnet test writes)
@@ -133,16 +138,16 @@ bin/Debug/net10.0/TestResults/*.prototrace   (where dotnet test writes)
 PROTOTEST_RESULTS (absolute; trace and sinks agree)   (where CI looks)
 ```
 
-If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, the file was written by a version whose archive the viewer does not open: it reads spans format 2.x and state format 1.x or 2.x. Run the tests again with a current ProtoTest. The archive itself keeps its shape: manifest format 2.0, `spans.json` plus `state.json`, whose state documents are format 1.1.
+If [trace.prototest.dev](https://trace.prototest.dev) says the trace is **from an older ProtoTest**, an older version wrote the file and the viewer cannot open its archive format. The viewer reads spans format 2.x and state format 1.x or 2.x. Run the tests again with a current ProtoTest. A current archive has manifest format 2.0, plus `spans.json` and `state.json`, whose state documents are format 1.1.
 
 ## The CI artifact is empty
 
 > **No files were found with the provided path.**
 
-The trace's default relative path starts below the test process working directory, commonly `bin/Release/net10.0/TestResults/`, while the CI upload step usually searches from the repository root. Set an absolute `PROTOTEST_RESULTS` directory and use it for the trace and report sinks as shown in [Continuous integration](../continuous-integration/index.md#put-every-artifact-in-one-place).
+The default trace path is relative to the test process's working directory, commonly `bin/Release/net10.0/TestResults/`. The CI upload step usually searches from the repository root, so it finds nothing. Set an absolute directory and use it for the trace and the report sinks. The CI page does this with a `PROTOTEST_RESULTS` environment variable that the suite's own setup reads. See [Continuous integration](../continuous-integration/index.md#put-every-artifact-in-one-place).
 
-Also make the upload step run after failures: `if: always()` on GitHub Actions, `succeededOrFailed()` on Azure Pipelines or `artifacts: when: always` on GitLab. If the upload still fails, print the configured absolute directory once from the suite setup. Do not broaden the artifact glob to the entire workspace, where it can collect unrelated files.
+Also make the upload step run after a failure: `if: always()` on GitHub Actions, `succeededOrFailed()` on Azure Pipelines, or `artifacts: when: always` on GitLab. If the upload still finds nothing, print the absolute directory once from the suite setup. Do not widen the artifact glob to the whole workspace, because it can collect unrelated files.
 
 ## Still stuck?
 
-Open the trace: the test's story shows every hook, request and check in order, and the failure leads with the check that decided it. If that does not explain it, [open an issue](https://github.com/MSeys/ProtoTest/issues). Only attach a trace after checking it for application data and secrets.
+Open the trace. It shows every hook, request and check in order, and the failure leads with the check that decided it. If that does not explain the problem, [open an issue](https://github.com/MSeys/ProtoTest/issues). Check a trace for application data and secrets before you attach it.

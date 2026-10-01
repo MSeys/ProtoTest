@@ -1,7 +1,7 @@
 ---
 id: contract-coverage
-title: Contract coverage, not code coverage
-sidebar_label: Contract coverage, not code coverage
+title: Contract coverage
+sidebar_label: Contract coverage
 sidebar_position: 2
 description: "Read what a run checked about your API's contract: endpoints, statuses and fields, next to what it merely saw."
 ---
@@ -10,9 +10,9 @@ import LearnShell from '@site/src/components/LearnShell';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
 import Link from '@docusaurus/Link';
 
-# Contract coverage, not code coverage
+# Contract coverage
 
-Code coverage counts the lines that ran. It does not say whether a check read what they returned. The report this lesson reads answers the other question, and the gap it shows is the interesting part.
+Code coverage counts the lines that ran. It does not say whether a check read what they returned. This lesson reads that report. The gap is the point.
 
 <LearnShell
   level="Level 4, lesson 2"
@@ -29,7 +29,8 @@ Code coverage counts the lines that ran. It does not say whether a check read wh
   situation={
     <>
       <p>An endpoint can be called by a hundred setup helpers and have its response asserted by none of them. The status comes back, the fields go unread, and a rename in the response body breaks a client you never tested.</p>
-      <p>ProtoTest measures coverage against the contract instead: the endpoints, the statuses and the fields your assertions actually matched. The sample records one REST write and one GraphQL read, and the report it wrote shows both what was covered and what was only seen.</p>
+      <p>ProtoTest measures coverage against the contract instead: the endpoints, the statuses and the fields your assertions actually matched.</p>
+      <p>The sample records one REST write and one GraphQL read, and the report it wrote shows both what was covered and what was only seen.</p>
     </>
   }
   checkpoint={{
@@ -43,7 +44,8 @@ Code coverage counts the lines that ran. It does not say whether a check read wh
     ),
     reveal: (
       <>
-        Coverage is kept per target and per protocol. A GraphQL shape assertion claims GraphQL fields; it says nothing about a REST response. The REST write's response was only ever judged on its status, so every field it carried is listed in the traffic section as observed and unasserted. Adding one <code>Should.MatchShape</code> to the write moves the fields it names into the covered row.
+        Coverage is kept per target and per protocol. A GraphQL shape assertion claims GraphQL fields; it says nothing about a REST response.
+        The REST write response was only ever judged on its status, so every field it carried is listed in the traffic section as observed and unasserted. Adding one <code>Should.MatchShape</code> to the write moves the fields it names into the covered row.
       </>
     ),
   }}
@@ -54,7 +56,7 @@ Code coverage counts the lines that ran. It does not say whether a check read wh
   ]}
   next={[
     {
-      label: 'The archive and the reports',
+      label: 'Archive and reports',
       to: '/learn/evidence/artifacts-and-reports',
       note: 'One file from CI holds the trace, the reports and the attachments. This lesson opens it.',
     },
@@ -65,7 +67,59 @@ Code coverage counts the lines that ran. It does not say whether a check read wh
     },
   ]}>
 
-## Where the coverage comes from
+## The report this run wrote
+
+The journey writes a project over REST and reads it back over GraphQL. The report inside its archive holds:
+
+| Row | Reading |
+| --- | --- |
+| `coverage` REST `POST /api/v1/projects`, covered | the endpoint and the status the test asserted |
+| `traffic` REST `POST /api/v1/projects · 201`, with `$.id`, `$.name`, `$.slug`, `$.status`, `$.environmentCount`, `$.createdAtUtc` | the fields the response carried and no assertion mentioned |
+| `gate` `no error findings`, passed | the run gate the sample registers; the gate row is explained in [lesson 6](/learn/evidence/run-gates) |
+| `resource` rows for the run pieces | what the run owned, still registered when the report was written |
+
+The summary reads `CoverageTotal: 1`, `Covered: 1`, `Uncovered: 0`.
+
+It counts one thing: the write endpoint. The six fields are not part of it, and the traffic section says so.
+
+The first row is the covered claim: the endpoint and the status the write asserted. The second row is the gap: six fields the response carried that no shape assertion mentioned.
+
+The children are shown by their identifiers; each child in the file is a full traffic row with its own status.
+
+A covered row says what the suite checked; a traffic row says what it only saw.
+
+## Reference
+
+The two rows read like this in `report.json` (from <a href="pathname:///lessons/l4-coverage.prototrace">l4-coverage.prototrace</a>, `resources/run/JsonReportSink/run-artifact-1/report.json`):
+
+```json
+{ "TargetName": "Northstar:Northstar", "Category": "REST",
+  "Identifier": "POST /api/v1/projects", "Kind": "coverage",
+  "Status": "Success", "IsCovered": true }
+{ "TargetName": "Northstar:Northstar", "Category": "REST traffic",
+  "Identifier": "POST /api/v1/projects · 201", "Kind": "traffic",
+  "Status": "Neutral",
+  "Message": "Fields that arrived in a response but no shape assertion mentioned.",
+  "Children": ["$.id", "$.name", "$.slug", "$.status", "$.environmentCount", "$.createdAtUtc"] }
+```
+
+## What claims a field
+
+The rule is short:
+
+- `Should.HaveHttpStatus(...)` covers the endpoint and the status.
+- `Should.MatchShape(...)` covers every property path it matched, such as `name` and `status`.
+- `JsonValue.Any()` mentions a whole value but not the fields inside it, so those fields stay in the traffic section.
+
+A field that no assertion names is a field that can break silently. The traffic section is where the report shows that gap without pretending it is covered.
+
+## Reading it in your own run
+
+The sample writes its report to `TestResults/Northstar.ProtoTest/report.json` and the same file is copied into the archive. Compare a run traffic section with the shape assertions in the journeys: every field the section lists is a field no assertion mentioned.
+
+The [coverage reference](/docs/observability/coverage) covers the collectors that read other contracts, including OpenAPI documents and GraphQL schemas.
+
+## Going further
 
 The composition registers two collectors on the REST client:
 
@@ -84,46 +138,6 @@ The composition registers two collectors on the REST client:
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. Collectors gather across the run; the sinks registered below them write the report.</>}
 />
 
-## The report this run wrote
-
-The journey writes a project over REST and reads it back over GraphQL. The report inside its archive holds:
-
-| Row | Reading |
-| --- | --- |
-| `coverage` REST `POST /api/v1/projects`, covered | the endpoint and the status the test asserted |
-| `traffic` REST `POST /api/v1/projects · 201`, with `$.id`, `$.name`, `$.slug`, `$.status`, `$.environmentCount`, `$.createdAtUtc` | the fields the response carried and no assertion mentioned |
-| `gate` `no error findings`, passed | the run gate the sample registers; the gate row is explained in [lesson 4](/learn/evidence/read-the-findings-and-the-run-gate) |
-| `resource` rows for the run pieces | what the run owned, still registered when the report was written |
-
-The summary reads `CoverageTotal: 1`, `Covered: 1`, `Uncovered: 0`. That number is narrow: one unit of the contract was checked, the write's endpoint. The six fields are not part of it, and the traffic section says so.
-
-The two rows read like this in `report.json` (from <a href="pathname:///lessons/l4-coverage.prototrace">l4-coverage.prototrace</a>, `resources/run/JsonReportSink/run-artifact-1/report.json`):
-
-```json
-{ "TargetName": "Northstar:Northstar", "Category": "REST",
-  "Identifier": "POST /api/v1/projects", "Kind": "coverage",
-  "Status": "Success", "IsCovered": true }
-{ "TargetName": "Northstar:Northstar", "Category": "REST traffic",
-  "Identifier": "POST /api/v1/projects · 201", "Kind": "traffic",
-  "Status": "Neutral",
-  "Message": "Fields that arrived in a response but no shape assertion mentioned.",
-  "Children": ["$.id", "$.name", "$.slug", "$.status", "$.environmentCount", "$.createdAtUtc"] }
-```
-
-The first row is the covered claim: the endpoint and the status the write asserted. The second row is the gap: six fields the response carried that no shape assertion mentioned. The children are shown by their identifiers; each child in the file is a full traffic row with its own status. A covered row says what the suite checked; a traffic row says what it only saw.
-
-## What claims a field
-
-The rule is short:
-
-- `Should.HaveHttpStatus(...)` covers the endpoint and the status.
-- `Should.MatchShape(...)` covers every property path it matched, such as `name` and `status`.
-- `JsonValue.Any()` mentions a whole value but not the fields inside it, so those fields stay in the traffic section.
-
-A field that no assertion names is a field that can break silently. The traffic section is where the report shows that gap without pretending it is covered.
-
-## Reading it in your own run
-
-The sample writes its report to `TestResults/Northstar.ProtoTest/report.json` and the same file is copied into the archive. Compare a run's traffic section with the shape assertions in the journeys: every field the section lists is a field some test read past. The [coverage reference](/docs/observability/coverage) covers the collectors that read other contracts, including OpenAPI documents and GraphQL schemas.
+The [coverage reference](/docs/observability/coverage) shows how to write your own.
 
 </LearnShell>

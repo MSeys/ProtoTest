@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 
 # Read a failing trace
 
-A failed run ends with a check you can read. The four drills in the sample fail on purpose, each next to the test that runs the same journey the right way, so the difference is one practice and the trace shows it.
+A failed run ends with a check you can read. The four drills in the sample fail on purpose. Each sits next to the test that runs the same journey the right way, so the difference is one practice and the trace shows it.
 
 <LearnShell
   level="Level 4, lesson 1"
@@ -29,7 +29,7 @@ A failed run ends with a check you can read. The four drills in the sample fail 
   situation={
     <>
       <p>The suite in CI reports one failing check. You cannot attach a debugger to that runner, and the log holds a single line. What is left of the run is the trace, and the trace records both halves of the comparison that failed.</p>
-      <p>The four pairs below are the same failures the [Level 0 tour](/learn/why-integration-tests-get-hard/the-trace-as-the-feedback-loop) showed, this time read the way you would read a failure of your own. Set <code>ProtoTest__Sample__Drills=true</code> and both halves run and leave their traces.</p>
+      <p>These four pairs repeat the Level 0 failures. This time read them as your own. Set <code>ProtoTest__Sample__Drills=true</code> and both halves run and leave their traces.</p>
     </>
   }
   checkpoint={{
@@ -56,7 +56,7 @@ A failed run ends with a check you can read. The four drills in the sample fail 
   ]}
   next={[
     {
-      label: 'Contract coverage, not code coverage',
+      label: 'Contract coverage',
       to: '/learn/evidence/contract-coverage',
       note: 'What the run checked about your API, read from the report it wrote.',
     },
@@ -69,7 +69,7 @@ A failed run ends with a check you can read. The four drills in the sample fail 
 
 ## The same journey, two runs
 
-Every pair runs one journey twice: the drill fails on purpose, the test beside it holds. The panes carry the records from a recording of the sample with the drills enabled, and each one links the archive a reader can download.
+Every pair runs one journey twice: the drill fails on purpose, the test beside it holds. The panes hold a recording of the sample with the drills on. Each one links the archive a reader can download.
 
 <TraceDiff />
 
@@ -90,10 +90,22 @@ The time pair is the clearest:
 | The call | `REST GET /api/v1/organization`, 74.0 ms, HTTP 200 | the same call, 65.3 ms, HTTP 200 |
 | The check | shape failed: `$.status` expected `past_due`, read `active` | shape succeeded, then the invoice is paid |
 
-The call succeeded in both runs. The application answered quickly, with a subscription that was still `active`, because nothing had moved the clock the application reads. The drill waited a real second, and that changed nothing. The fix advanced the test clock, and the same shape check passed. One failure, four answers, and the pair writes the fix down.
+The call succeeded in both runs. The application answered quickly, with a subscription that was still `active`, because nothing had moved the clock the application reads. The drill waited a real second, and that changed nothing.
+
+The fix advanced the test clock, and the same shape check passed. One failure, four answers, and the pair writes the fix down.
 
 ## When the trace is silent
 
-The environment pair is the other direction. Its execution layer holds a single `test.execution` entry of 2.05 s and no request at all. The entry records the failure, a connection error, and nothing about the call: the raw client ran outside the composition, so the run never wrapped it. That missing operation is the diagnosis. The fix takes the address from the composition, and the same call turns into an ordinary request entry.
+The environment pair is the other direction. Its execution layer holds one entry and no request at all.
+
+That missing operation is the diagnosis. The fix takes the address from the composition, and the same call turns into an ordinary request entry.
+
+## Reference
+
+The silent entry in full: a single `test.execution` entry of 2.05 s. It records the failure, a connection error, and nothing about the call. The raw client ran outside the composition, so the run never wrapped it.
+
+## Going further
+
+The same four pairs render in the [Level 0 tour](/learn/why-integration-tests-get-hard/the-trace-as-the-feedback-loop), read as a tour of why integration tests fail. The TraceDiff panes above explain each pair: the drill on one side, the test that holds on the other.
 
 </LearnShell>

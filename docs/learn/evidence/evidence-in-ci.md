@@ -1,8 +1,8 @@
 ---
 id: evidence-in-ci
-title: Take the evidence to CI
-sidebar_label: Take the evidence to CI
-sidebar_position: 5
+title: Evidence in CI
+sidebar_label: Evidence in CI
+sidebar_position: 7
 description: "Keep the trace and the reports as CI artifacts, post the digest with the action, and run the same suite at three depths."
 ---
 
@@ -15,20 +15,20 @@ import Link from '@docusaurus/Link';
 A red job that prints one line is not evidence. The suite already wrote the trace and the reports. The job must keep them. One step turns them into a comment the reviewer can open.
 
 <LearnShell
-  level="Level 4, lesson 5"
-  minutes="About 9 minutes"
+  level="Level 4, lesson 7"
+  minutes="About 7 minutes"
   outcome={[
     'Point every output at one directory and upload it as one CI artifact.',
     'Keep the evidence when the test step fails, not only when it passes.',
     'Post the digest with the action, and name the three jobs a pipeline uses.',
   ]}
   before={[
-    <>The archive and the reports (<Link to="/learn/evidence/artifacts-and-reports">lesson 3</Link>).</>,
+    <>Run gates (<Link to="/learn/evidence/run-gates">lesson 6</Link>).</>,
     'A repository with CI, if you want to try the workflow. Reading it also works.',
   ]}
   situation={
     <>
-      <p>The same suite runs in CI and on your machine. In CI nobody can open the trace from the test output folder, and the job is the last moment the files exist: once it ends, the runner is gone.</p>
+      <p>The same suite runs in CI and on your machine. Nobody can open a CI trace. When the job ends, the files are gone.</p>
       <p>The setup below gives CI one directory to upload, keeps it on failure, and posts a digest with the archive link. The reference pages carry the working workflow; this lesson is the shape of it.</p>
     </>
   }
@@ -114,7 +114,15 @@ The feedback action installs the CLI, uploads the trace, posts the digest and ch
     trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
 ```
 
-The comment carries the failing tests, the cause and the artifact link. One check annotation lands on each failing test's source location, and a missing target skips with its reason instead of failing the job. Give the action a `baseline-report` and a `current-report` as well, and the step also fails the pull request when the run is worse than the baseline. A digest comment reads like this:
+The comment carries the failing tests, the cause and the artifact link.
+
+One check annotation lands on each failing test source location.
+
+A missing target skips with its reason instead of failing the job.
+
+Give the action a `baseline-report` and a `current-report` as well, and the step also fails the pull request when the run is worse than the baseline.
+
+A digest comment reads like this (illustrative):
 
 ```text
 ProtoTest evidence: 1 failed, 0 passed, 0 skipped
@@ -124,9 +132,9 @@ Trace: run.prototrace (open it in the viewer)
 Report: report.json, report.html
 ```
 
-## Three shapes, one suite
+## Going further
 
-A pipeline around this suite usually splits into three jobs:
+A pipeline around this suite usually splits into three jobs. These are shapes a suite of this kind fits. The [CI page](/docs/continuous-integration/#one-suite-three-jobs) carries the same three, and its workflows are the ones to start from. The suite is the same in all three. What changes is the composition, and the composition is what decides which capabilities exist and which journeys skip.
 
 | Job | What it runs | What the reviewer opens |
 | --- | --- | --- |
@@ -134,9 +142,7 @@ A pipeline around this suite usually splits into three jobs:
 | Nightly | the same suite against the container topology | the same digest, with the store and the broker as real processes the run owned |
 | Smoke (optional) | the suite pointed at a deployed environment | the same digest; capability skips drop the journeys that need the test host |
 
-These are shapes a suite of this kind fits, not a fixed pipeline. The [CI page](/docs/continuous-integration/#one-suite-three-jobs) carries the same three, and its workflows are the ones to start from. The suite is the same in all three. What changes is the composition, and the composition is what decides which capabilities exist and which journeys skip.
-
-## Naming the build in the trace
+## Reference
 
 A trace downloaded from CI should say which build it came from. Name the variables once and every report carries them:
 
@@ -148,6 +154,14 @@ builder.ConfigureTracing(trace =>
 });
 ```
 
-Each entry appears in the report's run metadata section and on the run in the archive, so a trace three months old still names the commit it tested.
+Each entry appears in the report run metadata section and on the run in the archive, so a trace three months old still names the commit it tested.
+
+Local defaults for one run:
+
+| Output | Default path |
+| --- | --- |
+| Trace archive | `TestResults/prototest-{runId}.prototrace`, one archive per run |
+| JSON report | `TestResults/ProtoTest/report.json` |
+| HTML report | `TestResults/ProtoTest/report.html` |
 
 </LearnShell>

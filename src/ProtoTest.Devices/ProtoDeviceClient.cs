@@ -134,6 +134,11 @@ public sealed class ProtoDeviceClient
 
     private IProtoDeviceProtocol? ResolveProtocol()
     {
+        if (_registration.ProtocolInstances.Count > 0)
+        {
+            return _registration.ProtocolInstances[0];
+        }
+
         var protocols = _context.Service<IEnumerable<IProtoDeviceProtocol>>().ToArray();
         if (_registration.ProtocolTypes.Count == 0 || protocols.Length == 0)
         {

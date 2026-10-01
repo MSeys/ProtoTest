@@ -204,4 +204,19 @@ public sealed class ProtoDeviceClientBuilder
 
         return this;
     }
+
+    /// <summary>
+    /// Registers a protocol catalog instance, such as a <see cref="DeviceMessageProtocol"/> built from
+    /// message types. Pass the same instance to <see cref="DeviceCoverageCollector"/> to report its gaps.
+    /// </summary>
+    public ProtoDeviceClientBuilder AddProtocol(IProtoDeviceProtocol protocol)
+    {
+        ArgumentNullException.ThrowIfNull(protocol);
+        if (!_registration.ProtocolInstances.Contains(protocol))
+        {
+            _registration.ProtocolInstances.Add(protocol);
+        }
+
+        return this;
+    }
 }

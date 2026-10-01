@@ -296,7 +296,8 @@ Many devices send fields in one line of text, such as `$MTR,M-1,12.50*4B`. Descr
 `DeviceMessage` writes and reads it:
 
 ```csharp
-[DeviceMessage("$MTR", Checksum = typeof(NmeaChecksum))]
+[DeviceMessage("$MTR")]
+[DeviceChecksum<NmeaChecksum>]
 public sealed record MeterReading(
     string MeterId,
     [DeviceField(Format = "0.00")] decimal Volume);
@@ -307,8 +308,9 @@ DeviceMessage.Parse<MeterReading>(text);                // the record, or a Devi
 
 - **The fields are the record's parameters, in order.** On a class with settable properties, `[DeviceField(0)]`, `[DeviceField(1)]` and so on set the order.
 - **`Separator`** sets the text between fields, a comma by default. An empty separator makes a fixed-width message. Every field then needs a `Width`, with `Pad` and `PadLeft` for zero-padded numbers.
-- **`Format`** takes a .NET format for numbers, dates and times, `D` for an enum's number, or `Y|N` style words for a boolean. Values use the invariant culture. An empty field reads as `null` for a nullable field.
-- **`Checksum`** takes `NmeaChecksum` (`*` and two hex digits) or your own `IDeviceMessageChecksum`.
+- **`Format`** takes a .NET format for numbers, dates and times, `D` for an enum's number, or `Y|N` style words for a boolean. Values use the invariant culture. An empty field reads as `null` for a nullable field. A format without fractions, such as `yyyyMMddHHmmss`, drops them, so a parsed time is the whole second.
+- **`[DeviceChecksum<T>]`** adds a checksum: `NmeaChecksum` (`*` and two hex digits) or your own `IDeviceMessageChecksum`.
+- **`[DeviceFormat<T>]`** converts a value a format string cannot express. The formatter implements `IDeviceFieldFormatter<T>` for the field's type, and a mismatch fails when the message type is first used.
 - **A mismatch names its cause:** the prefix, the field count, the checksum, or the field and value that would not parse.
 
 A device sends and expects messages by type:
@@ -326,6 +328,83 @@ public sealed class FlowMeter : ProtoDevice
 
 `ExpectMessageAsync` skips frames that are not that message, and records the wait like `ExpectAsync`, named after
 the message type. A test builds its data strings as objects, and a wrong field fails with the field's name.
+
+#### Formatters
+
+`DeviceFormatters` holds the conversions devices often need:
+
+| Formatter | Field | Example |
+| --- | --- | --- |
+| `Tenths`, `Hundredths`, `Thousandths` | `decimal` | `12.50` sent as `1250` |
+| `Hex` | `int` | `255` sent as `FF` |
+| `UnixSeconds`, `UnixMilliseconds` | `DateTimeOffset` | seconds or milliseconds since 1970 |
+
+```csharp
+[DeviceMessage("PMP")]
+public sealed record PumpReading(
+    [DeviceFormat<DeviceFormatters.Hex>] int Pump,
+    [DeviceFormat<DeviceFormatters.Hundredths>] decimal Flow,
+    [DeviceFormat<DeviceFormatters.UnixSeconds>] DateTimeOffset At);   // "PMP,FF,1250,1790000000"
+```
+
+Another scale is one line, `sealed class Millivolts() : DeviceFormatters.ScaledDecimal(3);`. A device's own
+encoding is a class that implements `IDeviceFieldFormatter<T>`.
+
+#### Binary messages
+
+`[DeviceBinaryMessage]` makes the same record a block of bytes: the prefix bytes, then each field at a fixed
+size, big-endian unless `BigEndian = false`. A Modbus RTU request:
+
+```csharp
+[DeviceBinaryMessage(0x01, 0x03)]                 // slave 1, read holding registers
+[DeviceChecksum<Crc16Modbus>]
+public sealed record ReadHoldingRegisters(ushort Address, ushort Count);
+
+DeviceMessage.ToBytes(new ReadHoldingRegisters(0, 1));   // 01 03 00 00 00 01 84 0A
+```
+
+- **Numbers** take their natural size, from `byte` to `double`. An enum takes its underlying type's size, and a `bool` one byte.
+- **A string or byte array** needs `[DeviceField(Bytes = n)]`. A string is ASCII, padded with zero bytes.
+- **Binary formatters** implement `IDeviceBinaryFieldFormatter<T>`: `ScaledInt16` and `ScaledInt32` for scaled registers, `BinaryUnixSeconds`, and `Bcd` for packed decimal digits. Derive one for your scale or width, such as `sealed class Centi() : DeviceFormatters.ScaledInt16(2);`.
+- **Checksums** for binary messages are `Crc16Modbus`, `Xor8Checksum`, `Sum8Checksum` or your own `IDeviceBinaryChecksum`.
+- **A mismatch names its cause:** the length, the prefix, the checksum, or the field and its bytes.
+
+`SendMessageAsync` sends a binary message as a binary frame, and `ExpectMessageAsync` reads it back. With a TCP or
+serial client, pair binary messages with a framer that delimits them, such as `DeviceFramers.FixedLength`.
+
+#### Test data for devices
+
+Message records are ordinary records, so [ProtoTest.Data](./data/defaults.md) builds them. A defaults module fills
+what every reading shares, and the test sets only what it is about:
+
+```csharp
+builder.AddData(data => data.For<MeterReading>()
+    .Default(reading => reading.MeterId, context => $"M-{context.ObjectSequence}")
+    .Default(reading => reading.At, context => context.Clock.GetUtcNow()));
+
+var reading = Proto.Context.Data().For<MeterReading>().With(r => r.Volume, 12.5m).Build();
+var series = Proto.Context.Data().For<MeterReading>().BuildMany(100);   // 100 distinct meters
+await meter.SendMessageAsync(reading);
+```
+
+The default stamp reads the test's clock, so `Proto.Context.Clock.Advance` moves it and a run repeats exactly.
+
+#### Coverage per message type
+
+`DeviceMessageProtocol` turns message types into a protocol catalog. Each type is one message kind, and a matched
+`ExpectMessageAsync` covers it:
+
+```csharp
+var pumps = new DeviceMessageProtocol("Pump protocol").Add<PumpReading>().Add<PumpAlarm>();
+builder.AddDevices(devices => devices
+    .AddTcpClient("Pumps", address: "tcp://127.0.0.1:7000")
+        .AddProtocol(pumps)
+        .AddDevice<Pump>());
+builder.ConfigureServices(services => services.AddSingleton<IProtoCollector>(
+    new DeviceCoverageCollector("Pumps", [pumps])));
+```
+
+The report lists every message type no test expected as a gap.
 
 ### A device the system connects to
 
@@ -369,8 +448,10 @@ reports every kind in the catalog that no test asserted as a gap, as the OpenAPI
 
 ```csharp
 builder.ConfigureServices(services => services.AddSingleton<IProtoCollector>(
-    new DeviceCoverageCollector("Devices", [new OcppProtocol()])));
+    new DeviceCoverageCollector("Chargers", [new OcppProtocol()])));
 ```
+
+The collector's name is the device client's name, because each matched expectation is recorded under its client.
 
 A report row names the message kind, whether a test asserted it, and how often:
 
@@ -444,7 +525,8 @@ device.command · the peer reads a flow reading
 - **A listening device accepts one connection.** It stops listening once the application connected. An application that reconnects needs a new device in a new test.
 - **A serial port is open in one test at a time.** Tests that share a port must not run in parallel.
 - **A stream frame has a size limit.** A receive that buffers more than `MaxFrameBytes` without a whole frame fails and shows the first bytes. That usually means the framer does not match the device.
-- **A message has a fixed list of fields.** Repeated groups and optional trailing fields need a string field, or a class per variant. A field holds a string, number, boolean, enum, date or time.
+- **A message has a fixed list of fields.** Repeated groups and optional trailing fields need a string field, or a class per variant. A text field holds a string, number, boolean, enum, date or time, or uses a formatter.
+- **A binary message has a fixed length.** Every field has a fixed size, so a length byte that announces a variable payload needs a framer and a byte array field per size.
 - **MQTT speaks MQTT 5 over plain TCP.** `mqtt://` only. An MQTT 3.1.1-only broker and `mqtts://` fail the connect.
 - **An MQTT client has one publish topic and one subscribe filter.** `{deviceId}` is the only placeholder, so one client covers one topic convention, and two device families need two clients. The filter may use the `+` and `#` wildcards; the publish topic may not.
 - **MQTT options are one set per run.** Connect timeout, keep-alive, the packet cap and a broker set through `configure` apply to every MQTT client. A client that needs its own broker passes a resolver, because a configured or container broker wins over `address:`.

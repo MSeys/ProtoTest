@@ -104,7 +104,8 @@ public sealed class SerialDeviceTests
         });
     }
 
-    [DeviceMessage("$MTR", Checksum = typeof(NmeaChecksum))]
+    [DeviceMessage("$MTR")]
+    [DeviceChecksum<NmeaChecksum>]
     private sealed record MeterReading(string MeterId, [DeviceField(Format = "0.00")] decimal Volume);
 
     private sealed class Meter : ProtoDevice

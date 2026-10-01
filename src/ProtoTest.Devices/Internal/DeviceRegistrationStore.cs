@@ -39,6 +39,9 @@ internal sealed class DeviceClientRegistration(string name)
     public List<Type> DeviceTypes { get; } = [];
 
     public List<Type> ProtocolTypes { get; } = [];
+
+    /// <summary>Protocol catalogs registered as instances, such as a <see cref="DeviceMessageProtocol"/>.</summary>
+    public List<IProtoDeviceProtocol> ProtocolInstances { get; } = [];
 }
 
 /// <summary>

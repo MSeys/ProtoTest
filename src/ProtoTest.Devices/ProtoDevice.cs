@@ -68,13 +68,13 @@ public abstract class ProtoDevice
         CancellationToken cancellationToken = default)
         => Session.ExpectAsync(description, match, timeout, cancellationToken);
 
-    /// <summary>Sends a message type as its data string, as <see cref="DeviceMessage.Format{TMessage}"/> writes it.</summary>
+    /// <summary>Sends a message type as the frame a device sends: its data string, or its bytes for a binary message.</summary>
     protected ValueTask SendMessageAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default)
         where TMessage : notnull
         => Session.SendAsync(DeviceMessage.ToFrame(message), cancellationToken);
 
     /// <summary>
-    /// Waits for a text frame that parses as <typeparamref name="TMessage"/> and, when given, satisfies
+    /// Waits for a frame that reads as <typeparamref name="TMessage"/> and, when given, satisfies
     /// <paramref name="match"/>; frames that are not that message are skipped. The wait is recorded like
     /// <see cref="ExpectAsync"/>, named after the message type unless <paramref name="description"/> says otherwise.
     /// </summary>
@@ -86,12 +86,10 @@ public abstract class ProtoDevice
     {
         var frame = await Session.ExpectAsync(
             description ?? typeof(TMessage).Name,
-            candidate => candidate.TryGetText(out var text)
-                && DeviceMessage.TryParse<TMessage>(text, out var message)
-                && (match is null || match(message)),
+            candidate => DeviceMessage.TryRead<TMessage>(candidate, out var message) && (match is null || match(message)),
             timeout,
             cancellationToken).ConfigureAwait(false);
-        return DeviceMessage.Parse<TMessage>(frame.AsText());
+        return DeviceMessage.Read<TMessage>(frame);
     }
 
     /// <summary>A readable log of the frames exchanged so far, for failure messages.</summary>

@@ -13,6 +13,7 @@ public sealed class ProtoDataValueContext
     internal ProtoDataValueContext(
         IServiceProvider services,
         IProtoData data,
+        TimeProvider clock,
         string testId,
         long objectSequence,
         Type targetType,
@@ -21,6 +22,7 @@ public sealed class ProtoDataValueContext
     {
         Services = services;
         _data = data;
+        Clock = clock;
         TestId = testId;
         ObjectSequence = objectSequence;
         TargetType = targetType;
@@ -29,6 +31,12 @@ public sealed class ProtoDataValueContext
     }
 
     public IServiceProvider Services { get; }
+
+    /// <summary>
+    /// Gets the test's clock, so a default stamp such as a reading's time follows <c>Proto.Context.Clock</c>
+    /// and moves when the test advances it.
+    /// </summary>
+    public TimeProvider Clock { get; }
     public string TestId { get; }
     public long ObjectSequence { get; }
     public Type TargetType { get; }

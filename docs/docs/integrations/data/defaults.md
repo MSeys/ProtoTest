@@ -127,6 +127,7 @@ Both kinds of provider, and every member default, receive a `ProtoDataValueConte
 | `ObjectSequence` | the object's position among objects built in this test |
 | `TargetType`, `ValueType`, `MemberName` | what is being resolved |
 | `Services` | the test's service provider |
+| `Clock` | the test's clock, so a default stamp follows `Proto.Context.Clock` and moves when the test advances it |
 | `NextGuid()` | a deterministic GUID |
 | `NextString()` | a deterministic string like `Invoice.Reference-0001-00` |
 | `Ref<T>(identity)` | a value provisioned earlier in this test, from the [identity map](./provisioners.md#refs-and-the-identity-map) |

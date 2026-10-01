@@ -36,9 +36,11 @@ dotnet add package ProtoTest.Devices.Serial                 # COM ports and /dev
 - Stream framing for TCP, serial and custom stream transports: `DeviceFramers.Lines`, `Delimited`,
   `Enveloped`, `LengthPrefixed` and `FixedLength`, set per client with `WithFramer`, and
   `StreamDeviceConnection` for a stream of your own.
-- Device data strings as records: `DeviceMessage.Format`/`Parse` with a prefix, separator or fixed
-  widths and an optional checksum (`NmeaChecksum`), and `SendMessageAsync`/`ExpectMessageAsync` on
-  the device.
+- Device messages as records: text (`DeviceMessage.Format`/`Parse`, prefix, separator or fixed widths)
+  or binary (`[DeviceBinaryMessage]`, `ToBytes`/`FromBytes`), with `[DeviceChecksum<T>]` (NMEA,
+  CRC-16/Modbus, XOR, sum) and `[DeviceFormat<T>]` field formatters (`DeviceFormatters`: scaled, hex,
+  Unix time, BCD). `SendMessageAsync`/`ExpectMessageAsync` on the device, and `DeviceMessageProtocol`
+  for coverage per message type.
 - `ListenAsync` for transports the system under test connects to, such as `AddTcpListener`.
 - `[RequiresDevice<TDevice>]` skips tests the environment cannot run.
 

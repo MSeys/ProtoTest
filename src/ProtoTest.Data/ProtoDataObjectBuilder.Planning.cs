@@ -93,6 +93,7 @@ public sealed partial class ProtoDataObjectBuilder<T>
         var valueContext = new ProtoDataValueContext(
             executionContext.Services,
             _data,
+            executionContext.Clock,
             executionContext.TestId,
             _objectSequence,
             typeof(T),

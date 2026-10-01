@@ -139,7 +139,8 @@ public sealed class DeviceMessageTests
         Assert.That(exception!.Message, Does.Contain("MeterAck was not observed").And.Contain("noise"));
     }
 
-    [DeviceMessage("$MTR", Checksum = typeof(NmeaChecksum))]
+    [DeviceMessage("$MTR")]
+    [DeviceChecksum<NmeaChecksum>]
     private sealed record MeterReading(
         string MeterId,
         [DeviceField(Format = "0.00")] decimal Volume,

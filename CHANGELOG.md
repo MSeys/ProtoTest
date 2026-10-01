@@ -113,6 +113,9 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `ProtoTest.Devices.Serial` opens `serial://` lines; a client without an address reads `ProtoTest:Devices:Serial:Ports:{client}`. [Devices](https://prototest.dev/docs/integrations/devices#tcp-and-serial)
 - stream framing (`IDeviceFramer`, `DeviceFramers`, `WithFramer`) and `StreamDeviceConnection` serve any byte-stream transport. [Devices](https://prototest.dev/docs/integrations/devices#tcp-and-serial)
 - `DeviceMessage` writes and reads device data strings as records, with `SendMessageAsync`/`ExpectMessageAsync`. [Devices](https://prototest.dev/docs/integrations/devices#data-strings-as-messages)
+- `[DeviceChecksum<T>]` and `[DeviceFormat<T>]` add checksums and field formatters (`DeviceFormatters`: scaled, hex, Unix time, BCD). [Devices](https://prototest.dev/docs/integrations/devices#formatters)
+- `[DeviceBinaryMessage]` writes and reads fixed-layout binary messages, with `Crc16Modbus`, `Xor8Checksum` and `Sum8Checksum`. [Devices](https://prototest.dev/docs/integrations/devices#binary-messages)
+- `DeviceMessageProtocol` and `AddProtocol(instance)` report the message types no test expected. [Devices](https://prototest.dev/docs/integrations/devices#coverage-per-message-type)
 
 #### Web
 
@@ -128,6 +131,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### SQL and Data
 
+- `ProtoDataValueContext.Clock` gives defaults the test clock, so a default stamp follows `Proto.Context.Clock`. [Defaults](https://prototest.dev/docs/integrations/data/defaults#the-value-context)
 - `SqlOptions.AddressKeys` declares the connection keys and gates the SQL and EF Core capabilities. [SQL](https://prototest.dev/docs/integrations/sql/)
 - `SqlAddressRule` publishes the declared-keys lookup for a sibling SQL provider. [SQL](https://prototest.dev/docs/integrations/sql/)
 - generated member defaults are deterministic per test. [Defaults](https://prototest.dev/docs/integrations/data/defaults)
@@ -341,6 +345,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### SQL and Data
 
+- building a value with a `DateTime`, `DateTimeOffset`, `decimal` or `Guid` member no longer overflows the stack while tracing it. [Defaults](https://prototest.dev/docs/integrations/data/defaults)
 - optional constructor-parameter defaults win over generated values. [Defaults](https://prototest.dev/docs/integrations/data/defaults)
 - a run whose declared keys are unprovided keeps the hooks inert and names the required gate. [SQL](https://prototest.dev/docs/integrations/sql/)
 

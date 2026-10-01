@@ -8,7 +8,7 @@ import CodeSnippet from '@site/src/components/CodeSnippet';
 import CopyCode from '@site/src/components/CopyCode';
 import Frame from '@site/src/components/Frame';
 import ReleaseFeed from '@site/src/components/ReleaseFeed';
-import CheckView from '@site/src/components/ViewerWalkthrough/CheckView';
+import ViewerMock from '@site/src/components/ViewerMock';
 import {withoutProtoTest, withProtoTest} from '@site/src/data/comparison';
 import styles from './index.module.css';
 
@@ -356,7 +356,7 @@ export default function Home(): ReactNode {
               head={<span className={styles.frameTitle}>ProtoTrace viewer · failing check</span>}
               foot="Test 12 from prototest-demo.prototrace, as the inspector shows it."
             >
-              <CheckView />
+              <ViewerMock screen="check" />
             </Frame>
           </div>
         </section>

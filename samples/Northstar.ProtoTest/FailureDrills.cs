@@ -185,7 +185,7 @@ public sealed class FailureDrills
         Assert.Warn(message);
     }
 
-    private static void RequireDrills()
+    internal static void RequireDrills()
     {
         var drills = Proto.Host.Configuration["ProtoTest:Sample:Drills"];
         if (!string.Equals(drills, "true", StringComparison.OrdinalIgnoreCase)

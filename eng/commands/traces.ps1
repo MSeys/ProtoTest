@@ -6,6 +6,9 @@ Regenerates the committed trace archives from the Northstar sample.
 lessons writes docs/static/lessons (one filtered run per lesson trace), recipes writes
 viewer/public/demos/recipes, demo writes the viewer's landing demo from the whole suite with the
 drills on. all runs the three in that order.
+
+-Only limits lessons to the named traces, so adding one lesson does not rewrite the values the
+other lessons quote from theirs.
 #>
 [CmdletBinding()]
 param(
@@ -14,7 +17,8 @@ param(
     [string]$Set = "all",
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [string[]]$Only = @()
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +41,12 @@ $lessonTraces = @(
     @{ Name = "l1-first-journey"; Filter = "FullyQualifiedName~ProjectsJourney.CreatingAProjectReturnsIt"; Expect = "Passed" },
     @{ Name = "l2-broker-skip"; Filter = "FullyQualifiedName~BrokerJourney.PayingAnInvoicePublishesAnInvoicePaidEvent"; Expect = "Skipped" },
     @{ Name = "l3-clock-window"; Filter = "FullyQualifiedName~ClockJourney.ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock"; Expect = "Passed" },
+    @{ Name = "l3-lagging-read"; Filter = "FullyQualifiedName~WebhookJourney.CreatingAProjectDeliversItsWebhook"; Expect = "Passed" },
+    # The flaky drill passes or fails by timing (about one Release run in six fails), so the passing
+    # trace re-runs it until it passes. The failing trace widens the race with a two-second dispatcher,
+    # the way the lesson confirms the cause, and fails on the first run.
+    @{ Name = "l4-flaky-pass"; Filter = "FullyQualifiedName~WebhookJourney.OneReadRacesTheDispatcher"; Drills = $true; Expect = "Passed"; Attempts = 10 },
+    @{ Name = "l4-flaky-fail"; Filter = "FullyQualifiedName~WebhookJourney.OneReadRacesTheDispatcher"; Drills = $true; Expect = "Failed"; Attempts = 3; Environment = @{ Northstar__WebhookDispatchInterval = "00:00:02" } },
     @{ Name = "l4-coverage"; Filter = "FullyQualifiedName~PlatformJourney.RestWritesAreVisibleThroughGraphQL"; Expect = "Passed" },
     @{ Name = "l4-artifacts"; Filter = "FullyQualifiedName~SheetsJourney.TheMonthlyReportMatchesItsModel"; Expect = "Passed" },
     # NUnit reports a warning test as skipped, so the summary check expects Skipped; the archive check
@@ -86,31 +96,53 @@ function Assert-PartialTrace([string]$archivePath) {
 function Write-LessonTraces {
     $destination = Join-Path $repository "docs/static/lessons"
     New-Item -ItemType Directory -Force -Path $destination | Out-Null
-    foreach ($item in $lessonTraces) {
+    # ./proto forwards "-Only a,b" as one string, so split it here as well.
+    $names = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $selected = @($lessonTraces | Where-Object { $names.Count -eq 0 -or $names -contains $_.Name })
+    $unknown = @($names | Where-Object { $_ -notin $lessonTraces.Name })
+    if ($unknown.Count -gt 0) {
+        throw "Unknown lesson trace(s): $($unknown -join ', '). Known: $($lessonTraces.Name -join ', ')."
+    }
+    foreach ($item in $selected) {
         # The destination is deleted first so a stale committed trace can never pass the copy.
         $destinationFile = Join-Path $destination "$($item.Name).prototrace"
         Remove-Item -LiteralPath $destinationFile -Force -ErrorAction SilentlyContinue
 
-        $run = Invoke-ProtoSampleRun -Configuration $Configuration -Filter $item.Filter -NoBuild:$NoBuild -Drills:([bool]$item.Drills) -Name $item.Name
-        $summary = $run.Summary
-        $matched = $summary.Success
-        if ($matched) {
-            $matched = [int]$summary.Groups[1].Value -eq $(if ($item.Expect -eq "Failed") { 1 } else { 0 })
-            $matched = $matched -and [int]$summary.Groups[2].Value -eq $(if ($item.Expect -eq "Passed") { 1 } else { 0 })
-            $matched = $matched -and [int]$summary.Groups[3].Value -eq $(if ($item.Expect -eq "Skipped") { 1 } else { 0 })
-            $matched = $matched -and [int]$summary.Groups[4].Value -eq 1
-            $matched = $matched -and $run.ExitCode -eq $(if ($item.Expect -eq "Failed") { 1 } else { 0 })
+        $attempts = if ($item.Attempts) { [int]$item.Attempts } else { 1 }
+        $environment = if ($item.Environment) { $item.Environment } else { @{} }
+        $previous = @{}
+        foreach ($key in $environment.Keys) {
+            $previous[$key] = [Environment]::GetEnvironmentVariable($key)
+            [Environment]::SetEnvironmentVariable($key, $environment[$key])
+        }
+        try {
+            for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+                $run = Invoke-ProtoSampleRun -Configuration $Configuration -Filter $item.Filter -NoBuild:$NoBuild -Drills:([bool]$item.Drills) -Name $item.Name
+                $summary = $run.Summary
+                $matched = $summary.Success
+                if ($matched) {
+                    $matched = [int]$summary.Groups[1].Value -eq $(if ($item.Expect -eq "Failed") { 1 } else { 0 })
+                    $matched = $matched -and [int]$summary.Groups[2].Value -eq $(if ($item.Expect -eq "Passed") { 1 } else { 0 })
+                    $matched = $matched -and [int]$summary.Groups[3].Value -eq $(if ($item.Expect -eq "Skipped") { 1 } else { 0 })
+                    $matched = $matched -and [int]$summary.Groups[4].Value -eq 1
+                    $matched = $matched -and $run.ExitCode -eq $(if ($item.Expect -eq "Failed") { 1 } else { 0 })
+                }
+                if ($matched) { break }
+            }
+        }
+        finally {
+            foreach ($key in $environment.Keys) { [Environment]::SetEnvironmentVariable($key, $previous[$key]) }
         }
         if (-not $matched) {
             Write-ProtoTail $run.Text
-            throw "The run for $($item.Name) did not $($item.Expect.ToLowerInvariant()) its one test (exit $($run.ExitCode)). Log: $($run.Log)"
+            throw "The run for $($item.Name) did not end with its one test $($item.Expect.ToLowerInvariant()) in $attempts run(s) (exit $($run.ExitCode)). Log: $($run.Log)"
         }
 
         Copy-FreshTrace $run $destinationFile
         Write-Host "Wrote $($item.Name).prototrace ($($item.Expect.ToLowerInvariant())): $($summary.Value.Trim())"
         if ($item.ExpectPartial) { Assert-PartialTrace $destinationFile }
     }
-    Write-Host "Wrote $($lessonTraces.Count) lesson traces to $destination"
+    Write-Host "Wrote $($selected.Count) lesson traces to $destination"
 }
 
 function Write-RecipeTraces {

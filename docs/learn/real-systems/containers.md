@@ -32,7 +32,7 @@ import ModesComparison from '@site/src/components/ModesComparison';
 
 A suite that needs a database and a broker usually asks you to install both first. You would rather start the suite and let it bring what it needs.
 
-These lessons use recorded runs from OpenCSMS, a separate suite. You can follow them without its checkout. Running the commands needs it.
+These lessons use recorded runs from [OpenCSMS](https://github.com/MSeys/OpenCsms), a separate suite. You can follow them without its checkout. Running the commands needs it.
 
 OpenCSMS manages EV charging. It has a REST API with a dashboard, PostgreSQL for storage, RabbitMQ for events, and billing and notification workers. Its suite has one setup class and four modes. This track reads three modes, then examines failures the suite creates deliberately.
 

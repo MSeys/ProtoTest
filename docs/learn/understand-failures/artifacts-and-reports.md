@@ -2,7 +2,7 @@
 id: artifacts-and-reports
 title: What is inside the file CI uploads?
 sidebar_label: Archive and reports
-sidebar_position: 7
+sidebar_position: 8
 description: "Open a .prototrace in the viewer and with an archive tool, and find the operations and the JSON and HTML reports inside it."
 ---
 
@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 7 of 8"
+  step="Lesson 8 of 9"
   minutes={6}
   outcomes={[
     'Name what a .prototrace holds',

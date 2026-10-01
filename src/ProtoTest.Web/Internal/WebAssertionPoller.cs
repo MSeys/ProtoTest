@@ -173,7 +173,7 @@ internal sealed class WebAssertionPoller(WebSession session, WebOperationRunner 
                 {
                     throw new WebAssertionException(
                         $"Element '{element.ComponentPath}.{element.Name}' should {describedExpectation} within {assertionTimeout}. " +
-                        $"Last observed: {result.Value.Observation}.");
+                        WebBackendErrors.LastObserved(result.Value.Observation));
                 }
 
                 // The verified address is read inside the assertion operation, so coverage comes from

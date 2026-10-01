@@ -16,7 +16,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 1 of 8"
+  step="Lesson 1 of 9"
   minutes={10}
   outcomes={[
     'Run the sample suite with its four failing tests enabled',

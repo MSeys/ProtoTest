@@ -16,9 +16,14 @@ public static class WebBackendErrors
         var message =
             $"Element '{element.ComponentPath}.{element.Name}' did not become actionable within {timeout}. " +
             $"Locator: {element.Locator.Describe()}.";
-        return new WebActionabilityException(
-            observation is null ? message : $"{message} Last observed: {observation}.");
+        return new WebActionabilityException(observation is null ? message : $"{message} {LastObserved(observation)}");
     }
+
+    /// <summary>
+    /// The closing "Last observed" sentence. An observation is often a whole failure message with its own
+    /// full stop, so the sentence ends with exactly one.
+    /// </summary>
+    internal static string LastObserved(string observation) => $"Last observed: {observation.TrimEnd().TrimEnd('.')}.";
 
     /// <summary>A read of an element that never appeared.</summary>
     public static WebElementResolutionException NotPresent(WebElementReference element, TimeSpan timeout)

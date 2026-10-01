@@ -13,7 +13,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
 
 <Lesson
   track="Reliable tests"
-  step="Lesson 1 of 3"
+  step="Lesson 1 of 4"
   minutes={7}
   outcomes={[
     'Move a test clock past a billing boundary',

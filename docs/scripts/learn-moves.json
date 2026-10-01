@@ -26,9 +26,10 @@
   "/learn/real-topology/published-mode": "/learn/real-systems/published-mode",
   "/learn/real-topology/fault-injection": "/learn/real-systems/fault-injection",
   "/learn/make-it-yours/attributes": "/learn/extend/attributes",
-  "/learn/make-it-yours/provisioners-and-page-objects": "/learn/extend/provisioners-and-page-objects",
+  "/learn/make-it-yours/provisioners-and-page-objects": "/learn/extend/provisioners",
   "/learn/make-it-yours/write-an-integration": "/learn/extend/write-an-integration",
   "/learn/make-it-yours/swap-a-dependency-for-one-test": "/learn/extend/swap-a-dependency-for-one-test",
   "/learn/make-it-yours/evidence-loop-with-an-agent": "/learn/extend/evidence-loop-with-an-agent",
-  "/learn/why-integration-tests-get-hard/the-four-questions": "/learn/why-it-gets-hard"
+  "/learn/why-integration-tests-get-hard/the-four-questions": "/learn/why-it-gets-hard",
+  "/learn/extend/provisioners-and-page-objects": "/learn/extend/provisioners"
 }

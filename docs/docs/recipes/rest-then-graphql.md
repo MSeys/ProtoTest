@@ -117,7 +117,7 @@ The sample suite's own run:
 
 - **Filter to what the test created.** `totalCount = 1` only holds if the query is narrowed to this test's data. The sample suite gets that from its provisioned tenant, and a shared database needs its own filter.
 - **The two APIs name things differently.** REST and GraphQL often disagree on casing and enum values (`active` and `ACTIVE`). Assert each in its own terms, because the shape matcher compares exactly.
-- **Assume the read may lag the write until the test proves otherwise.** If the read side updates asynchronously, the first query can miss the write. Poll with a deadline instead of adding a delay, so the wait ends as soon as the write is visible.
+- **Assume the read may lag the write until the test proves otherwise.** If the read side updates asynchronously, the first query can miss the write. Poll with a deadline instead of adding a delay, so the wait ends as soon as the write is visible. [`ProtoPolling.PollAsync`](../foundation/time.md#waiting-for-work-on-a-real-timer) is that loop.
 
   ```text
   BEFORE: await Task.Delay(2000); // slow, and still flaky when the write lags longer

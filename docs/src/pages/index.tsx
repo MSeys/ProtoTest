@@ -166,6 +166,14 @@ function JourneyExample(): ReactNode {
     </Frame>
   );
 }
+// The coding-agents page's example run: the turns an agent takes over one failing test.
+const agentTurns = [
+  {call: 'list_runs', result: '1 run · 1 test failed'},
+  {call: 'get_failure', result: 'TheAddressWasHardcodedForOneMachine · connection refused · Program.cs:65'},
+  {call: 'get_diagnosis', result: 'the call it judged, its ancestors, the source snippet, the state changes'},
+  {call: 'edit', result: 'the file and line the diagnosis named'},
+  {call: 'prototest verify', result: 'the pull request verdict: coverage, contract and run gates'},
+];
 function templateCommands(runner?: string): string[] {
   return [
     'dotnet new install ProtoTest.Templates',
@@ -357,6 +365,53 @@ export default function Home(): ReactNode {
               foot="Test 12 from prototest-demo.prototrace, as the inspector shows it."
             >
               <ViewerMock screen="check" />
+            </Frame>
+          </div>
+        </section>
+        <section className={`container ${styles.section}`} aria-labelledby="agents">
+          <div className={styles.feature}>
+            <div className={styles.featureCopy}>
+              <p className={styles.eyebrow}>For coding agents</p>
+              <Heading as="h2" id="agents">
+                Your agent reads the evidence, not the logs.
+              </Heading>
+              <p>
+                A local MCP server hands a coding agent the failed check, the call it judged and the source line
+                as one small document. The agent spends its context on the fix instead of on finding out what
+                happened.
+              </p>
+              <p>
+                The server is read-only and nothing leaves the machine: no account, no telemetry, no upload.
+                The same diagnosis renders in a terminal and in the pull request comment.
+              </p>
+              <div className={styles.links}>
+                <Link className={styles.more} to="/docs/agent-workflows/setup">
+                  Connect your agent →
+                </Link>
+                <Link className={styles.more} to="/docs/agent-workflows/loop">
+                  The evidence loop in CI →
+                </Link>
+              </div>
+            </div>
+            <Frame
+              kind="preview"
+              className={styles.checkFrame}
+              head={<span className={styles.frameTitle}>Coding agent · one failing test</span>}
+              foot={
+                <>
+                  The turns from the <Link to="/docs/agent-workflows/coding-agents">coding agents</Link>{' '}
+                  example. Docs for agents: <a href="/llms.txt">llms.txt</a>.
+                </>
+              }
+            >
+              <ol className={styles.agentTurns}>
+                {agentTurns.map((turn) => (
+                  <li key={turn.call}>
+                    <code>{turn.call}</code>
+                    <span>{turn.result}</span>
+                  </li>
+                ))}
+              </ol>
             </Frame>
           </div>
         </section>

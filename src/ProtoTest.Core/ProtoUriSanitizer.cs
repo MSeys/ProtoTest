@@ -91,10 +91,16 @@ public static class ProtoUriSanitizer
         }
 
         var withoutUserInfo = WithoutUserInfo(address);
-        return Uri.TryCreate(withoutUserInfo, UriKind.Absolute, out var uri)
+        return TryCreateAbsolute(withoutUserInfo, out var uri)
             ? new UriBuilder(uri) { Query = string.Empty, Fragment = string.Empty }.Uri.ToString()
             : withoutUserInfo;
     }
+
+    // On Linux and macOS, Uri reads "/orders?id=1" as an absolute file path, which would turn a relative
+    // address into file:///orders%3Fid=1. Only an address that names its own scheme counts as absolute.
+    private static bool TryCreateAbsolute(string address, out Uri uri)
+        => Uri.TryCreate(address, UriKind.Absolute, out uri!)
+           && (!uri.IsFile || address.StartsWith("file:", StringComparison.OrdinalIgnoreCase));
 
     private static string RedactQueryParameter(string parameter, HashSet<string> sensitive)
     {

@@ -140,11 +140,11 @@ const defaultLayers: Layer[] = [
 const blindSpots: BlindSpot[] = [
   {
     title: 'Work outside the composition',
-    body: 'The environment drill used a raw HttpClient against a fixed address. Its test.execution span ran 2.05 s and recorded no operation at all; the entry holds the connection failure, and the call it never wrapped cannot appear in the trace.',
+    body: 'The environment drill used a raw HttpClient against a fixed address. Its test.execution operation ran 2.05 s and recorded no child operation at all. The entry holds the connection failure, and the call it never wrapped cannot appear in the trace.',
   },
   {
     title: 'Work inside the application',
-    body: 'invoice.issue and invoice.pay are there because the demo application reports that activity source. A step the application does not report has no span, however much it did.',
+    body: 'invoice.issue and invoice.pay are there because the demo application reports that activity source. A step the application does not report has no operation, however much it did.',
   },
   {
     title: 'Wall time',

@@ -2,7 +2,7 @@
 id: swap-a-dependency-for-one-test
 title: Swap a dependency for one test
 sidebar_label: Swap a dependency
-sidebar_position: 4
+sidebar_position: 5
 description: "Replace one service in the application under test for a single test, read the dedicated server in the trace, and see when the framework refuses."
 ---
 
@@ -14,7 +14,7 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 <Lesson
   track="Extend ProtoTest"
-  step="Lesson 4 of 5"
+  step="Lesson 5 of 6"
   minutes={9}
   outcomes={[
     'Replace a service in the application for one test with Override',

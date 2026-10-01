@@ -1,17 +1,29 @@
 namespace ProtoTest.SampleApp.Northstar;
 
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using ProtoTest.SampleApp.Domain;
 
-/// <summary>Drains the webhook outbox with retries and HMAC-SHA256 request signing.</summary>
+/// <summary>
+/// Drains the webhook outbox with retries and HMAC-SHA256 request signing. It runs every 100 ms on a real
+/// timer; <c>Northstar:WebhookDispatchInterval</c> changes that, which the flaky-test lesson uses to widen
+/// the race between a delivery and a test that reads it once.
+/// </summary>
 internal sealed class WebhookDispatcher(
     NorthstarStore store,
     IWebhookTransport transport,
+    IConfiguration configuration,
     ILogger<WebhookDispatcher> logger) : BackgroundService
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan DefaultInterval = TimeSpan.FromMilliseconds(100);
     private const int BatchSize = 25;
+
+    private TimeSpan Interval =>
+        TimeSpan.TryParse(configuration["Northstar:WebhookDispatchInterval"], CultureInfo.InvariantCulture, out var interval)
+        && interval > TimeSpan.Zero
+            ? interval
+            : DefaultInterval;
 
     public static string Sign(string secret, string payload)
     {

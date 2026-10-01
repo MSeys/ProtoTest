@@ -4,6 +4,6 @@
   "customProps": {
     "outcome": "Run the same suite on containers, through Aspire and against a deployed stack, and break things on purpose.",
     "time": "About 35 minutes",
-    "needs": "Reliable tests, and a checkout of OpenCSMS"
+    "needs": "Reliable tests. An OpenCSMS checkout is optional."
   }
 }

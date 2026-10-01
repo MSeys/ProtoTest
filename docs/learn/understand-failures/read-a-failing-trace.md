@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 2 of 8"
+  step="Lesson 2 of 9"
   minutes={9}
   outcomes={[
     'Find the check that failed and the call it judged',

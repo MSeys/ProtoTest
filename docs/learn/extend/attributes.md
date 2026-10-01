@@ -14,7 +14,7 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 <Lesson
   track="Extend ProtoTest"
-  step="Lesson 1 of 5"
+  step="Lesson 1 of 6"
   minutes={8}
   outcomes={[
     'Write an attribute that prepares something for a test and cleans it up',
@@ -161,7 +161,7 @@ The tenant attribute's before entry comes first, so it appears before yours in t
 - `Order` sequences attributes that depend on each other, and teardown runs in reverse.
 - A composite attribute groups attributes that always travel together.
 
-Next: [provisioners and page objects](/learn/extend/provisioners-and-page-objects), where the data an attribute creates comes from.
+Next: [create test data with a provisioner](/learn/extend/provisioners), where the data an attribute creates comes from.
 
 ## Go deeper
 

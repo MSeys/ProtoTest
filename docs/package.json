@@ -16,7 +16,7 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
-    "test:plugins": "node --test plugins/rehype-table-labels.test.cjs scripts/prose-check.test.mjs",
+    "test:plugins": "node --test plugins/rehype-table-labels.test.cjs plugins/llms-txt.test.cjs scripts/prose-check.test.mjs",
     "test:catalog": "node --test scripts/integrations-catalog.test.mjs"
   },
   "dependencies": {

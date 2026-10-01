@@ -2,7 +2,7 @@
 id: evidence-loop-with-an-agent
 title: Run the evidence loop with an agent
 sidebar_label: The evidence loop with an agent
-sidebar_position: 5
+sidebar_position: 6
 description: "Summarize a failing trace with the CLI, connect a coding agent to the same file over MCP, and close the loop with a verified fix."
 ---
 
@@ -14,7 +14,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Extend ProtoTest"
-  step="Lesson 5 of 5"
+  step="Lesson 6 of 6"
   minutes={9}
   outcomes={[
     'Summarize a real failing trace from the command line',

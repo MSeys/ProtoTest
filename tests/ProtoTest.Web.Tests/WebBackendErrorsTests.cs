@@ -23,6 +23,16 @@ public sealed class WebBackendErrorsTests
     }
 
     [Test]
+    public void LastObserved_ShouldEndAWholeSentenceObservationWithOneFullStop()
+        => Assert.Multiple(() =>
+        {
+            Assert.That(WebBackendErrors.LastObserved("not found"), Is.EqualTo("Last observed: not found."));
+            Assert.That(
+                WebBackendErrors.NotActionable(Reference(), TimeSpan.FromSeconds(5), "Element 'A.B' was not present.").Message,
+                Does.EndWith("Last observed: Element 'A.B' was not present."));
+        });
+
+    [Test]
     public void NotPresent_ShouldNameTheElementAndLocator()
         => Assert.That(
             WebBackendErrors.NotPresent(Reference(), TimeSpan.FromSeconds(1)).Message,

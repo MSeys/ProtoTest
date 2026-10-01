@@ -64,8 +64,8 @@ public static class ProtoReadinessExtensions
     /// <summary>
     /// Awaits the address an application is published at: reads
     /// <c>ProtoTest:Applications:{applicationName}:BaseUrl</c> (or the value a started piece published
-    /// under the same key) and probes it at run start. An application running in-process has no address
-    /// and needs no wait, so the probe is skipped and says so in the trace.
+    /// under the same key) and probes it at run start. An application running in-process has no network
+    /// address to probe and needs no wait, so the probe is skipped and says so in the trace.
     /// </summary>
     /// <remarks>
     /// Register the probe <b>after</b> the piece that publishes the address: probes are awaited at

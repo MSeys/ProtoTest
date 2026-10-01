@@ -5,8 +5,8 @@ using System.Net.Http;
 /// <summary>
 /// Waits for the address an application is published at, read from the run's settings first (a started
 /// standalone instance wins, matching the web session rule) and then from
-/// <c>ProtoTest:Applications:{name}:BaseUrl</c>. An application running in-process has no address: the
-/// wait is skipped and the trace says so.
+/// <c>ProtoTest:Applications:{name}:BaseUrl</c>. An application running in-process has no network
+/// address to probe: the wait is skipped and the trace says so.
 /// </summary>
 internal sealed class ApplicationReadinessInfrastructure : IProtoConfiguredInfrastructure, IProtoStartupEvidence
 {

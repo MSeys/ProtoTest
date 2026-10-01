@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+Packs every packable project into artifacts/packages and checks versions, symbols and dependencies.
+#>
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
@@ -16,7 +20,7 @@ $ErrorActionPreference = "Stop"
 if ($PSVersionTable.PSEdition -ne "Core") {
     $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
     if (-not $pwsh) {
-        throw "eng/pack.ps1 requires PowerShell 7. Install it or run this script with pwsh."
+        throw "./proto pack requires PowerShell 7. Install it or run it with pwsh."
     }
 
     $forwarded = @("-NoProfile", "-File", $PSCommandPath, "-Configuration", $Configuration, "-OutputPath", $OutputPath)
@@ -30,7 +34,8 @@ if ($PSVersionTable.PSEdition -ne "Core") {
     return
 }
 
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $packages = @(
     "src/ProtoTest.Core/ProtoTest.Core.csproj",
     "src/ProtoTest.Testcontainers/ProtoTest.Testcontainers.csproj",
@@ -84,17 +89,17 @@ $packable = Get-ChildItem -Path (Join-Path $repository "src/*/*.csproj") |
 
 $missing = @($packable | Where-Object { $packages -notcontains $_ })
 if ($missing.Count -gt 0) {
-    throw "Packable projects missing from eng/pack.ps1: $($missing -join ', ')."
+    throw "Packable projects missing from eng/commands/pack.ps1: $($missing -join ', ')."
 }
 
 $extra = @($packages | Where-Object { $packable -notcontains $_ })
 if ($extra.Count -gt 0) {
-    throw "eng/pack.ps1 lists projects that are not packable: $($extra -join ', ')."
+    throw "eng/commands/pack.ps1 lists projects that are not packable: $($extra -join ', ')."
 }
 
 $unknown = @($packages | Where-Object { -not (Test-Path -LiteralPath (Join-Path $repository $_)) })
 if ($unknown.Count -gt 0) {
-    throw "eng/pack.ps1 lists projects that do not exist: $($unknown -join ', ')."
+    throw "eng/commands/pack.ps1 lists projects that do not exist: $($unknown -join ', ')."
 }
 
 # A package may opt out of validation only while it has no released baseline, and the opt-out carries
@@ -123,12 +128,10 @@ Remove-Item -Path (Join-Path $output "*.nupkg"), (Join-Path $output "*.snupkg") 
 
 $packStarted = Get-Date
 
-foreach ($project in $packages) {
-    & dotnet pack (Join-Path $repository $project) @packArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Packing '$project' failed with exit code $LASTEXITCODE."
-    }
-}
+# One pack over the solution: IsPackable defaults to false (Directory.Build.props), so it packs exactly the
+# projects checked against the list above, with one parallel build graph instead of one per project.
+Invoke-ProtoNative -Name "pack" -FilePath "dotnet" `
+    -ArgumentList (@("pack", (Join-Path $repository "ProtoTest.slnx")) + $packArguments) | Out-Null
 
 # Every package has to agree with the rest of the family: same version, a README, and ProtoTest
 # dependencies that point at a package in this set, at exactly this version.

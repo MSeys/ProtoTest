@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+Checks the shared test helpers, the InternalsVisibleTo edges and the formatting of the whole solution.
+#>
 [CmdletBinding()]
 param(
     [switch]$NoRestore
@@ -6,14 +10,12 @@ param(
 $ErrorActionPreference = "Stop"
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
 
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $solution = Join-Path $repository "ProtoTest.slnx"
 
 if (-not $NoRestore) {
-    & dotnet restore $solution
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet restore failed with exit code $LASTEXITCODE."
-    }
+    Invoke-ProtoNative -Name "lint/restore" -FilePath "dotnet" -ArgumentList @("restore", $solution) | Out-Null
 }
 
 # One home for the shared test helpers. A local definition of a helper whose name
@@ -156,7 +158,5 @@ if ($friendEdgeViolations.Count -gt 0) {
 # check was a false green (measured twice).
 $formatArguments = @($solution, "--verify-no-changes", "--no-restore")
 
-& dotnet format @formatArguments
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet format found files that need formatting; run 'dotnet format ProtoTest.slnx' and commit the result."
-}
+Invoke-ProtoNative -Name "lint/format" -FilePath "dotnet" -ArgumentList (@("format") + $formatArguments) `
+    -Failure "dotnet format found files that need formatting; run 'dotnet format ProtoTest.slnx' and commit the result." | Out-Null

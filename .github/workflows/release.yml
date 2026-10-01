@@ -64,13 +64,13 @@ jobs:
           # mistaken publish cannot be undone. Dry runs stay available everywhere; the real path
           # also re-checks the ref here so the guard cannot be lost with a step condition.
           if ('${{ inputs.dry_run }}' -eq 'true') {
-            ./eng/release.ps1 -Configuration Release -DryRun
+            ./proto.ps1 release publish -Configuration Release -DryRun
             exit 0
           }
           if ('${{ github.ref_type }}' -ne 'tag') {
             throw "Refusing to publish from '${{ github.ref }}': this workflow publishes only from a v* tag. Dispatch with dry_run: true to validate without publishing."
           }
-          ./eng/release.ps1 -Configuration Release
+          ./proto.ps1 release publish -Configuration Release
 
       - name: Create or update GitHub Release
         if: github.ref_type == 'tag' && inputs.dry_run != true
@@ -91,13 +91,13 @@ jobs:
           # skipped, and generated notes would quietly ship a release nobody wrote down: fail and
           # name the step instead.
           if (-not (Test-Path -LiteralPath CHANGELOG.md)) {
-            throw "CHANGELOG.md is missing; run eng/cut-release.ps1 before tagging $tag."
+            throw "CHANGELOG.md is missing; run ./proto release cut before tagging $tag."
           }
           $text = Get-Content -LiteralPath CHANGELOG.md -Raw
           $pattern = "(?ms)^##\s+\[?$([regex]::Escape($version))\]?[^\r\n]*\r?\n.*?(?=^##\s|\z)"
           $section = [regex]::Match($text, $pattern)
           if (-not $section.Success) {
-            throw "CHANGELOG.md has no '## [$version]' section; run eng/cut-release.ps1 before tagging $tag."
+            throw "CHANGELOG.md has no '## [$version]' section; run ./proto release cut before tagging $tag."
           }
           $section.Value.Trim() | Set-Content -LiteralPath $notes -Encoding utf8
 

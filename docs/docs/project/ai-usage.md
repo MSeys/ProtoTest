@@ -32,8 +32,8 @@ Speed has costs, and they showed up here too: generated text drifts toward one v
 
 | What AI drafted | What changed before it shipped | Which gate proves it |
 | --- | --- | --- |
-| Code across the integrations | Compared suggestions from several models, set boundaries, said no often, changed direction when something did not fit | The test suite and the review bar (`eng/verify.ps1`) |
-| Documentation and public explanation | Rewritten in my own words, in a second pass over every page | The docs checks and the review bar (`eng/check-docs.ps1`, `eng/verify.ps1`) |
+| Code across the integrations | Compared suggestions from several models, set boundaries, said no often, changed direction when something did not fit | The test suite and the review bar (`./proto verify`) |
+| Documentation and public explanation | Rewritten in my own words, in a second pass over every page | The docs checks and the review bar (`./proto docs check`, `./proto verify`) |
 | Anything wrong | Understood and fixed by the maintainer | If generated code is wrong, that is still my problem to understand and fix |
 
 ## Do I regret using it?

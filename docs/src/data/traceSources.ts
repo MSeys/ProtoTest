@@ -1,7 +1,7 @@
 /*
  * The archives the Learn components read.
  *
- * eng/generate-lesson-traces.ps1 runs one filtered test per file against samples/Northstar.ProtoTest
+ * ./proto traces lessons runs one filtered test per file against samples/Northstar.ProtoTest
  * and writes the result to docs/static/lessons/, so every entry below names a file the site serves and
  * a reader can download. The values in data/failureDrills.ts are read from those committed archives:
  * names, statuses and messages come from the run, and the durations are the recording's own, so a

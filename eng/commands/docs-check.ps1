@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+Checks the docs: removed APIs, configuration keys, links and fragments, sample paths and secrets.
+#>
 [CmdletBinding()]
 param()
 
@@ -8,7 +12,8 @@ param()
 
 $ErrorActionPreference = "Stop"
 
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $docsRoot = Join-Path $repository "docs"
 $docsContentRoot = Join-Path $docsRoot "docs"
 $learnContentRoot = Join-Path $docsRoot "learn"
@@ -351,7 +356,10 @@ foreach ($file in @($contentFiles + $docsSourceFiles)) {
             if ($externalRepoPaths -contains $path) { continue }
             $firstSegment = $match.Groups[2].Value.Split('/')[0]
             if ($firstSegment -cnotmatch '[A-Z]') { continue }
-            if (-not (Test-Path -LiteralPath (Join-Path $repository $path))) {
+            # Build output exists only after a build, so a path through bin/ or obj/ must name a real
+            # project folder; the output below it is not checked.
+            $checked = if ($path -match '^(.+?)/(bin|obj)(/|$)') { $Matches[1] } else { $path }
+            if (-not (Test-Path -LiteralPath (Join-Path $repository $checked))) {
                 $linkFailures.Add(("{0}:{1}: '{2}' names no file in the repository" -f $relative, ($lineNumber + 1), $path))
             }
         }

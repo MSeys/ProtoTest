@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+Pushes the packed packages to NuGet in dependency order; -DryRun prints the plan only.
+#>
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
@@ -12,7 +16,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $packagesPath = Join-Path $repository "artifacts/packages"
 
 # Publishing is tag-gated: the release workflow only publishes a v* tag, and this script refuses a
@@ -76,14 +81,14 @@ function Get-PackageMetadata {
 }
 
 if (-not (Test-Path -LiteralPath $packagesPath)) {
-    throw "The packages directory '$packagesPath' does not exist. Run eng/pack.ps1 -Configuration $Configuration first."
+    throw "The packages directory '$packagesPath' does not exist. Run ./proto pack -Configuration $Configuration first."
 }
 
 $packageFiles = @(Get-ChildItem -LiteralPath $packagesPath -File |
     Where-Object { $_.Extension -eq '.nupkg' } |
     Sort-Object Name)
 if ($packageFiles.Count -eq 0) {
-    throw "No .nupkg files found in '$packagesPath'. Run eng/pack.ps1 -Configuration $Configuration first."
+    throw "No .nupkg files found in '$packagesPath'. Run ./proto pack -Configuration $Configuration first."
 }
 
 $packages = @{}

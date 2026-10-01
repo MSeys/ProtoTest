@@ -23,7 +23,7 @@ npm run build
 The full site adds the generated .NET API reference under `/api/`. Run this from the repository root:
 
 ```powershell
-./eng/build-docs-site.ps1
+./proto docs site
 ```
 
 The script runs the Docusaurus build, builds the API reference with DocFX, and copies it into `docs/build/api`, so the site's `/api` links resolve. Use `-NoRestore` after the DocFX tool has been restored once.

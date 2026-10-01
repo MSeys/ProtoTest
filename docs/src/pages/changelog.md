@@ -221,6 +221,11 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 - 44 packages pack in one version, 16 more than 1.0; the installation page lists the supported and preview tiers. [Installation](https://prototest.dev/docs/getting-started/installation)
 
+#### Engineering
+
+- one `./proto` command runs the repository's gates, packs, traces, docs builds and releases; `./proto help` lists them. Each step prints one line and keeps its full output under `artifacts/logs`.
+- the docs check accepts a path through a project's `bin/` or `obj/` folder on an unbuilt checkout, and still fails when the project itself is missing.
+
 ### Fixes
 
 #### Core

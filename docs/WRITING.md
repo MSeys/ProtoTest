@@ -164,5 +164,5 @@ Moved or folded: <what, and where to>
 Flagged: <claims to check, things missing, things that seem wrong>
 ```
 
-Run `pwsh -NoProfile -File eng/check-docs.ps1` and `node docs/scripts/prose-check.mjs --base <ref> <files>` before
+Run `./proto docs check` and `./proto docs prose --base <ref> <files>` before
 reporting. `--base` shows each page's reading words before and after the edit; a page that grows needs a reason.

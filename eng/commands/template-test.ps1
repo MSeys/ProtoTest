@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+Installs the packed template and builds and tests a starter for every runner.
+#>
 [CmdletBinding()]
 param(
     [string]$Configuration = "Release",
@@ -12,13 +16,14 @@ param(
 $ErrorActionPreference = "Stop"
 if (Test-Path variable:PSNativeCommandUseErrorActionPreference) { $PSNativeCommandUseErrorActionPreference = $false }
 
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 if ([string]::IsNullOrWhiteSpace($PackagesDirectory)) {
     $PackagesDirectory = Join-Path $repository "artifacts/packages"
 }
 
 if (-not (Test-Path -LiteralPath $PackagesDirectory)) {
-    throw "The packages directory '$PackagesDirectory' does not exist; run eng/pack.ps1 first."
+    throw "The packages directory '$PackagesDirectory' does not exist; run ./proto pack first."
 }
 
 $package = Get-ChildItem -LiteralPath $PackagesDirectory -Filter "ProtoTest.Templates.*.nupkg" |

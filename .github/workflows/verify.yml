@@ -72,7 +72,7 @@ jobs:
 
       - name: Restore, build, and test every runner
         shell: pwsh
-        run: ./eng/test.ps1 -Configuration Release
+        run: ./proto.ps1 test -Configuration Release
 
       # The viewer's recipe traces are regenerated from the demo this job just built and tested, so a
       # recipe filter that matches no test (or a generator break) fails CI. The committed snapshots
@@ -80,38 +80,38 @@ jobs:
       # (records facts/gotchas.md, "Versioning, feeds and gates").
       - name: Regenerate the viewer recipe traces
         shell: pwsh
-        run: ./eng/generate-recipe-traces.ps1 -NoBuild
+        run: ./proto.ps1 traces recipes -NoBuild
 
       # The lesson traces are the evidence the Learn lessons embed. Same contract as the recipe
       # traces: the filters, the expected outcomes and the file set are checked, while the run id and
       # timestamps make byte equality impossible.
       - name: Regenerate the lesson traces
         shell: pwsh
-        run: ./eng/generate-lesson-traces.ps1 -NoBuild
+        run: ./proto.ps1 traces lessons -NoBuild
 
       # The gate fixtures, now with the Release test binaries the MTP zero-test guards need.
       - name: Test the gate scripts
         shell: pwsh
-        run: ./eng/test-gates.ps1
+        run: ./proto.ps1 gates test
 
       - name: Verify formatting and analyzers
         shell: pwsh
-        run: ./eng/lint.ps1 -NoRestore
+        run: ./proto.ps1 lint -NoRestore
 
       - name: Validate NuGet packages
         shell: pwsh
-        run: ./eng/pack.ps1 -Configuration Release -NoBuild -NoRestore
+        run: ./proto.ps1 pack -Configuration Release -NoBuild -NoRestore
 
       - name: Validate release plan
         shell: pwsh
-        run: ./eng/release.ps1 -Configuration Release -DryRun
+        run: ./proto.ps1 release publish -Configuration Release -DryRun
 
       # The template is packed with every run; this proves the package actually installs, generates a
       # project against the just-packed packages for every runner the template offers, and builds and
       # tests each one. The gate fixtures run the same script wherever the packed feed exists.
       - name: Smoke-test the starter template
         shell: pwsh
-        run: ./eng/test-template.ps1
+        run: ./proto.ps1 template test
 
       - name: Keep the validated release packages
         if: inputs.upload_packages
@@ -220,14 +220,14 @@ jobs:
       # machine that has the records checkout.
       - name: Check the documentation content
         shell: pwsh
-        run: ./eng/check-docs.ps1
+        run: ./proto.ps1 docs check
 
       # The gate scripts are themselves gated: the fixtures run verify.ps1, check-docs.ps1, lint.ps1
       # and release.ps1 in throwaway repositories. The MTP runner guards skip here (no built test
       # binaries) and run in the build-and-test job below, after the suites are built.
       - name: Test the gate scripts
         shell: pwsh
-        run: ./eng/test-gates.ps1
+        run: ./proto.ps1 gates test
 
       # Both builds run stylelint, type checks and link checks; they are not part of the dotnet build,
       # so without this job a broken page or type error would only surface after merge.
@@ -277,4 +277,4 @@ jobs:
       # Browser and broker suites skip themselves when no browser or broker is installed here.
       - name: Run the full test suite
         shell: pwsh
-        run: ./eng/test.ps1 -Configuration Release
+        run: ./proto.ps1 test -Configuration Release

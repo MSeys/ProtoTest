@@ -99,7 +99,7 @@ The determinism lessons read these from the suite itself:
 
 ## Lesson traces (for lesson authors)
 
-`eng/generate-lesson-traces.ps1` runs each test below and writes the trace to `docs/static/lessons/`. A lesson embeds the file it names, so the evidence is the run's own and a lesson never invents a failure.
+`./proto traces lessons` runs each test below and writes the trace to `docs/static/lessons/`. A lesson embeds the file it names, so the evidence is the run's own and a lesson never invents a failure.
 
 | Trace | Test | What the run proves | Used by |
 | --- | --- | --- | --- |

@@ -113,7 +113,7 @@ using var response = await Proto.Context.Rest().PostAsync("/invoices/42/pay");
 
 var paid = await Proto.Context.Messaging().AwaitAsync(
     "InvoicePaid",
-    message => message.Payload!.Contains("\"invoiceId\":42"));
+    message => message.MatchesShape(new { invoiceId = 42 }));
 
 paid.Should.MatchShape(new { invoiceId = 42, amount = 10.5m });
 ```

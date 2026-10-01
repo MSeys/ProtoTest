@@ -38,6 +38,75 @@ public sealed class ProtoMessagingAssertionsTests
     }
 
     [Test]
+    public void MatchesShape_ShouldCompareWholeValuesAndAllowOtherFields()
+    {
+        var message = new ProtoMessage("invoice.paid", """{"id":123,"status":"paid"}""");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(message.MatchesShape(new { id = 123 }), Is.True, "extra fields are allowed");
+            Assert.That(message.MatchesShape(new { id = 12 }), Is.False, "12 is not a prefix match for 123");
+            Assert.That(message.MatchesShape(new { id = 123, status = "open" }), Is.False);
+        }
+    }
+
+    [Test]
+    public void MatchesShape_ShouldBeFalseForEmptyOrNonJsonPayloads()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(new ProtoMessage("invoice.paid", null).MatchesShape(new { id = 42 }), Is.False);
+            Assert.That(new ProtoMessage("invoice.paid", " ").MatchesShape(new { id = 42 }), Is.False);
+            Assert.That(new ProtoMessage("invoice.paid", "not json").MatchesShape(new { id = 42 }), Is.False);
+        }
+    }
+
+    [Test]
+    public void MatchesShape_Exact_ShouldBeFalseForAFieldTheShapeDoesNotMention()
+    {
+        var message = new ProtoMessage("invoice.paid", """{"id":42,"status":"paid"}""");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(message.MatchesShape(new { id = 42 }, exact: true), Is.False);
+            Assert.That(message.MatchesShape(new { id = 42, status = "paid" }, exact: true), Is.True);
+        }
+    }
+
+    [Test]
+    public async Task MatchesShape_ShouldPickTheMessageInAnAwaitWithoutRecordingACheck()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddMessaging();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("messaging matches shape", TestMethods.Placeholder);
+        var messages = context.Messaging();
+        await messages.PublishAsync("invoice.paid", """{"id":123,"status":"paid"}""");
+        await messages.PublishAsync("invoice.paid", """{"id":12,"status":"paid"}""");
+
+        var message = await messages.AwaitAsync(
+            "invoice.paid",
+            candidate => candidate.MatchesShape(new { id = 12 }),
+            TimeSpan.FromSeconds(5));
+
+        Assert.That(message.Payload, Does.Contain("\"id\":12,"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                host.Trace.Snapshot().Tests.Single().Entries.Where(entry => entry.Kind == "assert.json.shape"),
+                Is.Empty,
+                "a predicate check is not an assertion");
+            Assert.That(
+                context.RecordedObservations.Where(item => item.Kind == "messaging.contract.shape"),
+                Is.Empty);
+        }
+
+        await host.StopAsync();
+    }
+
+    [Test]
     public async Task MatchShape_ShouldNameTheDestinationOnMismatch()
     {
         var builder = new ProtoHostBuilder();

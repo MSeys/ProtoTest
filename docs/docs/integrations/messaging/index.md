@@ -18,7 +18,7 @@ public async Task Paying_an_invoice_publishes_an_event()
 
     var message = await messages.AwaitAsync(
         "invoice.paid",
-        candidate => candidate.Payload!.Contains("\"id\":42"));
+        candidate => candidate.MatchesShape(new { id = 42 }));
 
     message.Should.MatchShape(new { id = 42 });
 }
@@ -369,7 +369,7 @@ overloads publish under the destination itself. The key is bound when the keyed 
 delivers only messages published after that. Pre-bind the destination with `Tap` to keep act-then-await reliable.
 MassTransit addresses contract types, not routing, so its adapter rejects a routing key.
 
-**Shape checks.** `message.Should.MatchShape(shape)` uses the same [shape matcher](../rest/responses.md#matchshape)
+**Shape checks.** `candidate.MatchesShape(shape)` picks a message in an `AwaitAsync` predicate: it answers true or false, records nothing, and is false for an empty or non-JSON payload. `message.Should.MatchShape(shape)` then asserts it with the same [shape matcher](../rest/responses.md#matchshape)
 as REST, GraphQL and gRPC. `MatchShape(shape, exact: true)` is the exhaustive form. A mismatch throws
 `MessagingAssertionException`, starting with the destination, with the shared `JsonShapeMismatchException` as its
 `InnerException`.

@@ -80,7 +80,10 @@ internal sealed class ProtoDataRedactionPolicy
             return "[REDACTED]";
         }
 
-        if (type == typeof(string) || type.IsPrimitive || type.IsEnum)
+        // Dates, times, decimals and GUIDs are leaves: walking their properties never ends, because a
+        // DateTime's Date is another DateTime and a boxed value is a new object to the cycle check.
+        if (type == typeof(string) || type.IsPrimitive || type.IsEnum
+            || (type.IsValueType && value is IFormattable) || value is Uri)
         {
             return value;
         }

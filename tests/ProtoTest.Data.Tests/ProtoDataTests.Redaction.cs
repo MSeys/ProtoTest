@@ -34,6 +34,38 @@ public sealed partial class ProtoDataTests
     }
 
     [Test]
+    public async Task Build_WithDateTimeDecimalAndGuidMembers_ShouldTraceThemAsValues()
+    {
+        // Walking a DateTime's properties never ends (its Date is another DateTime), so the trace
+        // writer treats formattable value types as leaves instead of overflowing the stack.
+        var at = new DateTimeOffset(2026, 10, 1, 9, 30, 0, TimeSpan.Zero);
+        var builder = new ProtoHostBuilder().AddData();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        await host.StartTestAsync("dated data", TestMethods.Placeholder);
+
+        var built = Proto.Context.Data().For<Stamped>()
+            .With(x => x.At, at)
+            .With(x => x.Amount, 12.5m)
+            .Build();
+
+        var entries = host.Trace.Snapshot().Tests.Single().Entries
+            .Where(entry => entry.Kind == "data.value.resolve")
+            .ToDictionary(entry => entry.Attributes["data.member"]!, entry => entry.Attributes["data.value"]);
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+        await host.StopAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(built.At, Is.EqualTo(at));
+            Assert.That(entries[nameof(Stamped.At)], Does.Contain("2026-10-01"));
+            Assert.That(entries[nameof(Stamped.Amount)], Does.Contain("12.5"));
+            Assert.That(entries, Does.ContainKey(nameof(Stamped.Id)));
+        });
+    }
+
+    public sealed record Stamped(DateTimeOffset At, decimal Amount, Guid Id);
+
+    [Test]
     public async Task Trace_ShouldRedactConfiguredValueType()
     {
         var builder = new ProtoHostBuilder().AddData(data =>

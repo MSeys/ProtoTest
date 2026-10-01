@@ -56,7 +56,7 @@ cd Shop
 dotnet test
 ```
 
-When it works, the tests pass. The run also leaves two files in `Shop.Tests/bin/Debug/net10.0/TestResults/`: `prototest-{runId}.prototrace` and `Shop.html`. The first is the run's **trace**, the record of everything the run did. The second is the HTML report. Each run writes its own trace, so a rerun never overwrites the previous one.
+When it works, the tests pass. The run also leaves three files in `Shop.Tests/bin/Debug/net10.0/TestResults/`: `prototest-{runId}.prototrace`, `Shop.json` and `Shop.html`. The first is the run's **trace**, the record of everything the run did. The other two are the report, as JSON for tools and as HTML for you. Each run writes its own trace, so a rerun never overwrites the previous one.
 
 To look at the results, open the report. It shows the verdict and the API routes the run covered. You can also drop the trace on [trace.prototest.dev](https://trace.prototest.dev), the viewer for traces.
 
@@ -79,17 +79,23 @@ Shop/
 ├── Shop.slnx
 ├── global.json                    # xunit3 and tunit only: the Microsoft.Testing.Platform opt-in
 ├── README.md
+├── AGENTS.md                      # how a coding agent runs, reads and extends the suite
+├── .mcp.json                      # registers the ProtoTest MCP server for Claude Code
+├── .config/dotnet-tools.json      # pins the prototest CLI and the prototest-mcp server
+├── .claude/skills/                # prototest-evidence-loop and prototest-write-test
 ├── Shop.Api/
 │   ├── Shop.Api.csproj
 │   ├── Program.cs                 # POST /api/orders, GET /api/orders/{id}, in-memory store
 │   └── Orders.cs                  # NewOrder, Order, OrderStore
 └── Shop.Tests/
-    ├── Shop.Tests.csproj          # the runner package plus AspNetCore, Rest, Reporting
-    ├── Setup.cs                   # hosts the API in-process, registers REST, tracing, the HTML report
+    ├── Shop.Tests.csproj          # the runner package plus AspNetCore, Rest, Reporting, Analyzers
+    ├── Setup.cs                   # hosts the API in-process, registers REST, tracing, the reports
     └── OrderTests.cs              # four tests: create, read back, validation, not found
 ```
 
-`Setup.cs` starts as `Setup.{runner}.cs` and is renamed for the runner you picked. The test project always adds `ProtoTest.AspNetCore`, `ProtoTest.Rest` and `ProtoTest.Reporting` next to the runner package. TUnit also sets `OutputType` to `Exe`, because TUnit requires it.
+`Setup.cs` starts as `Setup.{runner}.cs` and is renamed for the runner you picked. The test project always adds `ProtoTest.AspNetCore`, `ProtoTest.Rest` and `ProtoTest.Reporting` next to the runner package, and `ProtoTest.Analyzers` for the build-time warnings. TUnit also sets `OutputType` to `Exe`, because TUnit requires it.
+
+The agent files cost nothing until you use them. Run `dotnet tool restore` once and a coding agent that reads `.mcp.json` can list the runs and read each failure through the [MCP server](../agent-workflows/setup.md). Delete them if you do not use an agent.
 
 </details>
 

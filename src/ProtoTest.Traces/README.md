@@ -26,8 +26,8 @@ embedded sources with their content on request, the tracked state (`ReadState`) 
 report (`ProtoTraceReport.TryRead`).
 
 `ProtoTraceDiscovery.Discover(folder)` finds the readable runs a folder holds: its `TestResults/`
-first, then, when that yields no readable run, the tree with `bin`, `obj`, `.git` and `node_modules`
-pruned, newest first by the run's recorded start time. An archive that cannot be read comes back with
+first, then, when that yields no readable run, the tree with `obj`, `.git` and `node_modules` pruned
+and only the `TestResults` folders read inside `bin`, newest first by the run's recorded start time. An archive that cannot be read comes back with
 the reason it was skipped instead of failing the scan.
 
 ## Limits

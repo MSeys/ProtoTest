@@ -35,7 +35,7 @@ builder
 
 Both files are also added to the [`.prototrace` archive](./prototrace-archive.md#the-file-format) under `resources/run/{SinkName}/run-artifact-{n}/{fileName}`, so a single artifact from CI contains the trace and the reports.
 
-The template and the sample set their own paths, so what a reader sees differs from the defaults by design. The template writes `TestResults/Shop.html`, and the sample writes `report.*` under its output folder.
+The template and the sample set their own paths, so what a reader sees differs from the defaults by design. The template writes `TestResults/Shop.json` and `TestResults/Shop.html`, and the sample writes `report.*` under its output folder.
 
 Items arrive sorted by target, category and identifier. Only top-level items are passed, so walk `Children` for nested ones.
 

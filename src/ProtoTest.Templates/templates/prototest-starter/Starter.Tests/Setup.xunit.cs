@@ -9,7 +9,7 @@ using Xunit;
 
 /// <summary>
 /// Composes the suite once for the whole run: the API hosted in-process, a REST client for it, coverage of
-/// the endpoints the tests call, a trace of everything, and an HTML report. xUnit builds the collection
+/// the endpoints the tests call, a trace of everything, and a JSON and an HTML report. xUnit builds the collection
 /// fixture once per test process, before any test class runs.
 /// </summary>
 public sealed class ProtoTestFixture : ProtoTestAssembly
@@ -21,6 +21,7 @@ public sealed class ProtoTestFixture : ProtoTestAssembly
                 .AddRest(rest => rest
                     .AddClient("Api")
                     .AddCollector<RestCoverageCollector>()))
+            .AddSink<JsonReportSink>(sink => sink.OutputPath = "TestResults/Starter.json")
             .AddSink<HtmlReportSink>(sink => sink.OutputPath = "TestResults/Starter.html");
 }
 

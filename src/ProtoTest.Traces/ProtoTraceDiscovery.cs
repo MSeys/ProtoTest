@@ -18,14 +18,17 @@ public sealed record ProtoTraceFolderRuns(
 /// <summary>
 /// Finds the <c>.prototrace</c> archives a folder holds. One archive per run; the folder's
 /// <c>TestResults/</c> is searched first, and when it yields no readable run the folder tree is
-/// walked with build and tooling directories pruned. Recency is the run's recorded start time, not
+/// walked with build and tooling directories pruned. Inside <c>bin</c> only <c>TestResults</c> folders
+/// are read, where a suite's trace lands by default. Recency is the run's recorded start time, not
 /// a file timestamp, and an unreadable archive is skipped with its reason instead of failing the scan.
 /// </summary>
 public static class ProtoTraceDiscovery
 {
+    private const string BuildOutput = "bin";
+    private const string ResultsFolder = "TestResults";
+
     private static readonly HashSet<string> s_prunedDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
-        "bin",
         "obj",
         ".git",
         "node_modules"
@@ -43,7 +46,7 @@ public static class ProtoTraceDiscovery
 
         var runs = new List<ProtoTraceRun>();
         var skipped = new List<ProtoTraceSkippedArchive>();
-        var testResults = Path.Combine(root, "TestResults");
+        var testResults = Path.Combine(root, ResultsFolder);
         if (Directory.Exists(testResults))
         {
             Collect(EnumerateTraces(testResults, prune: false), runs, skipped);
@@ -146,13 +149,44 @@ public static class ProtoTraceDiscovery
 
             foreach (var subdirectory in directories)
             {
-                if (prune && s_prunedDirectories.Contains(Path.GetFileName(subdirectory)))
+                var name = Path.GetFileName(subdirectory);
+                if (prune && string.Equals(name, BuildOutput, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var results in ResultsFoldersIn(subdirectory))
+                    {
+                        pending.Push(results);
+                    }
+
+                    continue;
+                }
+
+                if (prune && s_prunedDirectories.Contains(name))
                 {
                     continue;
                 }
 
                 pending.Push(subdirectory);
             }
+        }
+    }
+
+    // A test project's default trace lands in bin/<configuration>/<framework>/TestResults; the rest of
+    // bin is build output and copied fixtures, never a run. A results folder inside another is read once.
+    private static IEnumerable<string> ResultsFoldersIn(string buildOutput)
+    {
+        try
+        {
+            var folders = Directory
+                .GetDirectories(buildOutput, ResultsFolder, SearchOption.AllDirectories)
+                .OrderBy(folder => folder, StringComparer.Ordinal)
+                .ToList();
+            return folders
+                .Where(folder => !folders.Any(outer => folder.StartsWith(outer + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
+                .ToArray();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return [];
         }
     }
 }

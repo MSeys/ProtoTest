@@ -13,7 +13,7 @@ using ProtoTest.Xunit3;
 
 /// <summary>
 /// Composes the suite once for the whole run: the API hosted in-process, a REST client for it, coverage of
-/// the endpoints the tests call, a trace of everything, and an HTML report. The assembly fixture runs it
+/// the endpoints the tests call, a trace of everything, and a JSON and an HTML report. The assembly fixture runs it
 /// once per test process.
 /// </summary>
 public sealed class Setup : ProtoTestAssembly
@@ -25,5 +25,6 @@ public sealed class Setup : ProtoTestAssembly
                 .AddRest(rest => rest
                     .AddClient("Api")
                     .AddCollector<RestCoverageCollector>()))
+            .AddSink<JsonReportSink>(sink => sink.OutputPath = "TestResults/Starter.json")
             .AddSink<HtmlReportSink>(sink => sink.OutputPath = "TestResults/Starter.html");
 }

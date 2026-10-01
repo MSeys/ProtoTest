@@ -41,6 +41,27 @@ public sealed class VocabularyTests
     }
 
     [Test]
+    public void AutoWrapAttributes_ShouldPinTheShippedNamesAndWhatTheyWrap()
+    {
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                ProtoTestVocabulary.AutoWrapAttributes.Keys,
+                Is.EquivalentTo(new[]
+                {
+                    typeof(ProtoTest.NUnit.ProtoTestAutoWrapAttribute).FullName!,
+                    typeof(ProtoTest.Xunit3.ProtoTestAutoWrapAttribute).FullName!,
+                }));
+            Assert.That(
+                ProtoTestVocabulary.AutoWrapAttributes[typeof(ProtoTest.NUnit.ProtoTestAutoWrapAttribute).FullName!],
+                Is.EquivalentTo(new[] { typeof(global::NUnit.Framework.TestAttribute).FullName! }));
+            Assert.That(
+                ProtoTestVocabulary.AutoWrapAttributes[typeof(ProtoTest.Xunit3.ProtoTestAutoWrapAttribute).FullName!],
+                Is.EquivalentTo(new[] { typeof(Xunit.FactAttribute).FullName!, typeof(Xunit.TheoryAttribute).FullName! }));
+        }
+    }
+
+    [Test]
     public void TUnitTestAttribute_ShouldStayOutsideTheVocabulary()
     {
         using (Assert.EnterMultipleScope())

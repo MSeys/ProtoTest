@@ -1,6 +1,6 @@
 # ProtoTest.Mcp.DemoEndpoint
 
-A demo-only MCP endpoint. It serves the same read-only tools as the local `prototest-mcp` server (`list_runs`, `get_failure`, `get_diagnosis`, `get_coverage`) over the Streamable HTTP transport, against the one bundled `viewer/public/demos/prototest-demo.prototrace` archive.
+A demo-only MCP endpoint. It serves the same read-only tools as the local `prototest-mcp` server (`list_runs`, `get_failure`, `get_diagnosis`, `get_coverage`, `get_suite_map`) over the Streamable HTTP transport, against the one bundled `viewer/public/demos/prototest-demo.prototrace` archive.
 
 ```bash
 dotnet run --project samples/ProtoTest.Mcp.DemoEndpoint

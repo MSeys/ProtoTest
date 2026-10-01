@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "prototest.cli": {
+      "version": "PROTOTEST_VERSION",
+      "commands": ["prototest"],
+      "rollForward": false
+    },
+    "prototest.mcp": {
+      "version": "PROTOTEST_VERSION",
+      "commands": ["prototest-mcp"],
+      "rollForward": false
+    }
+  }
+}

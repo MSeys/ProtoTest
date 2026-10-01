@@ -23,6 +23,8 @@
     <Compile Remove="templates/**" />
     <None Remove="templates/**" />
     <Content Include="templates/**" Exclude="templates/**/bin/**;templates/**/obj/**;templates/**/TestResults/**;templates/prototest-starter/.template.config/template.json" />
+    <!-- The starter carries the repository's agent skills, so a new project starts with the same ones. -->
+    <Content Include="../../skills/prototest-*/SKILL.md" Pack="true" PackagePath="content/templates/prototest-starter/.claude/skills/" />
   </ItemGroup>
 
   <!--

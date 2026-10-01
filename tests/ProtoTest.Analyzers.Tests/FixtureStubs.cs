@@ -39,4 +39,25 @@ internal static class FixtureStubs
             public sealed class TestAttribute : System.Attribute { }
         }
         """;
+
+    /// <summary>TUnit with the ProtoTest executor registered for the assembly.</summary>
+    public const string TUnitWithExecutor = """
+        [assembly: TUnit.Core.Executors.TestExecutor<ProtoTest.TUnit.ProtoTestExecutor>]
+
+        namespace TUnit.Core
+        {
+            public sealed class TestAttribute : System.Attribute { }
+        }
+
+        namespace TUnit.Core.Executors
+        {
+            [System.AttributeUsage(System.AttributeTargets.All)]
+            public sealed class TestExecutorAttribute<T> : System.Attribute { }
+        }
+
+        namespace ProtoTest.TUnit
+        {
+            public class ProtoTestExecutor { }
+        }
+        """;
 }

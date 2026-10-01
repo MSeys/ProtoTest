@@ -69,14 +69,32 @@ try {
             if ($LASTEXITCODE -ne 0) { throw "restore failed for the $runner starter." }
             dotnet build Starter.slnx --configuration $Configuration --no-restore
             if ($LASTEXITCODE -ne 0) { throw "build failed for the $runner starter." }
-            dotnet test Starter.Tests/Starter.Tests.csproj --configuration $Configuration --no-build --no-restore
+            # The MTP variants select the Microsoft Testing Platform in global.json, where dotnet test
+            # takes the project through --project; the VSTest variants take it as the argument.
+            $usesMtp = (Test-Path -LiteralPath "global.json") -and
+                ((Get-Content -LiteralPath "global.json" -Raw) -match "Microsoft\.Testing\.Platform")
+            $project = @("Starter.Tests/Starter.Tests.csproj")
+            if ($usesMtp) { $project = @("--project") + $project }
+            dotnet test @project --configuration $Configuration --no-build --no-restore
             if ($LASTEXITCODE -ne 0) { throw "test failed for the $runner starter." }
+
+            # The agent setup works as shipped: the pinned tools restore from this feed, and the CLI
+            # reads the trace the run just wrote.
+            foreach ($agentFile in @("AGENTS.md", ".mcp.json", ".claude/skills/prototest-evidence-loop/SKILL.md", ".claude/skills/prototest-write-test/SKILL.md")) {
+                if (-not (Test-Path -LiteralPath $agentFile)) { throw "the $runner starter has no $agentFile." }
+            }
+            dotnet tool restore
+            if ($LASTEXITCODE -ne 0) { throw "dotnet tool restore failed for the $runner starter." }
+            $trace = Get-ChildItem -Path "Starter.Tests" -Recurse -Filter "*.prototrace" | Select-Object -First 1
+            if (-not $trace) { throw "the $runner starter wrote no trace." }
+            dotnet tool run prototest summary $trace.FullName
+            if ($LASTEXITCODE -ne 0) { throw "prototest summary failed for the $runner starter's trace." }
         }
         finally {
             Pop-Location
         }
 
-        Write-Host "template starter: $runner generated, restored, built and tested."
+        Write-Host "template starter: $runner generated, restored, built, tested and read back."
     }
 }
 finally {

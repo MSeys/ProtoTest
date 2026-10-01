@@ -20,6 +20,7 @@
     <ProjectReference Include="..\ProtoTest.SampleApp\ProtoTest.SampleApp.csproj" />
     <ProjectReference Include="..\ProtoTest.SampleApp.Contracts\ProtoTest.SampleApp.Contracts.csproj" />
     <ProjectReference Include="..\ProtoTest.SampleApp.Domain\ProtoTest.SampleApp.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.Analyzers\ProtoTest.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\..\src\ProtoTest.Data\ProtoTest.Data.csproj" />

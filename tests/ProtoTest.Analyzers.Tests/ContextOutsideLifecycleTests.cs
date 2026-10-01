@@ -225,4 +225,49 @@ public class Suite
 
         Assert.That(diagnostics, Is.Empty);
     }
+
+    [Test]
+    public async Task PlainNUnitTestUnderAutoWrap_ShouldNotReport()
+    {
+        var diagnostics = await AnalyzerTestFixture.GetDiagnosticsAsync(new ContextWithoutLifecycleAnalyzer(), """
+            using NUnit.Framework;
+            using ProtoTest.Core;
+            using ProtoTest.NUnit;
+
+            [assembly: ProtoTestAutoWrap]
+
+            public class Suite
+            {
+                [Test]
+                public void WrappedTest()
+                {
+                    _ = Proto.Context;
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty, "auto-wrap runs every plain [Test] inside the lifecycle");
+    }
+
+    [Test]
+    public async Task PlainXunit3FactUnderAutoWrap_ShouldNotReport()
+    {
+        var diagnostics = await AnalyzerTestFixture.GetDiagnosticsAsync(new ContextWithoutLifecycleAnalyzer(), """
+            using Xunit;
+            using ProtoTest.Core;
+
+            [assembly: ProtoTest.Xunit3.ProtoTestAutoWrap]
+
+            public class Suite
+            {
+                [Fact]
+                public void WrappedFact()
+                {
+                    _ = Proto.Context;
+                }
+            }
+            """);
+
+        Assert.That(diagnostics, Is.Empty, "auto-wrap runs every plain [Fact] inside the lifecycle");
+    }
 }

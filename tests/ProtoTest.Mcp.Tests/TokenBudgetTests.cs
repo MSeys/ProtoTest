@@ -24,6 +24,7 @@ public sealed class TokenBudgetTests
             ["includeUncovered"] = true,
             ["limit"] = 1000
         });
+        var suiteMap = await session.CallToolAsync("get_suite_map");
 
         using (Assert.EnterMultipleScope())
         {
@@ -38,6 +39,8 @@ public sealed class TokenBudgetTests
             Assert.That(McpSession.Text(diagnosis).Length, Is.LessThan(16 * 1024));
             Assert.That(McpSession.Text(context).Length, Is.LessThan(32 * 1024));
             Assert.That(McpSession.Text(pagedToTheCap).Length, Is.LessThan(32 * 1024));
+            Assert.That(suiteMap.IsError, Is.Not.True);
+            Assert.That(McpSession.Text(suiteMap).Length, Is.LessThan(16 * 1024));
         }
 
         var failureJson = McpSession.Json(failure);
@@ -55,6 +58,8 @@ public sealed class TokenBudgetTests
             Assert.That(coverageJson.GetProperty("uncoveredTotal").GetInt32(), Is.EqualTo(1000));
             Assert.That(coverageJson.GetProperty("truncated").GetBoolean(), Is.True);
             Assert.That(McpSession.Json(pagedToTheCap).GetProperty("uncovered").GetArrayLength(), Is.EqualTo(200));
+            Assert.That(McpSession.Json(suiteMap).GetProperty("coverageGaps").GetProperty("units").GetArrayLength(), Is.EqualTo(50));
+            Assert.That(McpSession.Json(suiteMap).GetProperty("coverageGaps").GetProperty("truncated").GetBoolean(), Is.True);
         }
     }
 }

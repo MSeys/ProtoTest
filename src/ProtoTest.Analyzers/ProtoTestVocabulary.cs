@@ -1,5 +1,6 @@
 namespace ProtoTest.Analyzers;
 
+using System.Collections.Generic;
 using System.Collections.Immutable;
 
 /// <summary>
@@ -30,6 +31,29 @@ internal static class ProtoTestVocabulary
         "NUnit.Framework.TestAttribute",
         "Xunit.FactAttribute",
         "Xunit.TheoryAttribute");
+
+    /// <summary>
+    /// Assembly attributes that run a runner's plain tests inside the lifecycle, with the plain
+    /// attributes each one wraps. MSTest and xUnit v2 have no such mode.
+    /// </summary>
+    public static readonly ImmutableDictionary<string, ImmutableHashSet<string>> AutoWrapAttributes =
+        ImmutableDictionary.CreateRange(
+            StringComparer.Ordinal,
+            new[]
+            {
+                new KeyValuePair<string, ImmutableHashSet<string>>(
+                    "ProtoTest.NUnit.ProtoTestAutoWrapAttribute",
+                    ImmutableHashSet.Create(StringComparer.Ordinal, "NUnit.Framework.TestAttribute")),
+                new KeyValuePair<string, ImmutableHashSet<string>>(
+                    "ProtoTest.Xunit3.ProtoTestAutoWrapAttribute",
+                    ImmutableHashSet.Create(StringComparer.Ordinal, "Xunit.FactAttribute", "Xunit.TheoryAttribute"))
+            });
+
+    /// <summary>TUnit's test attribute; its tests run in the lifecycle when the ProtoTest executor is registered.</summary>
+    public const string TUnitTestAttribute = "TUnit.Core.TestAttribute";
+
+    /// <summary>The TUnit executor that wraps every test it runs in the lifecycle.</summary>
+    public const string TUnitExecutor = "ProtoTest.TUnit.ProtoTestExecutor";
 
     /// <summary>The one static gateway the ambient execution context is read through.</summary>
     public const string ContextType = "ProtoTest.Core.Proto";

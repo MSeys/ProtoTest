@@ -122,12 +122,12 @@ flowchart TD
     start -->|"neither"| env["PROTOTEST_PROJECT, else the working directory"]
     env --> pr
     pr -->|"yes"| stop["Use it and stop there"]
-    pr -->|"no"| walk["Walk the tree, skipping<br/>bin, obj, .git, node_modules"]
+    pr -->|"no"| walk["Walk the tree, skipping obj, .git, node_modules<br/>inside bin, only TestResults"]
 ```
 
 "Newest" is the run's recorded start time, never a file timestamp. An archive the reader cannot open is skipped with a reason in `list_runs` and never guessed at.
 
-The default trace lands below the test project's build output, and the walk skips `bin`, so the server cannot see it from the repository root. Give the suite a results folder the server can see. The [continuous integration page](../continuous-integration/index.md#put-every-artifact-in-one-place) sets that up with one environment variable, so CI and local runs write to the same place:
+The default trace lands in the test project's build output, `bin/<configuration>/<framework>/TestResults`. The walk reads those folders and nothing else inside `bin`, so a fixture copied to the output is never taken for a run. A results folder of your own is still the better setup: one place for every run, and the first place the server looks. The [continuous integration page](../continuous-integration/index.md#put-every-artifact-in-one-place) sets that up with one environment variable, so CI and local runs write to the same place:
 
 ```csharp
 var results = Environment.GetEnvironmentVariable("PROTOTEST_RESULTS")
@@ -141,18 +141,18 @@ Set `PROTOTEST_RESULTS` to an absolute path such as `<repository>/TestResults` w
 
 ## Give the agent the skill
 
-The repository carries one skill that teaches the evidence loop and the four tools: [`skills/prototest-evidence-loop/SKILL.md`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-evidence-loop/SKILL.md). It is copy-in, not an install.
+The repository carries two skills. [`prototest-evidence-loop`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-evidence-loop/SKILL.md) teaches the loop from a red test to a fix. [`prototest-write-test`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-write-test/SKILL.md) teaches writing a new test that reuses what the suite already composes, and proving it. Both are copy-in, not an install.
 
 A client that reads skills folders (Claude Code, for example) loads it from its skills directory. From a checkout of the ProtoTest repository:
 
 ```bash
 mkdir -p .claude/skills
-cp -r skills/prototest-evidence-loop .claude/skills/
+cp -r skills/prototest-evidence-loop skills/prototest-write-test .claude/skills/
 ```
 
-Otherwise download the file from the repository and place it in the same layout. A client without a skills folder reads the file as an instruction instead: paste its body into the client's rules or instructions file.
+A project made with `dotnet new prototest` already has both in `.claude/skills/`. Otherwise download the files from the repository and place it in the same layout. A client without a skills folder reads a file as an instruction instead: paste its body into the client's rules or instructions file.
 
-The skill is optional. The MCP server's tool descriptions are the contract, so an agent without the bundle can still list the tools and work from them.
+The skills are optional. The MCP server's tool descriptions are the contract, so an agent without the bundle can still list the tools and work from them.
 
 ## What the agent can see
 
@@ -187,14 +187,17 @@ The run id, file paths and timestamps above stand in for any run. A real call re
 | `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the shape mismatches and the test's artifacts | 10 failed operations, 25 mismatches |
 | `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary` or `context`) | the run's diagnosis, or one failing test's context package | the [diagnosis caps](./diagnosis.md#limits) |
 | `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | coverage totals and uncovered units from the report the run embedded | 200 uncovered units |
+| `get_suite_map` | optional `runId` | what a new test reuses: the capabilities and infrastructure the host composed, the clients, data provisioners, attributes, page objects and devices the tests used, one passed example test per kind of work with its file, and the open coverage gaps | 50 entries per list, 50 gaps |
 
 [Diagnosis](./diagnosis.md) explains what `get_failure` and `get_diagnosis` return and what the agent can do with it.
+
+`get_suite_map` lists what the run recorded, not the whole test project: a provisioner or page object no test used in that run is not in it. A keyed element lists its shape, `OrdersPage.Order[key].Status`, not the key one run found it by.
 
 ## Limits
 
 - Read-only: no trace is written, no suite is rerun, the stdio host binds no port, and nothing on disk is modified.
 - Nothing leaves the machine by default: no telemetry, no uploads, no accounts. The stdio host reads local archives, stdout carries the protocol only, and logs go to stderr.
-- Hard caps bound every payload. `list_runs` returns at most 50 runs, `get_coverage` at most 200 uncovered units, and `get_diagnosis` applies the [diagnosis caps](./diagnosis.md#limits).
+- Hard caps bound every payload. `list_runs` returns at most 50 runs, `get_coverage` at most 200 uncovered units, `get_suite_map` at most 50 entries per list, and `get_diagnosis` applies the [diagnosis caps](./diagnosis.md#limits).
 - The server reads evidence that already exists. A run with no `.prototrace` is not visible to it, so write the trace first.
 - One external dependency: the official `ModelContextProtocol` SDK (Apache-2.0).
 - The demo endpoint is a local sample. See [Coding agents](./coding-agents.md#demo-endpoint).

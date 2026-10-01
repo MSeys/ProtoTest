@@ -30,7 +30,10 @@ public sealed class FailureDrills
         RequireDrills();
         var invoice = await Proto.Context.Data().IssueInvoiceAsync();
 
+        // The drill takes the shortcut PT0003 warns about, on purpose.
+#pragma warning disable PT0003
         await Task.Delay(TimeSpan.FromSeconds(1));
+#pragma warning restore PT0003
 
         using var organization = await Proto.Context.Rest().GetAsync("/api/v1/organization");
         organization
@@ -96,7 +99,10 @@ public sealed class FailureDrills
     public async Task TheAddressWasHardcodedForOneMachine()
     {
         RequireDrills();
+        // The drill takes the shortcut PT0004 warns about, on purpose.
+#pragma warning disable PT0004
         using var client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5099") };
+#pragma warning restore PT0004
 
         try
         {

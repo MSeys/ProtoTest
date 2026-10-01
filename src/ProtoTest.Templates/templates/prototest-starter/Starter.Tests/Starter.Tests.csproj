@@ -36,6 +36,7 @@
     <PackageReference Include="ProtoTest.AspNetCore" Version="PROTOTEST_VERSION" />
     <PackageReference Include="ProtoTest.Rest" Version="PROTOTEST_VERSION" />
     <PackageReference Include="ProtoTest.Reporting" Version="PROTOTEST_VERSION" />
+    <PackageReference Include="ProtoTest.Analyzers" Version="PROTOTEST_VERSION" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

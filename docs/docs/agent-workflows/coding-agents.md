@@ -62,11 +62,11 @@ The tools here are for your agent. How the project itself uses AI is on the [AI 
 
 ## The skills bundle
 
-The repository carries one skill: [`skills/prototest-evidence-loop/SKILL.md`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-evidence-loop/SKILL.md). It covers the loop, the four MCP tools, `prototest verify`, `prototest feedback`, and the docs.
+The repository carries two skills. [`skills/prototest-evidence-loop/SKILL.md`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-evidence-loop/SKILL.md) covers the loop, the MCP tools, `prototest verify`, `prototest feedback`, and the docs. [`skills/prototest-write-test/SKILL.md`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-write-test/SKILL.md) covers a new test: read the suite with `get_suite_map`, reuse its clients, provisioners, attributes and page objects, then prove the test with two runs and `prototest verify`.
 
-It is copy-in, not a package. No NuGet package carries it and no installer writes it. Copy the folder into your client's skills directory, or paste the file into the instructions file your client reads. [Setup](./setup.md#give-the-agent-the-skill) shows both.
+They are copy-in, not a package. A project made with `dotnet new prototest` starts with both in `.claude/skills/`, next to an `AGENTS.md` and a `.mcp.json`. Otherwise copy the folders into your client's skills directory, or paste the file into the instructions file your client reads. [Setup](./setup.md#give-the-agent-the-skill) shows both.
 
-The skill is optional. The MCP tool descriptions and the CLI output are the contract, and the skill only points at them. This page is written so an agent pointed at it can follow the same commands.
+The skills are optional. The MCP tool descriptions and the CLI output are the contract, and the skills only point at them. This page is written so an agent pointed at it can follow the same commands.
 
 ## What is local and what is not
 
@@ -81,13 +81,13 @@ Nothing is uploaded by default. There is no telemetry, no account and no ProtoTe
 
 ### Demo endpoint
 
-`samples/ProtoTest.Mcp.DemoEndpoint` is a sample project. Run it on your own machine and it serves the same four read-only tools over Streamable HTTP against one bundled demo trace. It takes no filesystem input. It enforces 60 requests per minute and binds to loopback.
+`samples/ProtoTest.Mcp.DemoEndpoint` is a sample project. Run it on your own machine and it serves the same five read-only tools over Streamable HTTP against one bundled demo trace. It takes no filesystem input. It enforces 60 requests per minute and binds to loopback.
 
 ```bash
 dotnet run --project samples/ProtoTest.Mcp.DemoEndpoint
 ```
 
-The endpoint is then at `http://127.0.0.1:5199/`: the root path, with no `/mcp` prefix. Point a client that speaks MCP Streamable HTTP at it (for example MCP Inspector) and call `list_runs`: one bundled trace, four tools, no account. A plain JSON-RPC POST without the Streamable HTTP headers is answered `406`. The local stdio server is the surface that reads your repository, and this one reads the bundled trace.
+The endpoint is then at `http://127.0.0.1:5199/`: the root path, with no `/mcp` prefix. Point a client that speaks MCP Streamable HTTP at it (for example MCP Inspector) and call `list_runs`: one bundled trace, five tools, no account. A plain JSON-RPC POST without the Streamable HTTP headers is answered `406`. The local stdio server is the surface that reads your repository, and this one reads the bundled trace.
 
 ## Check it
 

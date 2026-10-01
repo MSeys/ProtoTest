@@ -15,7 +15,7 @@ using ProtoTest.Traces;
 /// bounded shape.
 /// </summary>
 [McpServerToolType]
-public sealed class ProtoTestMcpTools(ProtoTestMcpOptions options)
+public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
 {
     private const int DefaultRunLimit = 10;
     private const int MaxRunLimit = 50;

@@ -66,6 +66,34 @@ public sealed class ProtoTraceDiscoveryTests
     }
 
     [Test]
+    public async Task Discover_ShouldReadTestResultsUnderBuildOutputAndNothingElseThere()
+    {
+        var folder = TraceFolders.Create();
+        try
+        {
+            var output = Directory.CreateDirectory(Path.Combine(folder, "Shop.Tests", "bin", "Release", "net10.0")).FullName;
+            var results = Directory.CreateDirectory(Path.Combine(output, "TestResults", "TestResults")).FullName;
+            var run = Path.Combine(output, "TestResults", "run.prototrace");
+            var nestedRun = Path.Combine(results, "nested.prototrace");
+            var copiedFixture = Path.Combine(Directory.CreateDirectory(Path.Combine(output, "Fixtures")).FullName, "fixture.prototrace");
+            await TraceFixtures.WritePassingAsync(run);
+            await TraceFixtures.WritePassingAsync(nestedRun);
+            await TraceFixtures.WritePassingAsync(copiedFixture);
+
+            var discovered = ProtoTraceDiscovery.Discover(folder);
+
+            Assert.That(
+                discovered.Runs.Select(found => found.TraceFile),
+                Is.EquivalentTo(new[] { Path.GetFullPath(run), Path.GetFullPath(nestedRun) }),
+                "a default trace is visible, read once, and a fixture copied to the output is not a run");
+        }
+        finally
+        {
+            TraceFolders.Delete(folder);
+        }
+    }
+
+    [Test]
     public void Discover_ShouldNameAMissingFolder()
     {
         var folder = Path.Combine(Path.GetTempPath(), $"prototest-missing-{Guid.NewGuid():N}");

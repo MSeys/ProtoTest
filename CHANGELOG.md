@@ -162,6 +162,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - xUnit v3 and TUnit pass their per-test cancellation token into the lifecycle; MSTest's 4.0.2 floor exposes none. [Execution context](https://prototest.dev/docs/foundation/execution-context#cancellation)
 - `dotnet new prototest --runner <name>` (nunit, xunit, xunit3, tunit or mstest) writes a suite per runner. [Overview](https://prototest.dev/docs/integrations/overview)
 - `ProtoTest.Analyzers` reports `PT0001` and `PT0002` for intent the runtime cannot check. [Analyzers](https://prototest.dev/docs/project/analyzers)
+- `PT0003` flags a fixed wait and `PT0004` a hand-made `HttpClient` in a ProtoTest test. [Analyzers](https://prototest.dev/docs/project/analyzers)
 
 #### Agent workflows
 
@@ -170,6 +171,9 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `prototest feedback` and `prototest verify` post the channels and print a verdict. [CLI](https://prototest.dev/docs/agent-workflows/cli)
 - `prototest-mcp` reads `.prototrace` files over stdio (`list_runs`, `get_failure`, `get_coverage`). [Setup](https://prototest.dev/docs/agent-workflows/setup)
 - `get_diagnosis` returns the run digest or one failing test's context package. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
+- `get_suite_map` lists what a new test reuses: clients, provisioners, attributes, pages, examples and gaps. [Setup](https://prototest.dev/docs/agent-workflows/setup#what-the-agent-can-see)
+- the `prototest-write-test` skill teaches writing a test on top of the suite and proving it. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents)
+- `dotnet new prototest` starts agent-ready: `AGENTS.md`, `.mcp.json`, both skills, a tool manifest and the analyzers. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents)
 - the demo endpoint (`samples/ProtoTest.Mcp.DemoEndpoint`) serves the same tools over the demo trace. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#demo-endpoint)
 - `ProtoDiagnosis.Read` builds a deterministic digest; `ReadContext` adds one test's context. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
 - `ProtoTest.Verification` compares a baseline and a candidate report. [Verification](https://prototest.dev/docs/agent-workflows/verification)
@@ -371,6 +375,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - a body `OperationCanceledException` records `Cancelled` under xUnit v2 as under the other adapters. [Runners](https://prototest.dev/docs/runners/overview)
 - TUnit parameterized rows record their arguments in the trace name. [TUnit](https://prototest.dev/docs/runners/tunit)
 - the MSTest floor accepts the standard template's version, and every runner page states its framework minimum. [Runners](https://prototest.dev/docs/runners/overview)
+- `PT0002` no longer reports a plain test under `[assembly: ProtoTestAutoWrap]`, which runs in the lifecycle. [Analyzers](https://prototest.dev/docs/project/analyzers)
 
 #### Agent workflows
 
@@ -382,6 +387,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 #### Traces and reporting
 
 - an unreadable archive under `TestResults` no longer hides readable runs elsewhere from `prototest index` and MCP discovery. [Setup](https://prototest.dev/docs/agent-workflows/setup)
+- `prototest index` and MCP discovery read the `TestResults` folders under `bin`, where a suite's trace lands by default. [Setup](https://prototest.dev/docs/agent-workflows/setup#where-it-reads)
 
 #### Viewer
 

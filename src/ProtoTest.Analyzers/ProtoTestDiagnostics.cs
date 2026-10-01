@@ -24,4 +24,22 @@ internal static class ProtoTestDiagnostics
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: "A runner-registered test without a ProtoTest attribute has no ambient execution context, so Proto.Context throws before the test can use it. Register the test with the ProtoTest attribute instead of the plain runner attribute.");
+
+    public static readonly DiagnosticDescriptor FixedWait = new(
+        id: "PT0003",
+        title: "ProtoTest test waits a fixed time",
+        messageFormat: "'{0}' waits a fixed time with {1}. Move time with Proto.Context.Clock, or wait for the condition with ProtoPolling.PollAsync.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A fixed wait is either too short on a slow machine, which makes the test flaky, or longer than needed everywhere else. A ProtoTest test moves time with the test clock, or polls for the condition it waits on with a deadline, and the trace records both.");
+
+    public static readonly DiagnosticDescriptor RawHttpClient = new(
+        id: "PT0004",
+        title: "ProtoTest test creates its own HttpClient",
+        messageFormat: "'{0}' creates an HttpClient. Call the application through Proto.Context.Rest() so the call is traced, asserted and counted toward coverage.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "A client the test creates itself bypasses the host's composed client: it does not reach an in-process application, records no trace operation and counts toward no coverage. Use the client the host registered.");
 }

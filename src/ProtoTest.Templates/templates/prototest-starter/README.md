@@ -6,13 +6,14 @@ A small ASP.NET Core API and a ProtoTest suite created by the `prototest` templa
 dotnet test
 ```
 
-The run writes a `.prototrace` file and an HTML coverage report under the test project's `TestResults` folder.
+The run writes a `.prototrace` file and a JSON and an HTML coverage report under the test project's `TestResults` folder.
 
 ## Where things are
 
 - `Starter.Api/Program.cs` contains the example API.
 - `Starter.Tests/Setup.cs` hosts the API in-process and registers REST, tracing and reporting.
 - `Starter.Tests/OrderTests.cs` contains the first scenarios.
+- `AGENTS.md`, `.mcp.json` and `.claude/skills` set up a coding agent: run `dotnet tool restore` once and the agent can read each run's trace through the ProtoTest MCP server.
 
 Try changing an expected value and open the trace at [trace.prototest.dev](https://trace.prototest.dev/). The file is processed in the browser and is not uploaded.
 

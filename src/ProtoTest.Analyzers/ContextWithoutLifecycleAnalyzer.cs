@@ -7,8 +7,8 @@ using Microsoft.CodeAnalysis.Operations;
 
 /// <summary>
 /// Reports a read of <c>Proto.Context</c> in a method the runner registers with its own plain test
-/// attribute. The ambient context only exists inside the ProtoTest lifecycle, so such a read is
-/// guaranteed to throw before the test can use it.
+/// attribute, outside an assembly auto-wrap. The ambient context only exists inside the ProtoTest
+/// lifecycle, so such a read is guaranteed to throw before the test can use it.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class ContextWithoutLifecycleAnalyzer : DiagnosticAnalyzer
@@ -32,9 +32,10 @@ public sealed class ContextWithoutLifecycleAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var method = EnclosingMethod(context.ContainingSymbol);
+        var method = ProtoTestMethods.EnclosingMethod(context.ContainingSymbol);
         if (method is null ||
-            method.Find(ProtoTestVocabulary.LifecycleAttributes) is not null)
+            method.Find(ProtoTestVocabulary.LifecycleAttributes) is not null ||
+            ProtoTestMethods.IsAutoWrapped(method))
         {
             return;
         }
@@ -50,19 +51,5 @@ public sealed class ContextWithoutLifecycleAnalyzer : DiagnosticAnalyzer
             reference.Syntax.GetLocation(),
             method.Name,
             plain.AttributeClass!.Name));
-    }
-
-    /// <summary>
-    /// Resolves the method a context read belongs to, so a local function reports through the test
-    /// that declares it. Lambdas have no symbol of their own and already report as their method.
-    /// </summary>
-    private static IMethodSymbol? EnclosingMethod(ISymbol symbol)
-    {
-        while (symbol is IMethodSymbol { MethodKind: MethodKind.LocalFunction } localFunction)
-        {
-            symbol = localFunction.ContainingSymbol;
-        }
-
-        return symbol as IMethodSymbol;
     }
 }

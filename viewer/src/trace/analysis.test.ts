@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { checkItems, deriveVisibility, diagnosisRule, findFailure, shapeMismatches, untracedGaps } from "./analysis";
 import { openTraceArchive } from "./archive";
 import { buildRun } from "./model";
-import type { Change, ChangeSource, Item, SectionItem, Span, TestTrace } from "./model";
+import type { ChangeSource, Item, SectionItem, Span, TestTrace } from "./model";
 
 function span(overrides: Partial<Span>): Span {
   return {

@@ -21,7 +21,7 @@ export default function CopyCode({text, label = 'Copy code'}: {text: string; lab
   }
   return (
     <>
-      <button type="button" className={styles.copy} onClick={copy}>
+      <button type="button" className={styles.copy} onClick={() => void copy()}>
         {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : label}
       </button>
       <span className={styles.status} role="status">

@@ -1,4 +1,4 @@
-import type { ChangeSource, Evidence, Failure, Item, SectionItem, ShapeMismatch, Span, TestTrace, Visibility } from "./model";
+import type { ChangeSource, Evidence, Failure, Item, ShapeMismatch, Span, TestTrace, Visibility } from "./model";
 
 /** Kinds whose span a failure belongs to, the same set the diagnosis names as call ancestors. */
 const callKinds = new Set(["http.request", "graphql.operation", "grpc.call"]);

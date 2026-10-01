@@ -13,6 +13,10 @@ indent_size = 4
 [*.{json,yml,yaml,md,csproj,props,targets,slnx}]
 indent_size = 2
 
+# The docs site and the viewer indent with two spaces.
+[*.{ts,tsx,vue,css,js,mjs,cjs}]
+indent_size = 2
+
 [*.cs]
 # Language conventions the codebase already follows; these fail the format gate when violated.
 csharp_style_namespace_declarations = file_scoped:warning

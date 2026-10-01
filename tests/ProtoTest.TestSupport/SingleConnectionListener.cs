@@ -78,5 +78,10 @@ public sealed class SingleConnectionListener : IAsyncDisposable
         {
             // Same, for the pending accept the stop disposed out from under.
         }
+        catch (IOException)
+        {
+            // The client hung up before the held request was answered, for example after its own
+            // timeout. Linux reports the late answer as a broken pipe.
+        }
     }
 }

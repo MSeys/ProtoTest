@@ -222,7 +222,7 @@ const integrations = [
   },
   {
     title: 'Reach devices and documents',
-    body: 'Typed device clients over WebSocket or MQTT, and assertions on generated Excel workbooks.',
+    body: 'Typed device clients over WebSocket, MQTT, TCP or a serial port, and assertions on generated Excel workbooks.',
     status: 'Preview',
     to: '/docs/integrations/overview',
   },

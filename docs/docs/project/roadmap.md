@@ -25,6 +25,7 @@ The current release made ProtoTest a platform proven on a real product. The sect
 - **More layers testable:** per-test service substitution and fault injection, expected and exhaustive shape assertions, traffic coverage, `Should` vocabulary parity, a built-in test user, WireMock, Aspire and MassTransit integrations, and template `--runner` variants.
 - **Topology under test:** container topology, published mode, fault injection and the nightly reference run.
 - **A second device protocol:** MQTT, after OCPP proved the transport model.
+- **Devices that send data strings:** TCP (connecting out or listening) and serial transports over shared stream framing, and typed messages that write and read a device's data strings.
 - **Agent and evidence layer:** `ProtoTest.Mcp`, the `prototest` CLI, `ProtoTest.Diagnosis`, `ProtoTest.Verification`, `ProtoTest.Feedback`, the feedback action, the static trace index, and the docs and skills pages.
 - **Showcase:** the benchmark republished on the reference demo and the trace showpiece.
 
@@ -48,7 +49,7 @@ Preview packages graduate the same way. The agent layer, devices, Sheets, Aspire
 | --- | --- |
 | **Wolverine.Tracking bridge**, the same shape as the MassTransit bridge | Users asking for it |
 | **Allure and ReportPortal sinks**, built on the existing sink contract | The integration template existing, then community interest |
-| **Further device transports** (TCP, serial, Sigfox) and MQTT variants | A request, interest or need from a real suite |
+| **Further device transports** (Sigfox, TLS for TCP) and MQTT variants | A request, interest or need from a real suite |
 
 ## Not planned, with reasons
 

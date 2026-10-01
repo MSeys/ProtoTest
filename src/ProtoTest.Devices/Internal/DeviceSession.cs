@@ -64,6 +64,30 @@ internal sealed class DeviceSession : IAsyncDisposable
         await GetConnectionAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async ValueTask<string> ListenAsync(CancellationToken cancellationToken = default)
+    {
+        var connection = await GetConnectionAsync(cancellationToken).ConfigureAwait(false);
+        if (connection is not IProtoDeviceListener listener)
+        {
+            throw new InvalidOperationException(
+                $"The device '{_endpoint.DeviceId}' connects out over {_transport.Name}; only a listening transport, " +
+                "such as a client registered with AddTcpListener, waits for the device to connect.");
+        }
+
+        _context.Trace.WriteEvent(
+            "device.listen",
+            $"Device · {_endpoint.DeviceId} · listening on {listener.ListenAddress}",
+            ProtoDeviceDiagnostics.TraceSource,
+            outcome: ProtoTraceOutcome.Succeeded,
+            attributes: new Dictionary<string, string?>(State(connected: false), StringComparer.Ordinal)
+            {
+                ["device.listen.address"] = listener.ListenAddress
+            },
+            entityKind: ProtoTraceEntityKinds.Device,
+            entityId: EntityId);
+        return listener.ListenAddress;
+    }
+
     public async ValueTask DisconnectAsync(CancellationToken cancellationToken = default)
     {
         // A cancelled disconnect stops before it starts; once it starts it waits for a connect that is

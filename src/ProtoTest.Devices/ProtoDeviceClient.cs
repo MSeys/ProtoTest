@@ -78,7 +78,7 @@ public sealed class ProtoDeviceClient
             address = ResolveAddress(deviceId);
         }
 
-        endpoint = endpoint with { Address = address, Settings = ResolveSettings(deviceId) };
+        endpoint = endpoint with { Address = address, Settings = ResolveSettings(deviceId), Framer = _registration.Framer };
         var protocol = ResolveProtocol();
         var session = new DeviceSession(_context, Name, typeof(TDevice), transport, endpoint, protocol);
 

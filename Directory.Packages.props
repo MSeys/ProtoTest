@@ -35,6 +35,7 @@
     <PackageVersion Include="ModelContextProtocol" Version="2.2.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
     <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
+    <PackageVersion Include="System.IO.Ports" Version="8.0.0" />
     <PackageVersion Include="MSTest" Version="4.0.2" />
     <PackageVersion Include="MSTest.TestFramework" Version="4.0.2" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />

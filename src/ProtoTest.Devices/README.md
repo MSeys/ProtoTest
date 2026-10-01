@@ -11,6 +11,8 @@ dotnet add package ProtoTest.Devices.WebSocket              # ws:// and wss:// e
 dotnet add package ProtoTest.Devices.WebSocket.AspNetCore   # in-process endpoints, no socket
 dotnet add package ProtoTest.Devices.Mqtt                   # MQTT publish/subscribe
 dotnet add package ProtoTest.Devices.Mqtt.Testcontainers  # a Mosquitto broker owned by the run
+dotnet add package ProtoTest.Devices.Tcp                    # raw TCP, connecting out or listening
+dotnet add package ProtoTest.Devices.Serial                 # COM ports and /dev/tty lines
 ```
 
 ## Includes
@@ -31,6 +33,13 @@ dotnet add package ProtoTest.Devices.Mqtt.Testcontainers  # a Mosquitto broker o
   transport, address and connection state; the release path disconnects the device and records it.
 - Assertion-level coverage: a matched expectation records its message kind, and the client's protocol
   catalog reports kinds no test asserted as gaps.
+- Stream framing for TCP, serial and custom stream transports: `DeviceFramers.Lines`, `Delimited`,
+  `Enveloped`, `LengthPrefixed` and `FixedLength`, set per client with `WithFramer`, and
+  `StreamDeviceConnection` for a stream of your own.
+- Device data strings as records: `DeviceMessage.Format`/`Parse` with a prefix, separator or fixed
+  widths and an optional checksum (`NmeaChecksum`), and `SendMessageAsync`/`ExpectMessageAsync` on
+  the device.
+- `ListenAsync` for transports the system under test connects to, such as `AddTcpListener`.
 - `[RequiresDevice<TDevice>]` skips tests the environment cannot run.
 
 ## Limits

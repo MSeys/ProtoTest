@@ -168,6 +168,16 @@ public sealed class ProtoDeviceClientBuilder
         return this;
     }
 
+    /// <summary>
+    /// Declares how a stream transport (TCP, serial) cuts this client's bytes into frames, for example
+    /// <c>DeviceFramers.Lines("\r\n")</c>. Each device's endpoint carries it; message transports ignore it.
+    /// </summary>
+    public ProtoDeviceClientBuilder WithFramer(IDeviceFramer framer)
+    {
+        _registration.Framer = framer ?? throw new ArgumentNullException(nameof(framer));
+        return this;
+    }
+
     /// <summary>Registers a typed device the client can create; no address or id is configured here.</summary>
     public ProtoDeviceClientBuilder AddDevice<TDevice>()
         where TDevice : ProtoDevice

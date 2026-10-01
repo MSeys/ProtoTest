@@ -173,7 +173,7 @@ A `configure` callback that throws is not remembered. A later successful call ca
 | `ProtoTest:Messaging:RabbitMq` | one per integration | [Messaging](../integrations/messaging/index.md) (`ConnectionString` names the broker) |
 | `ProtoTest:Sql` | one per integration | [SQL](../integrations/sql/index.md) (`Isolation`, `SharedWithApplications`) |
 | `ProtoTest:Sheets` | one per integration | [Sheets](../integrations/sheets/index.md) (`IncludeHiddenSheets`) |
-| `ProtoTest:Devices:Mqtt`, `ProtoTest:Devices:WebSocket` | one per integration | [Devices](../integrations/devices.md) |
+| `ProtoTest:Devices:Mqtt`, `ProtoTest:Devices:Serial`, `ProtoTest:Devices:Tcp`, `ProtoTest:Devices:WebSocket` | one per integration | [Devices](../integrations/devices.md) |
 | `ProtoTest:Web:Playwright`, `ProtoTest:Web:Selenium`, `ProtoTest:Web:Pages` | one per integration | [Web](../integrations/web/index.md) |
 | `ProtoTest:Reporting:Json`, `ProtoTest:Reporting:Html` | one per integration | [Reporting](../observability/reporting.md) |
 | `ProtoTest:Readiness` | one per run | [Infrastructure](../foundation/infrastructure.md) (host probes and containers) |

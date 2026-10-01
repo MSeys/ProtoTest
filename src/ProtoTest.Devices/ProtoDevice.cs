@@ -32,6 +32,14 @@ public abstract class ProtoDevice
     protected ValueTask ConnectAsync(CancellationToken cancellationToken = default)
         => Session.ConnectAsync(cancellationToken);
 
+    /// <summary>
+    /// Starts listening for the device to connect to the test and returns the address to hand the system
+    /// under test, with the port the operating system chose. Only a listening transport supports it, such
+    /// as a client registered with <c>AddTcpListener</c>; the first send or receive waits for the connection.
+    /// </summary>
+    protected ValueTask<string> ListenAsync(CancellationToken cancellationToken = default)
+        => Session.ListenAsync(cancellationToken);
+
     /// <summary>Closes the connection; the device can connect again afterwards.</summary>
     protected ValueTask DisconnectAsync(CancellationToken cancellationToken = default)
         => Session.DisconnectAsync(cancellationToken);
@@ -59,6 +67,32 @@ public abstract class ProtoDevice
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
         => Session.ExpectAsync(description, match, timeout, cancellationToken);
+
+    /// <summary>Sends a message type as its data string, as <see cref="DeviceMessage.Format{TMessage}"/> writes it.</summary>
+    protected ValueTask SendMessageAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default)
+        where TMessage : notnull
+        => Session.SendAsync(DeviceMessage.ToFrame(message), cancellationToken);
+
+    /// <summary>
+    /// Waits for a text frame that parses as <typeparamref name="TMessage"/> and, when given, satisfies
+    /// <paramref name="match"/>; frames that are not that message are skipped. The wait is recorded like
+    /// <see cref="ExpectAsync"/>, named after the message type unless <paramref name="description"/> says otherwise.
+    /// </summary>
+    protected async ValueTask<TMessage> ExpectMessageAsync<TMessage>(
+        Func<TMessage, bool>? match = null,
+        string? description = null,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        var frame = await Session.ExpectAsync(
+            description ?? typeof(TMessage).Name,
+            candidate => candidate.TryGetText(out var text)
+                && DeviceMessage.TryParse<TMessage>(text, out var message)
+                && (match is null || match(message)),
+            timeout,
+            cancellationToken).ConfigureAwait(false);
+        return DeviceMessage.Parse<TMessage>(frame.AsText());
+    }
 
     /// <summary>A readable log of the frames exchanged so far, for failure messages.</summary>
     protected IReadOnlyList<string> Exchange => Session.Exchange;

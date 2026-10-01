@@ -7,7 +7,8 @@ on:
       - "docs/api-reference/**"
       - "Directory.Build.targets"
       - ".config/dotnet-tools.json"
-      - "eng/build-api-reference.ps1"
+      - "eng/commands/docs-api.ps1"
+      - "eng/lib/**"
   push:
     branches: [main]
     paths:
@@ -15,7 +16,8 @@ on:
       - "docs/api-reference/**"
       - "Directory.Build.targets"
       - ".config/dotnet-tools.json"
-      - "eng/build-api-reference.ps1"
+      - "eng/commands/docs-api.ps1"
+      - "eng/lib/**"
   workflow_dispatch:
 
 permissions:
@@ -38,7 +40,7 @@ jobs:
 
       - name: Build the generated API reference
         shell: pwsh
-        run: ./eng/build-api-reference.ps1
+        run: ./proto.ps1 docs api
 
       - name: Upload the reference site
         uses: actions/upload-artifact@v4

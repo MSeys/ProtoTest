@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+Runs the fixtures that prove the gate commands themselves, in throwaway repositories.
+#>
 [CmdletBinding()]
 param()
 
@@ -15,11 +19,19 @@ param()
 $ErrorActionPreference = "Stop"
 if (Test-Path variable:PSNativeCommandUseErrorActionPreference) { $PSNativeCommandUseErrorActionPreference = $false }
 
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) ("prototest-gate-fixtures-" + [Guid]::NewGuid().ToString("N").Substring(0, 12))
 New-Item -ItemType Directory -Path $fixtureRoot -Force | Out-Null
 
 $failures = New-Object System.Collections.Generic.List[string]
+$fixtures = New-Object System.Collections.Generic.List[object]
+# The helpers copy commands from here; a parallel runspace has no $PSScriptRoot of its own.
+$commandsRoot = $PSScriptRoot
+
+# These touch process-wide state (environment variables, the installed template, the repository's own
+# test binaries), so they run one at a time after the parallel ones.
+$serialFixtures = @("release-branch-ref", "template-starter-runners", "mtp-zero-test-guards")
 
 function Assert-Fixture {
     param([bool]$Condition, [string]$Message)
@@ -28,42 +40,87 @@ function Assert-Fixture {
 }
 
 function Invoke-Fixture {
+    # Registers a fixture; Invoke-AllFixtures runs them. Every fixture builds its own throwaway repository.
     param([string]$Name, [scriptblock]$Body)
 
-    try {
-        $result = & $Body
-        if ($result -eq "skip") {
-            Write-Host "gate-fixture: $Name SKIP"
+    $fixtures.Add([pscustomobject]@{ Name = $Name; Body = $Body })
+}
+
+function Write-FixtureResult {
+    param([object]$Result)
+
+    if ($Result.Error) {
+        $failures.Add("$($Result.Name): $($Result.Error)")
+        Write-Host "gate-fixture: $($Result.Name) FAILED: $($Result.Error)"
+    }
+    elseif ($Result.Skipped) { Write-Host "gate-fixture: $($Result.Name) SKIP" }
+    else { Write-Host "gate-fixture: $($Result.Name) ok" }
+}
+
+function Invoke-AllFixtures {
+    $helperNames = @("Assert-Fixture", "Copy-FixtureCommand", "New-FixtureRepository", "Add-FixtureFile",
+        "Invoke-FixtureVerify", "Get-FixtureRecord", "Get-FixtureMarker")
+    $helpers = ($helperNames | ForEach-Object { "function $_ {$((Get-Item "function:$_").Definition)}" }) -join "`n"
+    $parallel = @($fixtures | Where-Object { $_.Name -notin $serialFixtures } |
+        ForEach-Object { [pscustomobject]@{ Name = $_.Name; Body = $_.Body.ToString() } })
+    $throttle = [Math]::Max(2, [Math]::Min(8, [Environment]::ProcessorCount))
+
+    $results = $parallel | ForEach-Object -ThrottleLimit $throttle -Parallel {
+        $fixture = $_
+        $ErrorActionPreference = "Stop"
+        $PSNativeCommandUseErrorActionPreference = $false
+        $repository = $using:repository
+        $fixtureRoot = $using:fixtureRoot
+        $commandsRoot = $using:commandsRoot
+        . ([scriptblock]::Create($using:helpers))
+        try {
+            $result = & ([scriptblock]::Create($fixture.Body))
+            [pscustomobject]@{ Name = $fixture.Name; Skipped = [bool]($result -eq "skip"); Error = $null }
         }
-        else {
-            Write-Host "gate-fixture: $Name ok"
+        catch {
+            [pscustomobject]@{ Name = $fixture.Name; Skipped = $false; Error = $_.Exception.Message }
         }
     }
-    catch {
-        $failures.Add("$Name`: $($_.Exception.Message)")
-        Write-Host "gate-fixture: $Name FAILED: $($_.Exception.Message)"
+    foreach ($result in @($results | Sort-Object Name)) { Write-FixtureResult $result }
+
+    foreach ($fixture in @($fixtures | Where-Object { $_.Name -in $serialFixtures })) {
+        try {
+            $result = & $fixture.Body
+            Write-FixtureResult ([pscustomobject]@{ Name = $fixture.Name; Skipped = [bool]($result -eq "skip"); Error = $null })
+        }
+        catch {
+            Write-FixtureResult ([pscustomobject]@{ Name = $fixture.Name; Skipped = $false; Error = $_.Exception.Message })
+        }
     }
+}
+
+function Copy-FixtureCommand {
+    # A command and the shared module it imports, at the same relative paths as in the repository.
+    param([string]$Root, [string]$Name)
+
+    New-Item -ItemType Directory -Path (Join-Path $Root "eng/commands"), (Join-Path $Root "eng/lib") -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $commandsRoot "$Name.ps1") -Destination (Join-Path $Root "eng/commands/$Name.ps1")
+    Copy-Item -LiteralPath (Join-Path $commandsRoot "../lib/Proto.Eng.psm1") -Destination (Join-Path $Root "eng/lib/Proto.Eng.psm1")
 }
 
 function New-FixtureRepository {
     param([string]$Name)
 
     $root = Join-Path $fixtureRoot $Name
-    New-Item -ItemType Directory -Path (Join-Path $root "eng") -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "verify.ps1") -Destination (Join-Path $root "eng/verify.ps1")
+    Copy-FixtureCommand -Root $root -Name "verify"
 
     # The gate stubs stand in for the real gates: they record that they ran (with their arguments) and
     # succeed, so a fixture asserts which gates verify.ps1 invoked instead of building the solution.
     $gateStub = @'
 param([string]$Include = "", [switch]$NoRestore)
 $name = [IO.Path]::GetFileNameWithoutExtension($PSCommandPath)
-$markers = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) "artifacts/markers"
+$markers = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))) "artifacts/markers"
 New-Item -ItemType Directory -Path $markers -Force | Out-Null
 Add-Content -LiteralPath (Join-Path $markers "$name.txt") -Value ("Include=$Include;NoRestore=$NoRestore")
 exit 0
 '@
-    foreach ($gate in @("lint", "test", "check-docs", "pack", "test-gates", "test-viewer")) {
-        Set-Content -LiteralPath (Join-Path $root "eng/$gate.ps1") -Value $gateStub -Encoding utf8
+    foreach ($gate in @("lint", "test", "docs-check", "pack", "gates-test", "viewer-test")) {
+        Set-Content -LiteralPath (Join-Path $root "eng/commands/$gate.ps1") -Value $gateStub -Encoding utf8
     }
 
     Set-Content -LiteralPath (Join-Path $root "Directory.Build.props") -Value "<Project><PropertyGroup><Version>9.9.9-fixture</Version></PropertyGroup></Project>" -Encoding utf8
@@ -90,7 +147,7 @@ function Add-FixtureFile {
 function Invoke-FixtureVerify {
     param([string]$Root, [string[]]$Arguments)
 
-    $output = & pwsh -NoProfile -File (Join-Path $Root "eng/verify.ps1") @Arguments 2>&1
+    $output = & pwsh -NoProfile -File (Join-Path $Root "eng/commands/verify.ps1") @Arguments 2>&1
     return [pscustomobject]@{ Text = ($output -join [Environment]::NewLine); ExitCode = $LASTEXITCODE }
 }
 
@@ -126,10 +183,10 @@ try {
         Assert-Fixture ($record.classification -eq "docs-only") "expected classification docs-only, got '$($record.classification)'"
         Assert-Fixture ([bool]$record.green) "expected green"
         Assert-Fixture (-not [bool]$record.incomplete) "a docs-only stage is not incomplete"
-        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "check-docs") -ne "") "the docs gate did not run"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "docs-check") -ne "") "the docs gate did not run"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "lint") -eq "") "lint ran for a docs-only stage"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -eq "") "the tests ran for a docs-only stage"
-        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test-viewer") -eq "") "the viewer gate ran for a docs-only stage"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "viewer-test") -eq "") "the viewer gate ran for a docs-only stage"
         Assert-Fixture (@($record.skippedCodeGates).Count -eq 0) "a docs-only stage skipped no applicable code gate"
     }
 
@@ -146,7 +203,7 @@ try {
         Assert-Fixture ([bool]$record.green) "expected green"
         Assert-Fixture (-not [bool]$record.incomplete) "a viewer-only stage is not incomplete"
         Assert-Fixture ($record.viewerChanges -eq 1) "the record must count the viewer change"
-        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test-viewer") -ne "") "the viewer gate did not run for a viewer-only stage"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "viewer-test") -ne "") "the viewer gate did not run for a viewer-only stage"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "lint") -eq "") "lint ran for a viewer-only stage"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -eq "") "the tests ran for a viewer-only stage"
         Assert-Fixture (@($record.skippedCodeGates).Count -eq 0) "a viewer-only stage skipped no applicable code gate"
@@ -224,7 +281,7 @@ try {
         Assert-Fixture ([bool]$record.green) "expected green"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "lint") -ne "") "lint did not run under -Full"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -ne "") "the tests did not run under -Full"
-        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test-gates") -ne "") "the gate fixtures did not run under -Full"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "gates-test") -ne "") "the gate fixtures did not run under -Full"
     }
 
     # A tooling stage runs the gate fixtures and records tooling, not code.
@@ -237,7 +294,7 @@ try {
         $record = Get-FixtureRecord -Root $root -Stage "t-tooling"
         Assert-Fixture ($record.classification -eq "tooling") "expected classification tooling, got '$($record.classification)'"
         Assert-Fixture ([bool]$record.green) "expected green"
-        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test-gates") -ne "") "the gate fixtures did not run for a tooling stage"
+        Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "gates-test") -ne "") "the gate fixtures did not run for a tooling stage"
         Assert-Fixture ((Get-FixtureMarker -Root $root -Gate "test") -eq "") "the tests ran for a scripts-only stage"
     }
 
@@ -271,9 +328,9 @@ internal sealed class LazyTemporaryTrace
 {
 }
 '@ | Out-Null
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "lint.ps1") -Destination (Join-Path $root "eng/lint.ps1")
+        Copy-FixtureCommand -Root $root -Name "lint"
 
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/lint.ps1") -NoRestore 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/lint.ps1") -NoRestore 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "the renamed helpers must fail the lint gate: $text"
         Assert-Fixture ($text.Contains("GetFreePort")) "the failure must name GetFreePort: $text"
@@ -300,9 +357,9 @@ using System.Runtime.CompilerServices;
 </Project>
 '@ | Out-Null
         Add-FixtureFile -Root $root -RelativePath "tests/Fixture.Tests/Placeholder.cs" -Content "namespace Fixture.Tests; internal static class Placeholder; " | Out-Null
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "lint.ps1") -Destination (Join-Path $root "eng/lint.ps1")
+        Copy-FixtureCommand -Root $root -Name "lint"
 
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/lint.ps1") -NoRestore 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/lint.ps1") -NoRestore 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "an integration friend edge must fail the lint gate: $text"
         Assert-Fixture ($text.Contains("ProtoTest.Rest")) "the failure must name the attribute-form target: $text"
@@ -327,7 +384,7 @@ using System.Runtime.CompilerServices;
 '@ | Out-Null
         Set-Content -LiteralPath (Join-Path $root "ProtoTest.slnx") -Value '<Solution></Solution>' -Encoding utf8
 
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/lint.ps1") -NoRestore 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/lint.ps1") -NoRestore 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -eq 0) "a test-only target must pass the lint gate: $text"
         Assert-Fixture (-not $text.Contains("must not receive internals")) "the guard must not report a test target: $text"
@@ -343,7 +400,7 @@ using System.Runtime.CompilerServices;
 
             $root = Join-Path $fixtureRoot $Name
             New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
-            Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+            Copy-FixtureCommand -Root $root -Name "docs-check"
             Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
             Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public static class FixtureOptions { public const string ConfigurationSectionName = "ProtoTest:Fixture"; }' -Encoding utf8
             Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'Set `ProtoTest:Fixture` and `ProtoTest:Mystery:Key` to configure the fixture.' -Encoding utf8
@@ -358,7 +415,7 @@ using System.Runtime.CompilerServices;
             if ($LearnPage) {
                 Set-Content -LiteralPath (Join-Path $root "docs/learn/page.md") -Value $LearnPage -Encoding utf8
             }
-            $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+            $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
             return [pscustomobject]@{ Root = $root; Text = ($output -join [Environment]::NewLine); ExitCode = $LASTEXITCODE }
         }
 
@@ -402,7 +459,7 @@ using System.Runtime.CompilerServices;
 
             $root = Join-Path $fixtureRoot $Name
             New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src/pages"), (Join-Path $root "docs/src/data"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
-            Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+            Copy-FixtureCommand -Root $root -Name "docs-check"
             Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
             Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
             Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public sealed class Widget { }' -Encoding utf8
@@ -420,7 +477,7 @@ using System.Runtime.CompilerServices;
             if ($RegularPage) {
                 Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value $RegularPage -Encoding utf8
             }
-            $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+            $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
             return [pscustomobject]@{ Text = ($output -join [Environment]::NewLine); ExitCode = $LASTEXITCODE }
         }
 
@@ -441,7 +498,7 @@ using System.Runtime.CompilerServices;
 
         $root = Join-Path $fixtureRoot "check-docs-repo-paths"
         New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "samples/Real.Project"), (Join-Path $root "src/Real.Package"), (Join-Path $root "tests/Real.Tests") -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+        Copy-FixtureCommand -Root $root -Name "docs-check"
         Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "samples/Real.Project/File.cs") -Value "// real" -Encoding utf8
@@ -451,22 +508,34 @@ using System.Runtime.CompilerServices;
         # Existing repository paths pass, another layout's `src/pages` is not a repository path, and the
         # demo checkout's suite path is named but owned by another repository.
         Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'See `samples/Real.Project/File.cs`, `src/Real.Package/Options.cs` and `tests/Real.Tests/File.cs`; a Next.js app keeps pages under `src/pages/`, and the demo runs `dotnet test tests/OpenCsms.Suite` in its own checkout.' -Encoding utf8
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -eq 0) "existing repository paths, a framework path and the demo checkout path must pass: $text"
 
         # A prose path with nothing behind it fails and names the path, `tests/` included.
         Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'The retired suite lived at `samples/Missing.Project/File.cs`.' -Encoding utf8
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "a repository path with no file must fail: $text"
         Assert-Fixture ($text.Contains("samples/Missing.Project/File.cs")) "the failure must name the path: $text"
 
         Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'The retired suite lived at `tests/Missing.Tests/File.cs`.' -Encoding utf8
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "a tests/ path with no file must fail: $text"
         Assert-Fixture ($text.Contains("tests/Missing.Tests/File.cs")) "the failure must name the tests path: $text"
+
+        # Build output exists only after a build: a path through bin/ passes when its project exists and
+        # fails when the project does not.
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'Traces land in `samples/Real.Project/bin/Debug/net8.0/TestResults`.' -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -eq 0) "build output under an existing project must pass on an unbuilt checkout: $text"
+
+        Set-Content -LiteralPath (Join-Path $root "docs/docs/page.md") -Value 'Traces land in `samples/Missing.Project/bin/Debug/TestResults`.' -Encoding utf8
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
+        $text = $output -join [Environment]::NewLine
+        Assert-Fixture ($LASTEXITCODE -ne 0) "build output under a missing project must fail: $text"
     }
 
     # The integration pages carry the six template headings; the map and the deep task pages are
@@ -476,7 +545,7 @@ using System.Runtime.CompilerServices;
 
         $root = Join-Path $fixtureRoot "check-docs-integration-shape"
         New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs/integrations/rest"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+        Copy-FixtureCommand -Root $root -Name "docs-check"
         Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "docs/docs/integrations/overview.md") -Value "# Integrations map`n`nThe map." -Encoding utf8
@@ -514,7 +583,7 @@ HTTP only.
         Set-Content -LiteralPath (Join-Path $root "docs/docs/integrations/fakes.md") -Value $shape -Encoding utf8
 
         # A complete top-level page passes, and the map and the deep task page are not checked.
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -eq 0) "a complete integration page and the exempt pages must pass: $text"
         Assert-Fixture ($text.Contains("covered 1 page(s)")) "the check must cover the top-level page only: $text"
@@ -522,7 +591,7 @@ HTTP only.
         # A section index missing one required heading fails and names both.
         $missing = $shape -replace '(?ms)^## Limits\r?\n\r?\nHTTP only\.\r?\n?$', ''
         Set-Content -LiteralPath (Join-Path $root "docs/docs/integrations/rest/index.md") -Value $missing -Encoding utf8
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "a section index missing a heading must fail: $text"
         Assert-Fixture ($text.Contains("rest/index.md")) "the failure must name the page: $text"
@@ -537,7 +606,7 @@ HTTP only.
 
         $root = Join-Path $fixtureRoot "check-docs-link-fragments"
         New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs/guide"), (Join-Path $root "docs/learn/track"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "src") -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+        Copy-FixtureCommand -Root $root -Name "docs-check"
         Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
         Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public sealed class Fixture { }' -Encoding utf8
@@ -564,7 +633,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
         # A stale anchor fails and names the file, the line and the target.
         Add-Content -LiteralPath (Join-Path $root "docs/docs/guide/page.md") -Value "`nSee [the gone options](./target.md#no-such-section).`n" -Encoding utf8
         Add-Content -LiteralPath (Join-Path $root "CHANGELOG.md") -Value "- Gone. [Target](https://prototest.dev/docs/guide/target#no-such-changelog-section)`n" -Encoding utf8
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "a stale link fragment must fail: $text"
         Assert-Fixture ($text.Contains("guide/page.md") -and $text.Contains("target.md#no-such-section") -and $text.Contains("->")) "the failure must read 'file:line -> target#fragment': $text"
@@ -588,7 +657,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
 
 - A thing. [Target](https://prototest.dev/docs/guide/target#setup-options)
 '@ -Encoding utf8
-        $output = & pwsh -NoProfile -File (Join-Path $root "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -eq 0) "live anchors must pass: $text"
     }
@@ -604,7 +673,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
 
             $root = Join-Path $fixtureRoot $Name
             New-Item -ItemType Directory -Path (Join-Path $root "eng"), (Join-Path $root "docs/docs"), (Join-Path $root "docs/learn"), (Join-Path $root "docs/src"), (Join-Path $root "docs/scripts"), (Join-Path $root "docs/static/lessons"), (Join-Path $root "viewer/public/demos"), (Join-Path $root "src") -Force | Out-Null
-            Copy-Item -LiteralPath (Join-Path $PSScriptRoot "check-docs.ps1") -Destination (Join-Path $root "eng/check-docs.ps1")
+            Copy-FixtureCommand -Root $root -Name "docs-check"
             Set-Content -LiteralPath (Join-Path $root "docs/scripts/generate-changelog.mjs") -Value "process.exit(0);" -Encoding utf8
             Set-Content -LiteralPath (Join-Path $root "docs/configuration-keys.json") -Value '{"sections":[],"allowedKeys":[]}' -Encoding utf8
             Set-Content -LiteralPath (Join-Path $root "src/Fixture.cs") -Value 'namespace Fixture; public sealed class Fixture { }' -Encoding utf8
@@ -633,7 +702,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
             "state.json" = '{"broker":"amqp://guest:guest@localhost/","OwnerToken":"[REDACTED]"}';
             "sources/1/Widget.cs" = 'public sealed class Widget { public string Password = Proto.Context.UniqueName("user"); }'
         }
-        $output = & pwsh -NoProfile -File (Join-Path $clean "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $clean "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -eq 0) "a redacted archive with synthetic values must pass: $text"
         Assert-Fixture ($text.Contains("covered 1 archive(s)")) "the scan must cover the archive: $text"
@@ -648,7 +717,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
             "token.json" = '{"key":"ghp_abcdefghijklmnopqrstuvwxyz1234567890"}';
             "key.pem" = '-----BEGIN RSA PRIVATE KEY-----'
         }
-        $output = & pwsh -NoProfile -File (Join-Path $tainted "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $tainted "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "a planted secret must fail: $text"
         Assert-Fixture ($text.Contains("lesson-tainted.prototrace -> spans.json -> connection-string-password")) "the connection-string hit must read 'file -> entry -> pattern': $text"
@@ -660,7 +729,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
 
         # A loose JSON fixture beside the archives is scanned too.
         Set-Content -LiteralPath (Join-Path $tainted "viewer/public/demos/evidence.json") -Value '{"password": "RealSecret123"}' -Encoding utf8
-        $output = & pwsh -NoProfile -File (Join-Path $tainted "eng/check-docs.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $tainted "eng/commands/docs-check.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -ne 0) "a secret in a loose JSON fixture must fail: $text"
         Assert-Fixture ($text.Contains("evidence.json -> (file) -> json-secret-value")) "the loose JSON hit must name its file and pattern: $text"
@@ -670,7 +739,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
     # the same five runners instead of drifting apart.
     Invoke-Fixture "template-workflow-script" {
         $workflow = Get-Content -Raw -LiteralPath (Join-Path $repository ".github/workflows/verify.yml")
-        Assert-Fixture ($workflow -match "run: \./eng/test-template\.ps1") "the template smoke step must call eng/test-template.ps1"
+        Assert-Fixture ($workflow -match "run: \./proto\.ps1 template test") "the template smoke step must call ./proto.ps1 template test"
     }
 
     # The starter template is proved end to end whenever the packed feed exists: generation, restore,
@@ -686,7 +755,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
         else { $null }
         if (-not $template) { return "skip" }
 
-        $output = & pwsh -NoProfile -File (Join-Path $repository "eng/test-template.ps1") 2>&1
+        $output = & pwsh -NoProfile -File (Join-Path $repository "eng/commands/template-test.ps1") 2>&1
         $text = $output -join [Environment]::NewLine
         Assert-Fixture ($LASTEXITCODE -eq 0) "the starter template must generate, restore, build and test for every runner: $text"
     }
@@ -694,18 +763,18 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
     # Publishing from a branch ref fails before any push; dry runs stay allowed.
     Invoke-Fixture "release-branch-ref" {
         $root = New-FixtureRepository "release-branch-ref"
-        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "release.ps1") -Destination (Join-Path $root "eng/release.ps1")
+        Copy-FixtureCommand -Root $root -Name "release-publish"
 
         try {
             $env:GITHUB_REF_TYPE = "branch"
             $env:GITHUB_REF_NAME = "main"
-            $output = & pwsh -NoProfile -File (Join-Path $root "eng/release.ps1") 2>&1
+            $output = & pwsh -NoProfile -File (Join-Path $root "eng/commands/release-publish.ps1") 2>&1
             $text = $output -join [Environment]::NewLine
             Assert-Fixture ($LASTEXITCODE -ne 0) "publishing from a branch ref must fail: $text"
             Assert-Fixture ($text.Contains("tag")) "the failure must name the tag requirement: $text"
             Assert-Fixture (-not $text.Contains("packages directory")) "the ref guard must fire before package validation: $text"
 
-            $dry = & pwsh -NoProfile -File (Join-Path $root "eng/release.ps1") -DryRun 2>&1
+            $dry = & pwsh -NoProfile -File (Join-Path $root "eng/commands/release-publish.ps1") -DryRun 2>&1
             $dryText = $dry -join [Environment]::NewLine
             Assert-Fixture ($dryText.Contains("packages directory")) "a dry run must pass the ref guard and fail on the missing packages instead: $dryText"
         }
@@ -733,7 +802,7 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
         $tunitDll = Join-Path $repository "tests/ProtoTest.TUnit.Tests/bin/Release/net8.0/ProtoTest.TUnit.Tests.dll"
         if (-not (Test-Path -LiteralPath $xunit3Dll) -or -not (Test-Path -LiteralPath $tunitDll)) { return "skip" }
 
-        $testScript = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "test.ps1")
+        $testScript = Get-Content -Raw -LiteralPath (Join-Path $commandsRoot "test.ps1")
         $xunit3Minimum = [int][regex]::Match($testScript, 'ProtoTest\.Xunit3\.Tests.*?MinimumTests\s*=\s*(\d+)', [Text.RegularExpressions.RegexOptions]::Singleline).Groups[1].Value
         $tunitMinimum = [int][regex]::Match($testScript, 'ProtoTest\.TUnit\.Tests.*?MinimumTests\s*=\s*(\d+)', [Text.RegularExpressions.RegexOptions]::Singleline).Groups[1].Value
         Assert-Fixture ($xunit3Minimum -gt 0) "test.ps1 must declare the xUnit.net v3 minimum"
@@ -753,6 +822,8 @@ and [the process](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#c
         Assert-Fixture ($LASTEXITCODE -ne 0) "TUnit must fail when fewer tests run than the declared minimum: $tunitText"
         Assert-Fixture ($tunitText.Contains("Minimum expected tests")) "the TUnit failure must name the policy: $tunitText"
     }
+
+    Invoke-AllFixtures
 
     if ($failures.Count -gt 0) {
         Write-Host ""

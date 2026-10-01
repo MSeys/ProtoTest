@@ -1,3 +1,7 @@
+<#
+.SYNOPSIS
+Rolls CHANGELOG.md: [Unreleased] becomes the release section and a fresh [Unreleased] goes on top.
+#>
 [CmdletBinding()]
 param(
     # The changelog to cut; defaults to the repository's. -Path is what the tests use on a copy.
@@ -14,16 +18,12 @@ param(
 # .github/workflows/release.yml reads the section for the GitHub Release notes and fails without it.
 
 $ErrorActionPreference = "Stop"
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 if (-not $Path) { $Path = Join-Path $repository "CHANGELOG.md" }
 if (-not (Test-Path -LiteralPath $Path)) { throw "The changelog '$Path' does not exist." }
 
-if (-not $Version) {
-    $props = Get-Content -LiteralPath (Join-Path $repository "Directory.Build.props") -Raw
-    $match = [regex]::Match($props, '<Version>\s*([^<]+?)\s*</Version>')
-    if (-not $match.Success) { throw "Directory.Build.props does not declare a <Version>." }
-    $Version = $match.Groups[1].Value
-}
+if (-not $Version) { $Version = Get-ProtoVersion }
 if ($Version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
     throw "'$Version' is not a version (expected the <Version> form, for example 1.1.0)."
 }

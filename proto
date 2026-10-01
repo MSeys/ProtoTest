@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# The engineering commands for a POSIX shell; see proto.ps1.
+exec pwsh -NoProfile -File "$(dirname "$0")/proto.ps1" "$@"

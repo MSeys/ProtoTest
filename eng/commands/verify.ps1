@@ -1,3 +1,11 @@
+<#
+.SYNOPSIS
+Runs the gates a stage needs and writes artifacts/gates/<stage>.json.
+
+.DESCRIPTION
+Docs-only stages run the docs check, viewer stages the viewer gate, tooling stages the gate fixtures,
+code stages lint and the tests their projects reach. The last line is the evidence line for the plan.
+#>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
@@ -30,15 +38,15 @@ param(
 # not.
 
 $ErrorActionPreference = "Stop"
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $gatesRoot = Join-Path $repository "artifacts/gates"
 New-Item -ItemType Directory -Path $gatesRoot -Force | Out-Null
 
 $stageName = ($Stage -replace '[^A-Za-z0-9._-]', '-')
 $sha = (& git -C $repository rev-parse --short HEAD).Trim()
 $branch = (& git -C $repository branch --show-current).Trim()
-$propsText = Get-Content -LiteralPath (Join-Path $repository "Directory.Build.props") -Raw
-$version = ([regex]'<Version>([^<]+)</Version>').Match($propsText).Groups[1].Value.Trim()
+$version = Get-ProtoVersion
 
 function ConvertFrom-PorcelainPath {
     param([string]$Line)
@@ -147,7 +155,7 @@ $scope = if ($dirty) { "working-tree" } else { "head-commit" }
 $stageChanged = if ($dirty) { $changed } else { Get-CommittedPath }
 
 $codePattern = '\.(cs|csproj|props|targets|slnx)$|^global\.json$'
-$scriptPattern = '^eng/.*\.(ps1|psm1)$|^\.github/workflows/.*\.ya?ml$'
+$scriptPattern = '^eng/.*\.(ps1|psm1)$|^proto(\.ps1|\.cmd)?$|^\.github/workflows/.*\.ya?ml$'
 $viewerPattern = '^viewer/'
 $codeChanges = @($stageChanged | Where-Object { $_ -match $codePattern })
 $scriptChanges = @($stageChanged | Where-Object { $_ -match $scriptPattern })
@@ -269,8 +277,8 @@ $runScripts = $Full -or $scriptChanges.Count -gt 0
 $runViewer = (-not $SkipViewer) -and ($viewerChanges.Count -gt 0)
 
 # The documentation check reads files only, so it runs in a child process while lint builds.
-$docsPending = if ($runDocs -and $runLint) { Start-GateJob -Name "docs" -Script "eng/check-docs.ps1" } else { $null }
-$viewerPending = if ($runViewer -and ($runLint -or $runTests)) { Start-GateJob -Name "viewer" -Script "eng/test-viewer.ps1" } else { $null }
+$docsPending = if ($runDocs -and $runLint) { Start-GateJob -Name "docs" -Script "eng/commands/docs-check.ps1" } else { $null }
+$viewerPending = if ($runViewer -and ($runLint -or $runTests)) { Start-GateJob -Name "viewer" -Script "eng/commands/viewer-test.ps1" } else { $null }
 
 if (-not $runLint) {
     $reason = if ($SkipLint) { "requested" } else { $codeSkipReason }
@@ -278,7 +286,7 @@ if (-not $runLint) {
     if ($expectsCodeGates) { $skippedCodeGates.Add([pscustomobject]@{ name = "lint"; reason = $reason }) }
 }
 else {
-    Invoke-Gate -Name "lint" -Script "eng/lint.ps1" -ScriptArguments $lintArguments
+    Invoke-Gate -Name "lint" -Script "eng/commands/lint.ps1" -ScriptArguments $lintArguments
 }
 
 if (-not $runDocs) {
@@ -288,7 +296,7 @@ elseif ($null -ne $docsPending) {
     Complete-GateJob -Pending $docsPending
 }
 else {
-    Invoke-Gate -Name "docs" -Script "eng/check-docs.ps1"
+    Invoke-Gate -Name "docs" -Script "eng/commands/docs-check.ps1"
 }
 
 # The gate fixtures run the real gate scripts in throwaway repositories with stubbed gates; they
@@ -299,7 +307,7 @@ if (-not $runTests) {
     if ($expectsCodeGates) { $skippedCodeGates.Add([pscustomobject]@{ name = "test"; reason = $reason }) }
 }
 else {
-    Invoke-Gate -Name "test" -Script "eng/test.ps1" -ScriptArguments $testArguments
+    Invoke-Gate -Name "test" -Script "eng/commands/test.ps1" -ScriptArguments $testArguments
 }
 
 if (-not $runViewer) {
@@ -311,14 +319,14 @@ elseif ($null -ne $viewerPending) {
     Complete-GateJob -Pending $viewerPending
 }
 else {
-    Invoke-Gate -Name "viewer" -Script "eng/test-viewer.ps1"
+    Invoke-Gate -Name "viewer" -Script "eng/commands/viewer-test.ps1"
 }
 
 # The gate scripts are themselves under test; a stage that touches them (or -Full) proves them.
 if ($runScripts) {
     # The fixtures execute the real MTP test binaries in this repository, so running them next to the
     # suite races the same projects; this gate stays sequential.
-    Invoke-Gate -Name "scripts" -Script "eng/test-gates.ps1"
+    Invoke-Gate -Name "scripts" -Script "eng/commands/gates-test.ps1"
 }
 
 if ($Pack) {
@@ -326,7 +334,7 @@ if ($Pack) {
     # needs the build inside the pack gate.
     $packArguments = @()
     if ($runTests) { $packArguments += "-NoBuild" }
-    Invoke-Gate -Name "pack" -Script "eng/pack.ps1" -ScriptArguments $packArguments
+    Invoke-Gate -Name "pack" -Script "eng/commands/pack.ps1" -ScriptArguments $packArguments
 }
 
 $incomplete = $skippedCodeGates.Count -gt 0
@@ -344,7 +352,7 @@ $record = [pscustomobject]@{
     classification        = $classification
     incomplete            = $incomplete
     allowSkippedCodeGates = [bool]$AllowSkippedCodeGates
-    changed               = $codeChanges.Count
+    changed               = $stageChanged.Count
     codeChanges           = $codeChanges.Count
     scriptChanges         = $scriptChanges.Count
     viewerChanges         = $viewerChanges.Count

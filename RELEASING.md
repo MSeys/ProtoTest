@@ -4,7 +4,7 @@ Every ProtoTest package ships as one version. The release is: bump the version, 
 run the full gate and pack, tag, and let `.github/workflows/release.yml` publish. This file is the
 checklist; the scripts it names are the steps.
 
-Release stages run from `version/**` in this cycle. `eng/pack.ps1` refuses to pack the version in
+Release stages run from `version/**` in this cycle. `./proto pack` refuses to pack the version in
 `Directory.Build.targets`'s `PackageValidationBaselineVersion` (the published family), so a branch
 that just bumped the version can be packed and consumed before the release.
 
@@ -18,7 +18,7 @@ Branch builds use `x.y.0-alpha.<n>`; the release version must be new (see the pa
 `CHANGELOG.md` is Keep a Changelog: the release's entries live under `## [Unreleased]`. Run:
 
 ```powershell
-pwsh eng/cut-release.ps1
+./proto release cut
 ```
 
 It renames the section to `## [<version>] - <yyyy-MM-dd>` using `<Version>` from
@@ -32,7 +32,7 @@ Then regenerate the documentation feed:
 node docs/scripts/generate-changelog.mjs
 ```
 
-`eng/check-docs.ps1` fails when `docs/src/pages/changelog.md` or
+`./proto docs check` fails when `docs/src/pages/changelog.md` or
 `docs/src/data/changelog.generated.ts` is stale. The release workflow reads the `## [<version>]`
 section for the GitHub Release notes and fails when it is missing; it never falls back to generated
 notes, because a release nobody wrote down is the failure this step prevents.
@@ -50,12 +50,12 @@ that needed it. Write every release section this way from the start.
 ## 3. Verify and validate
 
 ```powershell
-pwsh eng/verify.ps1 -Stage release-<version> -Full -Pack
-pwsh eng/release.ps1 -Configuration Release -DryRun
+./proto verify -Stage release-<version> -Full -Pack
+./proto release publish -Configuration Release -DryRun
 ```
 
 `-Full` is the CI shape (lint, full test suite, docs) and `-Pack` validates every package against
-the baseline: `eng/pack.ps1` packs all 44 packages and checks the shared version, READMEs,
+the baseline: `./proto pack` packs all 44 packages and checks the shared version, READMEs,
 dependency edges, symbol pairs and package validation. `release.ps1 -DryRun` prints the
 dependency-ordered push plan from the packed folder without touching NuGet.
 
@@ -67,12 +67,12 @@ git push origin v<version>
 ```
 
 `release.yml` triggers on `v*` tags. Its verify job runs the CI shape and uploads the packages it
-built; the release job publishes exactly those packages with `eng/release.ps1` (NuGet OIDC login
+built; the release job publishes exactly those packages with `./proto release publish` (NuGet OIDC login
 against the `NUGET_USER` secret, or `NUGET_API_KEY` with `-AllowBranch` for a deliberate local push)
 and creates the GitHub Release from the changelog section. Publishing is tag-gated: the workflow logs
 in and publishes only from a `v*` tag, a dispatch with `dry_run: false` from a branch fails at the
-guard instead of pushing, and `eng/release.ps1` refuses a real push from any non-tag ref (or a local
-run with no CI ref) unless `-AllowBranch` is passed. `eng/release.ps1` fails when the tag does not
+guard instead of pushing, and `./proto release publish` refuses a real push from any non-tag ref (or a local
+run with no CI ref) unless `-AllowBranch` is passed. `./proto release publish` fails when the tag does not
 match the packed version, when the folder holds two versions, or when a ProtoTest dependency is not
 part of the same release. `workflow_dispatch` validates the plan without pushing (`dry_run: true`,
 the default).
@@ -89,14 +89,14 @@ had no baseline now have one. After `x.y.z` is on nuget.org:
    `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`, `ProtoTest.Web.Pages`,
    `ProtoTest.Traces`, `ProtoTest.Cli`, `ProtoTest.Analyzers`, `ProtoTest.Aspire`,
    `ProtoTest.Diagnosis`, `ProtoTest.Feedback`, `ProtoTest.Mcp`, `ProtoTest.Messaging.MassTransit`,
-   `ProtoTest.Verification` and `ProtoTest.WireMock`. `eng/pack.ps1` fails a packable project that
+   `ProtoTest.Verification` and `ProtoTest.WireMock`. `./proto pack` fails a packable project that
    disables package validation without a reason, so the opt-outs cannot silently outlive their
    rollover.
 3. Regenerate the `CompatibilitySuppressions.xml` files against the new baseline
    (`dotnet pack <project> -p:GenerateCompatibilitySuppressionFile=true`) and delete the entries the
    new baseline no longer reports; the old 1.0.1 suppressions describe removals the release already
    shipped.
-4. Re-run `pwsh eng/pack.ps1` and `pwsh eng/verify.ps1 -Stage <next-branch> -Full -Pack`.
+4. Re-run `./proto pack` and `./proto verify -Stage <next-branch> -Full -Pack`.
 5. Bump `Directory.Build.props` to the next branch version (`x.(y+1).0-alpha.1`).
 
 ## 6. Documentation at release
@@ -112,11 +112,11 @@ Bring the public default branch to the released commit first, so the docs links 
 2. Build the complete site from the repository root:
 
    ```powershell
-   pwsh eng/build-docs-site.ps1
+   ./proto docs site
    ```
 
    The script runs `npm run build` in `docs/`, builds the API reference with
-   `eng/build-api-reference.ps1`, and copies it into `docs/build/api`, so the site's `/api` links
+   `./proto docs api`, and copies it into `docs/build/api`, so the site's `/api` links
    resolve.
 3. Upload the contents of `docs/build` (Docusaurus plus `/api`) to Cloudflare Pages.
 
@@ -127,12 +127,12 @@ artifact; its push trigger runs on `main` only. Both are checks for a maintainer
 ## Checklist
 
 - [ ] `Directory.Build.props` carries the release version (not the baseline).
-- [ ] `eng/cut-release.ps1` rolled `[Unreleased]` into `## [<version>] - <date>` and left a fresh
+- [ ] `./proto release cut` rolled `[Unreleased]` into `## [<version>] - <date>` and left a fresh
       `[Unreleased]`.
-- [ ] `node docs/scripts/generate-changelog.mjs` ran and `eng/check-docs.ps1` is green.
-- [ ] `eng/verify.ps1 -Stage release-<version> -Full -Pack` is green.
-- [ ] `eng/release.ps1 -DryRun` prints the package plan without errors.
+- [ ] `node docs/scripts/generate-changelog.mjs` ran and `./proto docs check` is green.
+- [ ] `./proto verify -Stage release-<version> -Full -Pack` is green.
+- [ ] `./proto release publish -DryRun` prints the package plan without errors.
 - [ ] Tag `v<version>` pushed; `release.yml` published the packages and the GitHub Release.
 - [ ] Public default branch brought to the released commit; the `main` links resolve.
 - [ ] Baseline rollover done; opt-out reasons gone; next branch version bumped.
-- [ ] Announcement bar updated; `eng/build-docs-site.ps1` built `docs/build` with `/api`; the folder uploaded to Cloudflare Pages.
+- [ ] Announcement bar updated; `./proto docs site` built `docs/build` with `/api`; the folder uploaded to Cloudflare Pages.

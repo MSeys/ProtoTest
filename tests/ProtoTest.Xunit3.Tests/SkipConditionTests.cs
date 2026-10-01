@@ -20,7 +20,7 @@ public sealed class SkipConditionTests
         // started. Record.Exception deliberately lets a skip escape - it would report this driver as
         // skipped - so the driver catches it. A regression that reports the test as passed fails
         // here; one that drops the test from discovery is caught by the project's declared test
-        // minimum in eng/test.ps1.
+        // minimum in ./proto test.
         var method = typeof(Subjects).GetMethod(nameof(Subjects.RequiresCapability))!;
 
         SkipException? signal = null;

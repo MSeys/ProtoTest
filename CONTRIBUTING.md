@@ -7,8 +7,8 @@ Thanks for helping make integration tests easier to build and explain. Bug repor
 ProtoTest requires the .NET 8, 9 and 10 SDKs. Node.js 20 or newer is needed for the documentation and trace viewer.
 
 ```powershell
-./eng/test.ps1
-./eng/pack.ps1 -NoBuild -NoRestore
+./proto test
+./proto pack -NoBuild -NoRestore
 ```
 
 The first command restores, builds and tests the solution. The second validates the NuGet packages. Some browser and container-backed tests need Chromium or a container runtime; the scripts report when an optional environment is unavailable.
@@ -16,7 +16,7 @@ The first command restores, builds and tests the solution. The second validates 
 While iterating, scope the suite with `-Include` (semicolon-separated project directories):
 
 ```powershell
-./eng/test.ps1 -Include "tests/ProtoTest.Core.Tests;tests/ProtoTest.Rest.Tests"
+./proto test -Include "tests/ProtoTest.Core.Tests;tests/ProtoTest.Rest.Tests"
 ```
 
 ## Before writing code
@@ -53,7 +53,7 @@ An object whose lifetime spans tests (a broker, a browser pool, a run-scoped res
 For documentation changes:
 
 ```powershell
-./eng/check-docs.ps1
+./proto docs check
 cd docs
 npm ci
 npm run typecheck
@@ -70,7 +70,7 @@ npm run build
 
 ## Integration pages
 
-Every page under `docs/docs/integrations` follows one shape, and `eng/check-docs.ps1` fails when a page that should carry it does not. The six sections, in order:
+Every page under `docs/docs/integrations` follows one shape, and `./proto docs check` fails when a page that should carry it does not. The six sections, in order:
 
 1. **What it adds.** The capability and what it can see.
 2. **Install.** The `dotnet add package` lines and the supported targets.

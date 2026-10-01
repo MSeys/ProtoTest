@@ -1,6 +1,6 @@
 // One changelog source: the repository's CHANGELOG.md. This script generates the documentation page and
 // the homepage release feed from it, so a release is written once. Run without arguments to write the
-// files; run with --check to fail when they are stale (eng/check-docs.ps1 uses that mode).
+// files; run with --check to fail when they are stale (./proto docs check uses that mode).
 
 import {readFileSync, writeFileSync, existsSync} from 'node:fs';
 import path from 'node:path';

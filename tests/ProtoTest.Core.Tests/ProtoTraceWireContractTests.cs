@@ -43,7 +43,7 @@ public sealed class ProtoTraceWireContractTests
         Assert.That(
             File.Exists(path),
             Is.True,
-            $"The golden archive '{path}' is missing; regenerate it with eng/generate-viewer-demo.ps1.");
+            $"The golden archive '{path}' is missing; regenerate it with ./proto traces demo.");
 
         using var archive = ZipFile.OpenRead(path);
         var manifest = ReadJson(archive, "manifest.json");

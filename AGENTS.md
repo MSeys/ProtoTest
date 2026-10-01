@@ -38,7 +38,7 @@ This file is the operating contract for contributors and coding agents working i
 4. **One behavior change = one test.** Failure paths and parallel safety included; characterization
    first where existing behavior changes deliberately; tests go through the real entry point, not a
    hook in isolation.
-5. **Evidence or it did not happen.** A stage ends with `eng/verify.ps1` green (test + lint +
+5. **Evidence or it did not happen.** A stage ends with `./proto verify` green (test + lint +
    check-docs, plus pack when packaging changed) and its evidence line recorded in the plan.
 6. **The published surface is additive in 1.x.** Additive and obsolete shims protect what consumers
    already have - the released packages. An API that only exists on the current branch is fixed
@@ -92,14 +92,19 @@ When a controller session runs workers:
 
 ## Gates
 
+Every engineering command runs through `./proto` (`./proto help` lists them; `proto.cmd` and `proto` are the
+cmd and POSIX shims). A command prints one line per step and keeps the full output under `artifacts/logs`
+and `artifacts/test-logs`; a failure prints the tail and the log path. `-Verbose` streams everything, and
+CI always streams. Read the evidence line and, on failure, the named log.
+
 | Command | When |
 | --- | --- |
-| `eng/test.ps1` | every code stage (full suite; `-Include` with semicolon-separated project dirs only while iterating) |
-| `eng/lint.ps1` | every stage |
-| `eng/check-docs.ps1` | docs, README or site changes |
-| `eng/pack.ps1` | packaging, csproj, version or new-project changes |
-| `eng/verify.ps1 -Stage <name>` | every stage; scopes to the working-tree change, or the HEAD commit on a clean tree; a docs-only stage records `docs-only`, a viewer-only stage records `viewer` and runs the viewer gate (`npm ci`, `npm test`, `npm run build` in `viewer/`), a stage that only touched gate scripts/workflows records `tooling` and runs the gate fixtures, and a code stage whose lint/tests were skipped records `incomplete` (non-green) unless `-AllowSkippedCodeGates` names the exception; `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
-| `eng/test-gates.ps1` | the gate scripts' own fixtures; runs inside `verify.ps1` when `eng/**.ps1` or workflows changed, and in CI |
+| `./proto test` | every code stage (full suite; `-Include` with semicolon-separated project dirs only while iterating) |
+| `./proto lint` | every stage |
+| `./proto docs check` | docs, README or site changes |
+| `./proto pack` | packaging, csproj, version or new-project changes |
+| `./proto verify -Stage <name>` | every stage; scopes to the working-tree change, or the HEAD commit on a clean tree; a docs-only stage records `docs-only`, a viewer-only stage records `viewer` and runs the viewer gate (`npm ci`, `npm test`, `npm run build` in `viewer/`), a stage that only touched gate scripts/workflows records `tooling` and runs the gate fixtures, and a code stage whose lint/tests were skipped records `incomplete` (non-green) unless `-AllowSkippedCodeGates` names the exception; `-Pack` when public surface or packaging changed, `-Full` to force the CI shape; writes `artifacts/gates/<name>.json` |
+| `./proto gates test` | the gate scripts' own fixtures; runs inside `./proto verify` when `eng/**`, `proto.ps1` or workflows changed, and in CI |
 | `npm run typecheck` in `docs/` | docs site changes |
 | `npm run build` in `docs/` | docs site content or navigation changes |
 
@@ -119,7 +124,7 @@ Do not commit with a red gate, and do not describe a gate as green without the c
 ## Versioning and feeds
 
 - Branch packages carry `1.1.0-alpha.<n>` once plan-5 Phase 0 lands; never the published version.
-- Consumers resolve ProtoTest packages from the local feed produced by `eng/pack.ps1` with
+- Consumers resolve ProtoTest packages from the local feed produced by `./proto pack` with
   package-source mapping, and clear `~/.nuget/packages/prototest.*` after a repack.
 - `assets/internal/` is gitignored scratch; its `records/` subdirectory is a private git repository
   holding the process records (plan of record, audits, handoffs, reviews) and the engineering facts

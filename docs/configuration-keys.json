@@ -1,5 +1,5 @@
 {
-  "comment": "The public configuration-key list. 'sections' is the set of ConfigurationSectionName/SectionName/SectionPath constants in src/**/*.cs; eng/check-docs.ps1 compares this array with the source on every run and fails on drift, so update it with the constant. 'allowedKeys' are documented keys that are not section constants, each with its reason and each required to stay mentioned in a docs page. The gate cross-checks every ProtoTest:* key a docs page names against these two lists, which is the half that runs in CI; the private docs-facts sheets add the fact-sheet-to-docs direction where the records checkout exists.",
+  "comment": "The public configuration-key list. 'sections' is the set of ConfigurationSectionName/SectionName/SectionPath constants in src/**/*.cs; ./proto docs check compares this array with the source on every run and fails on drift, so update it with the constant. 'allowedKeys' are documented keys that are not section constants, each with its reason and each required to stay mentioned in a docs page. The gate cross-checks every ProtoTest:* key a docs page names against these two lists, which is the half that runs in CI; the private docs-facts sheets add the fact-sheet-to-docs direction where the records checkout exists.",
   "sections": [
     "ProtoTest:Applications",
     "ProtoTest:Devices:Mqtt",

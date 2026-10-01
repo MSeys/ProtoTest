@@ -1,3 +1,11 @@
+<#
+.SYNOPSIS
+Builds the solution and runs every discovered test project, or the ones -Include names.
+
+.DESCRIPTION
+Each project's full output goes to artifacts/test-logs/<project>.log; the console gets one line per project
+and the tail of a failing one.
+#>
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
@@ -5,7 +13,7 @@ param(
     [switch]$NoRestore,
 
     # Optional semicolon-separated project directories (relative to the repository or absolute) to run
-    # instead of every discovered test project; verify.ps1 passes the projects a stage can reach.
+    # instead of every discovered test project; verify passes the projects a stage can reach.
     [string]$Include = ""
 )
 
@@ -13,12 +21,13 @@ $ErrorActionPreference = "Stop"
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
 $env:TESTINGPLATFORM_TELEMETRY_OPTOUT = "1"
 
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $solution = Join-Path $repository "ProtoTest.slnx"
 
 $includeDirectories = @()
 if (-not [string]::IsNullOrWhiteSpace($Include)) {
-    # verify.ps1 hands over absolute directories; callers may also pass repository-relative ones.
+    # verify hands over absolute directories; callers may also pass repository-relative ones.
     $includeDirectories = @($Include -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
         ForEach-Object {
             if ([IO.Path]::IsPathRooted($_)) { [IO.Path]::GetFullPath($_) }
@@ -26,17 +35,8 @@ if (-not [string]::IsNullOrWhiteSpace($Include)) {
         })
 }
 
-function Invoke-DotNet {
-    param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
-
-    & dotnet @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-}
-
 if (-not $NoRestore) {
-    Invoke-DotNet restore $solution
+    Invoke-ProtoNative -Name "test/restore" -FilePath "dotnet" -ArgumentList @("restore", $solution) | Out-Null
 }
 
 if ($includeDirectories.Count -gt 0) {
@@ -44,11 +44,13 @@ if ($includeDirectories.Count -gt 0) {
     # chain, so nothing the suite needs is missing.
     foreach ($directory in $includeDirectories) {
         $scopedProject = Get-ChildItem -LiteralPath $directory -Filter *.csproj -File | Select-Object -First 1
-        Invoke-DotNet build $scopedProject.FullName --configuration $Configuration --no-restore
+        Invoke-ProtoNative -Name "test/build-$($scopedProject.BaseName)" -FilePath "dotnet" `
+            -ArgumentList @("build", $scopedProject.FullName, "--configuration", $Configuration, "--no-restore") | Out-Null
     }
 }
 else {
-    Invoke-DotNet build $solution --configuration $Configuration --no-restore
+    Invoke-ProtoNative -Name "test/build" -FilePath "dotnet" `
+        -ArgumentList @("build", $solution, "--configuration", $Configuration, "--no-restore") | Out-Null
 }
 
 # Test projects are discovered, not listed: a new project is in the suite the moment it is a test
@@ -169,15 +171,12 @@ if ($parallelProjects.Count -gt 0 -and (Get-Command Start-Job -ErrorAction Silen
 foreach ($project in $serialProjects) {
     # A discovered project that runs zero tests means the predicate matched a project the runner cannot
     # execute; the exit code alone would not say so.
-    $output = & dotnet test $project --configuration $Configuration --no-build --no-restore --verbosity minimal 2>&1
-    $output | ForEach-Object { Write-Host $_ }
     # Keep every project's output, serial ones included: a flake must be diagnosable after the run.
-    Set-Content -LiteralPath (Join-Path $logRoot "$(Split-Path -Leaf (Split-Path -Parent $project)).log") -Value ($output | Out-String) -Encoding utf8
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet test $project failed with exit code $LASTEXITCODE."
-    }
+    $name = Split-Path -Leaf (Split-Path -Parent $project)
+    $run = Invoke-ProtoNative -Name "dotnet test $name" -FilePath "dotnet" -Log (Join-Path $logRoot "$name.log") `
+        -ArgumentList @("test", $project, "--configuration", $Configuration, "--no-build", "--no-restore", "--verbosity", "minimal")
 
-    $text = $output -join [Environment]::NewLine
+    $text = $run.Text
     if ($text -match 'No test is available in' -or $text -match 'No test matches the given testcase filter') {
         throw "The discovered test project '$project' ran zero tests; fix the discovery predicate or the project."
     }
@@ -192,7 +191,7 @@ if ($null -ne $pool) {
         Set-Content -LiteralPath $log -Value $result.Output -Encoding utf8
         $text = [string]$result.Output
         if ($result.ExitCode -ne 0) {
-            Write-Host $text
+            Write-ProtoTail $text
             throw "dotnet test $($result.Project) failed with exit code $($result.ExitCode). Log: $log"
         }
 
@@ -209,7 +208,7 @@ foreach ($mtpProject in $mtpProjects) {
     # zero-test guard. The separator travels as an array element: a literal -- is swallowed by the
     # PowerShell parser. TUnit's platform enforces --minimum-expected-tests itself; xUnit.net v3's
     # in-process runner exits 0 on a zero-test run, so its structured JUnit result is parsed and
-    # compared with the same minimum. eng/test-gates.ps1 proves both guards fail on a zero-test filter.
+    # compared with the same minimum. the gate fixtures (./proto gates test) prove both guards fail on a zero-test filter.
     $projectPath = $mtpProject.Project
     $minimumTests = [int]$mtpProject.MinimumTests
     $mtpArguments = @(
@@ -219,18 +218,16 @@ foreach ($mtpProject in $mtpProjects) {
     )
     if ((Split-Path -Leaf (Split-Path -Parent $projectPath)) -eq "ProtoTest.TUnit.Tests") {
         $mtpArguments += @("--minimum-expected-tests", [string]$minimumTests)
-        Invoke-DotNet @mtpArguments
+        $name = Split-Path -Leaf (Split-Path -Parent $projectPath)
+        Invoke-ProtoNative -Name "dotnet run $name" -FilePath "dotnet" -ArgumentList $mtpArguments -Log (Join-Path $logRoot "$name.log") | Out-Null
         continue
     }
 
     $resultPath = Join-Path ([IO.Path]::GetTempPath()) ("prototest-mtp-" + [Guid]::NewGuid().ToString("N") + ".xml")
     try {
         $mtpArguments += @("-result-junit", $resultPath)
-        $output = & dotnet @mtpArguments 2>&1
-        $output | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) {
-            throw "dotnet run $projectPath failed with exit code $LASTEXITCODE."
-        }
+        $name = Split-Path -Leaf (Split-Path -Parent $projectPath)
+        Invoke-ProtoNative -Name "dotnet run $name" -FilePath "dotnet" -ArgumentList $mtpArguments -Log (Join-Path $logRoot "$name.log") | Out-Null
         if (-not (Test-Path -LiteralPath $resultPath)) {
             throw "The Microsoft Testing Platform project '$projectPath' wrote no structured result to '$resultPath'."
         }

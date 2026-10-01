@@ -1,9 +1,15 @@
+<#
+.SYNOPSIS
+Builds the Docusaurus site and the API reference into docs/build, ready to upload.
+#>
+[CmdletBinding()]
 param(
     [switch]$NoRestore
 )
 
 $ErrorActionPreference = "Stop"
-$repository = Split-Path -Parent $PSScriptRoot
+Import-Module (Join-Path $PSScriptRoot "../lib/Proto.Eng.psm1") -Force
+$repository = Get-ProtoRepository
 $docs = Join-Path $repository "docs"
 $docsBuild = [System.IO.Path]::GetFullPath((Join-Path $docs "build"))
 $apiBuild = [System.IO.Path]::GetFullPath((Join-Path $repository "artifacts/api-reference"))
@@ -11,14 +17,13 @@ $apiDestination = [System.IO.Path]::GetFullPath((Join-Path $docsBuild "api"))
 
 Push-Location $docs
 try {
-    & npm run build
-    if ($LASTEXITCODE -ne 0) { throw "Building the Docusaurus site failed." }
+    Invoke-ProtoNative -Name "docs-site/build" -FilePath "npm" -ArgumentList @("run", "build") -Failure "Building the Docusaurus site failed." | Out-Null
 }
 finally {
     Pop-Location
 }
 
-& (Join-Path $PSScriptRoot "build-api-reference.ps1") -NoRestore:$NoRestore
+& (Join-Path $PSScriptRoot "docs-api.ps1") -NoRestore:$NoRestore
 if (-not (Test-Path -LiteralPath $apiBuild)) {
     throw "DocFX did not write the expected site: $apiBuild"
 }

@@ -1,11 +1,11 @@
 ---
 sidebar_position: 10
-title: Messaging
+title: Test RabbitMQ and message events in .NET
+sidebar_label: Messaging
 description: "Publish a message, then await the one that matters with a predicate and a timeout, on RabbitMQ or your own broker adapter."
 ---
 
-# Messaging
-
+# Test RabbitMQ and message events in .NET
 Each test gets a broker client. Publish a message, then await the matching message with a predicate and a timeout:
 
 ```csharp

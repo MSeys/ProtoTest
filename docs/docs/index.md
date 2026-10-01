@@ -2,13 +2,12 @@
 id: index
 slug: /
 sidebar_position: 0
-title: Start here
+title: .NET integration testing with ProtoTest
 sidebar_label: Start here
 description: "Start with the path that matches what you bring: learn integration testing, evaluate ProtoTest, or find your way around an existing suite."
 ---
 
-# Start here
-
+# .NET integration testing with ProtoTest
 import StartPaths from '@site/src/components/StartPaths';
 
 ProtoTest is an integration testing foundation for .NET 8, 9 and 10. The integrations a suite needs share one host, one context per test, one lifecycle and one trace. A single test can then write through REST, read back through GraphQL and check the database on the way.

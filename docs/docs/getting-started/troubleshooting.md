@@ -1,10 +1,11 @@
 ---
 sidebar_position: 5
-title: Troubleshooting
+title: Troubleshoot ProtoTest
+sidebar_label: Troubleshooting
 description: "The first problems a new suite runs into, and what fixes them: the host, the context, clients, containers, browsers, parallel tests and missing artifacts."
 ---
 
-# Troubleshooting
+# Troubleshoot ProtoTest
 
 This page covers the problems a new suite meets first. Each one starts with the message you see, so you can search for it.
 

@@ -1,11 +1,11 @@
 ---
 sidebar_position: 8
-title: Aspire
+title: Test an Aspire AppHost from your test suite
+sidebar_label: Aspire
 description: "Run an Aspire AppHost with the suite: the run starts it, each resource becomes an application target, and the run releases it."
 ---
 
-# Aspire
-
+# Test an Aspire AppHost from your test suite
 `ProtoTest.Aspire` runs an Aspire AppHost with the suite: the run starts it, each resource becomes an application target, and the run releases it.
 
 ```csharp

@@ -7,6 +7,7 @@ description: "Describe a page once as a class, then sign in and read a project r
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
+import Link from '@docusaurus/Link';
 
 # Drive the browser with a page object
 
@@ -20,7 +21,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
     'Know what happens when the browser is not installed',
   ]}
   needs={[
-    <>The previous lesson, <a href="./check-the-database">Check what the application stored</a></>,
+    <>The previous lesson, <Link to="/learn/across-boundaries/check-the-database">Check what the application stored</Link></>,
     'The sample checkout from Start, with its .NET prerequisites',
     'Playwright Chromium installed, or automatic browser installation enabled (see step 1)',
   ]}

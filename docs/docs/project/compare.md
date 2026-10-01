@@ -1,14 +1,14 @@
 ---
 sidebar_position: 2
-title: ProtoTest compared
+title: ProtoTest vs Testcontainers, Alba and Aspire testing
+sidebar_label: ProtoTest compared
 description: "An honest comparison: where ProtoTest wins against the alternatives, where each alternative wins, and when ProtoTest is not the right choice."
 ---
 
 import Comparison from '@site/src/components/Comparison';
 import {comparisonConcerns, withoutProtoTest, withProtoTest} from '@site/src/data/comparison';
 
-# ProtoTest compared
-
+# ProtoTest vs Testcontainers, Alba and Aspire testing
 Every tool on this page is good, and ProtoTest is built on several of them. Your application runs in-process with `WebApplicationFactory`. Infrastructure comes from Testcontainers. Browsers use Playwright or Selenium. The question is never whether those libraries work. It is which shape fits your suite.
 
 This page says where each alternative wins, where ProtoTest wins, and ends with the cases where ProtoTest is the wrong choice. [When ProtoTest is not the right choice](#when-prototest-is-not-the-right-choice) is the honest version up front.

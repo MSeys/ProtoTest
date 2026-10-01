@@ -7,6 +7,7 @@ description: "Trigger an event through the API and await the message the applica
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
+import Link from '@docusaurus/Link';
 
 # Follow a message through a broker
 
@@ -20,7 +21,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
     'Read what a run reports when no broker is available',
   ]}
   needs={[
-    <>The previous lesson, <a href="./drive-the-browser">Drive the browser with a page object</a></>,
+    <>The previous lesson, <Link to="/learn/across-boundaries/drive-the-browser">Drive the browser with a page object</Link></>,
     'A running Docker engine for the container-backed run in step 5',
   ]}
 />

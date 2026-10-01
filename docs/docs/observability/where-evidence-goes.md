@@ -1,7 +1,7 @@
 ---
 sidebar_position: 6
 title: Where your evidence goes
-description: "One run writes one .prototrace archive and can feed five readers: the viewer, the report sinks, OpenTelemetry, the prototest CLI and the MCP server. What each surface holds, and what it cannot see."
+description: "One run writes one .prototrace archive for five readers: the viewer, report sinks, OpenTelemetry, the prototest CLI and the MCP server."
 ---
 
 # Where your evidence goes

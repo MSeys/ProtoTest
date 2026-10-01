@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
-title: Your first test
+title: Write your first .NET integration test
+sidebar_label: Your first test
 description: "Build a small ProtoTest suite against an ASP.NET Core API, run it, make it fail once, and read the trace."
 ---
 
@@ -76,8 +77,7 @@ export const firstJourneyLayers = [
   },
 ];
 
-# Your first test
-
+# Write your first .NET integration test
 This page takes a new test project to a passing test. Then you break the test on purpose and read the trace, the record of what the run did. The steps assume an ASP.NET Core application called `Orders.Api` next to the tests. The tip below creates one for you. The steps use **NUnit**. The other runners differ only in the setup class, which [Test runners](../runners/overview.md) covers.
 
 :::tip[Rather start from a working solution?]

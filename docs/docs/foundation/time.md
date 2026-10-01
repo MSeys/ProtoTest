@@ -1,11 +1,11 @@
 ---
 sidebar_position: 16
-title: Test time
+title: Control time in tests with TimeProvider
+sidebar_label: Test time
 description: "Advance a clock instead of sleeping: each test gets its own TimeProvider, the in-process application sees it, and every advance is recorded in the trace."
 ---
 
-# Test time
-
+# Control time in tests with TimeProvider
 Some behavior depends on time, for example tariffs and expiry. A test that sleeps through that time is slow and flaky. ProtoTest gives every test a clock you move by hand, and the application under test reads the same clock.
 
 ## Seeding the run

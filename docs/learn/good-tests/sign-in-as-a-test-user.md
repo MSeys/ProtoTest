@@ -3,7 +3,7 @@ id: sign-in-as-a-test-user
 title: Sign in as a test user
 sidebar_label: Sign in as a test user
 sidebar_position: 4
-description: "Declare the user a test acts as with [SignedInAs], read the identity in the trace, and learn what the built-in test user cannot do against a published application."
+description: "Declare the user a test acts as with [SignedInAs], read the identity in the trace, and see what the test user cannot do against a published app."
 ---
 
 import Lesson from '@site/src/components/Lesson';

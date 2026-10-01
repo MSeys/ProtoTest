@@ -1,11 +1,11 @@
 ---
 sidebar_position: 1
-title: REST API integration testing
+title: Test REST APIs in .NET
 sidebar_label: Overview
 description: "A per-test HTTP client on IHttpClientFactory, with JSON shape assertions, shared authentication, capture and coverage."
 ---
 
-# REST
+# Test REST APIs in .NET
 
 `ProtoTest.Rest` gives each test a named HTTP client with JSON shape assertions.
 

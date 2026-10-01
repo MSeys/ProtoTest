@@ -7,6 +7,7 @@ description: "Create data through REST and read it back through GraphQL in one t
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
+import Link from '@docusaurus/Link';
 
 # Write over REST, read over GraphQL
 
@@ -20,7 +21,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
     'Check that a REST-created project appears through GraphQL',
   ]}
   needs={[
-    <>The previous lesson, <a href="./call-an-api">Call an API and check its shape</a></>,
+    <>The previous lesson, <Link to="/learn/across-boundaries/call-an-api">Call an API and check its shape</Link></>,
   ]}
 />
 

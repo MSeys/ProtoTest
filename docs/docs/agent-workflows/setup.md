@@ -1,12 +1,13 @@
 ---
 sidebar_position: 2
-title: Setup
+title: Set up a coding agent with ProtoTest
+sidebar_label: Setup
 description: Install the ProtoTest MCP server and register it with a coding agent so it can read the runs in your repository.
 ---
 
 import TabbedCode from '@site/src/components/TabbedCode';
 
-# Setup
+# Set up a coding agent with ProtoTest
 
 One install connects a coding agent to the runs in your repository. The server is a .NET tool. It reads `.prototrace` archives and answers questions about them over the Model Context Protocol.
 

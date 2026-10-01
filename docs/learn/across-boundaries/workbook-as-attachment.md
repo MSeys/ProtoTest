@@ -8,6 +8,7 @@ description: "Download a workbook the application generated, check it through a 
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
+import Link from '@docusaurus/Link';
 
 # Check a generated file
 
@@ -21,7 +22,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
     'Find the workbook in the trace archive',
   ]}
   needs={[
-    <>The previous lesson, <a href="./follow-a-message">Follow a message through a broker</a></>,
+    <>The previous lesson, <Link to="/learn/across-boundaries/follow-a-message">Follow a message through a broker</Link></>,
     'The Northstar sample checkout and .NET 8 SDK, with default local settings',
   ]}
 />

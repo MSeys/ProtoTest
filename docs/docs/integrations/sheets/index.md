@@ -1,13 +1,13 @@
 ---
 sidebar_position: 11
-title: Sheets
+title: Test Excel workbook downloads in .NET
+sidebar_label: Sheets
 description: "Open the .xlsx your application generated and assert on its sheets, cells, ranges and typed rows."
 ---
 
 import TraceExample from '@site/src/components/TraceExample';
 
-# Sheets
-
+# Test Excel workbook downloads in .NET
 `ProtoTest.Sheets` opens the `.xlsx` your application generated and lets a test assert on its sheets, cells, ranges and typed rows.
 
 ```csharp

@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
-title: Installation
+title: Install ProtoTest
+sidebar_label: Installation
 description: "Install ProtoTest from the template, or add the runner and integration packages to a test project of your own."
 ---
 
@@ -41,7 +42,7 @@ export const installTabs = [
   },
 ];
 
-# Installation
+# Install ProtoTest
 
 You can start from a template that gives you a working API and test suite, or add ProtoTest packages to a test project you already have. The template is the faster way to see ProtoTest work.
 

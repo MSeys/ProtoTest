@@ -22,6 +22,9 @@ export default async function createConfig(): Promise<Config> {
   organizationName: 'MSeys',
   projectName: 'ProtoTest',
 
+  // Cloudflare Pages serves every page as a folder and redirects the slashless address to it, so links and
+  // canonical URLs end with a slash and never point at a redirect.
+  trailingSlash: true,
   onBrokenLinks: 'throw',
   markdown: {
     mermaid: true,
@@ -67,6 +70,8 @@ export default async function createConfig(): Promise<Config> {
         blog: false,
         sitemap: {
           ignorePatterns: ['/search'],
+          // The git date of each page, so a search engine sees which pages changed.
+          lastmod: 'date',
         },
         theme: {
           customCss: './src/css/custom.css',

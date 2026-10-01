@@ -37,7 +37,7 @@ An attribute is a C# attribute that prepares something for a test and cleans it 
 
 ### 1. Read the sample's attribute
 
-`NorthstarTenantAttribute` creates an isolated organization for the test. The data surface it calls also registers the cleanup, so the attribute does not remove the tenant itself.
+`NorthstarTenantAttribute` creates an isolated organization for the test. The data surface it calls, `context.Data()`, creates test data and registers its cleanup, so the attribute does not remove the tenant itself.
 
 <AnnotatedCode
   filename="NorthstarAttributes.cs"
@@ -142,7 +142,8 @@ The committed trace of the first journey, <a href="pathname:///lessons/l1-first-
 | `Before · NorthstarTenantAttribute`, 139.9 ms | Runs first, at order -200. |
 | `Create · ProvisionTenantRequest`, 137.0 ms | The tenant attribute's call to the data surface. |
 | `Before · NorthstarMemberAttribute` | The composite's own entry, carrying the attributes it composed. |
-| `After · NorthstarMemberAttribute`, then `After · NorthstarTenantAttribute` | Teardown reverses the order, and the tenant is removed. |
+| `After · NorthstarMemberAttribute`, then `After · NorthstarTenantAttribute` | Teardown reverses the order. |
+| `Release · data:TenantResponse:1`, then `Cleanup · TenantResponse` | The data surface removes the tenant it created. |
 
 ## Check yourself
 
@@ -156,7 +157,7 @@ The tenant attribute's before entry comes first, so it appears before yours in t
 
 ## Remember
 
-- An attribute derives from `ProtoAttribute` and overrides `BeforeTestAsync` and `AfterTestAsync`.
+- An attribute derives from `ProtoAttribute` and overrides `BeforeTestAsync`, and `AfterTestAsync` when it has something to undo.
 - `Order` sequences attributes that depend on each other, and teardown runs in reverse.
 - A composite attribute groups attributes that always travel together.
 

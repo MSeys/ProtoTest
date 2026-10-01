@@ -107,7 +107,7 @@ await host.StartAsync().ConfigureAwait(false);`}
 
 ### 3. Look for the end of the run in a trace
 
-Open [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace) in the [viewer](https://trace.prototest.dev). The host writes its own work in the run layer, outside every test. At the end, three entries release run resources after the test's teardown:
+Open [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace) in the [viewer](https://trace.prototest.dev). The host writes its own work in the run layer: the part of the trace that belongs to no single test. At the end, three entries release run resources after the test's teardown:
 
 | Entry | What it releases |
 | --- | --- |

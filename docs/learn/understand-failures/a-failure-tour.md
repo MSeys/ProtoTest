@@ -39,7 +39,7 @@ The Northstar sample suite ships four deliberate failures, each paired with a pa
 
 ### 1. Turn the failing tests on
 
-The sample skips the deliberate failures unless you enable them. Run this tour with the default local configuration and nothing listening on port 5099. A configured `ProtoTest__TargetUrl` changes which application the tests call.
+The sample skips the deliberate failures unless you enable them. Use the default local configuration, with nothing listening on port 5099.
 
 Set one environment variable and run the sample:
 
@@ -48,15 +48,15 @@ $env:ProtoTest__Sample__Drills = "true"
 dotnet test samples/Northstar.ProtoTest
 ```
 
-After the experiment, remove `ProtoTest__Sample__Drills` from your shell environment, or restore its previous value, before running the suite normally.
+Remove `ProtoTest__Sample__Drills` again before running the suite normally.
 
 With those prerequisites, expect four deliberate failures: time, state, environment and visibility. Their paired examples should pass. A fifth journey adds a finding and calls `Assert.Warn`, so its trace records a partial outcome.
 
-The sample writes a trace when the run reaches its reporting step. You can also use the saved traces below, which come from the same sample.
+You can also use the saved traces below, which come from the same sample.
 
 ### 2. Open a card
 
-Each card shows what a failing test recorded and what the test beside it does instead. The values are from a real recording, not an illustration.
+Each card shows what a failing test recorded and what the test beside it does instead.
 
 <FailureGallery />
 
@@ -68,7 +68,7 @@ The visibility failure already includes the response body in its status error. I
 
 The time failure waits a real second, which does not advance the test clock. Its paired test advances that clock eight days, then calls the application to observe the overdue invoice.
 
-This clock change reaches the application in the default in-process setup. Moving the test clock alone does not run billing or change a separately deployed application's clock.
+Moving the test clock alone does not run billing. The next request does.
 
 This is the body of `TheTestClockClosesTheDueWindow`:
 
@@ -90,7 +90,7 @@ paid
     .Should.MatchShape(new { status = InvoiceStatuses.Paid });`}
   callouts={[
     {line: 1, title: 'Build and provision the invoice', note: 'The local provisioner records usage and advances the tenant clock to issue an invoice. Tenant teardown removes the data.'},
-    {line: 3, title: 'Move the test clock', note: 'Advance records a clock.advance event, and the in-process application reads the same clock.'},
+    {line: 3, title: 'Move the test clock', note: 'Advance moves the test\'s clock and records a clock.advance event. The application runs inside the test process and reads that same clock.'},
     {line: 4, title: 'Call through the composed client', note: 'Rest() uses the client supplied by the run. Here it calls the in-process application, which reads the test clock.'},
     {line: 7, title: 'Assert the property the behavior depends on', note: 'For a status value mismatch, MatchShape reports the JSON path, expected value and actual value.'},
     {line: 11, title: 'Pay, then check the result', note: 'The second call reuses the same client, the same context and the same trace.'},
@@ -104,7 +104,7 @@ Each deliberate failure exposes an assumption. Real time moves the test clock, a
 
 The paired examples replace those assumptions with explicit setup, the client supplied by the run, and checks of the expected response. Compare both the requests and the assertions when reading each pair.
 
-Each failure also left a trace. You can download any of them from its card and open it in the [viewer](https://trace.prototest.dev). The next lesson reads one.
+Each failure left a trace you can download from its card and open in the [viewer](https://trace.prototest.dev). The next lesson reads one.
 
 ## Check yourself
 
@@ -114,7 +114,7 @@ Each failure also left a trace. You can download any of them from its card and o
 
 The saved trace records a connection error on `test.execution` and no HTTP operation. The source explains why: this test uses a raw `HttpClient` with the hardcoded address `http://127.0.0.1:5099`.
 
-That call has no HTTP instrumentation in this sample. A missing HTTP operation alone does not prove that no request happened or identify which client made it. Activity outside the configured instrumentation is absent from the trace.
+That client has no HTTP instrumentation, so its request is absent from the trace. A missing operation alone does not prove that no request happened.
 
 The fix calls the same endpoint through `Proto.Context.Rest()`, and then the request, the response and the shape check all appear.
 

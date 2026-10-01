@@ -42,14 +42,14 @@ Instead, the test moves its clock past the period end and sends a request. The a
 
 Use the sample's default local configuration for this lesson. Follow `ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock` in `samples/Northstar.ProtoTest/ClockJourney.cs`, or inspect the linked recording.
 
-The setup class starts the API inside the test process. Inside its `AddApplication` registration, this excerpt adds the in-process server:
+The setup class starts the API inside the test process. In `AddApplication`, where the setup class registers the API, this excerpt adds the in-process server:
 
 ```csharp
 app.AddAspNetCoreServer<NorthstarProgram>(configureWebHost: webHost =>
     ConfigureHostedApplication(webHost, run));
 ```
 
-This code is in `samples/Northstar.ProtoTest/Setup.cs`. The sample already configures it. The server supplies a `TimeProvider` that reads the current test's clock while handling its requests.
+The sample already configures this in `Setup.cs`. The server supplies a `TimeProvider` that reads the current test's clock while handling its requests.
 
 Northstar's billing code uses that provider. Code that reads `DateTimeOffset.UtcNow` directly would still see real time.
 
@@ -113,21 +113,15 @@ Or download [l3-clock-window.prototrace](pathname:///lessons/l3-clock-window.pro
 | `http.request` REST `GET /api/v1/invoices`, 68.4 ms, HTTP 200 | the invoice the test read |
 | `test.execution`, 233.7 ms | the test body, excluding setup and teardown |
 
-The recorded test body took 233.7 ms while advancing its clock by a month and one second. Your run's timings can differ.
+The recorded test body took 233.7 ms while its clock moved a month and one second.
 
 ## What happened
 
 The trace records the clock advance as an event on `test.execution`. The test updates an in-memory clock. The next request lets the application observe the new time.
 
-Each test gets a new clock seeded from the run clock. Advancing one test's clock does not advance another's. The in-process server uses the request's test id to find that clock in its owning host.
+Each test gets its own clock, which starts at the run's time. Advancing one test's clock does not advance another's. On each request, the in-process server uses the test id to find the right clock.
 
-The billing check no longer depends on how much real time elapsed. Requests and database work still take real time, so this does not eliminate every possible timeout or failure.
-
-The clock only changes `TimeProvider.GetUtcNow()`. Timers and ordinary delays still use real time. Code outside the test or request flow reads the run clock instead.
-
-The bridge follows the async flow. A background task that captures the request flow can retain its clock, so do not assume all background work uses run time.
-
-This sample's loopback browser application runs separately and does not receive the in-process clock bridge. Container and deployed applications likewise need their own way to control time.
+The clock only changes `TimeProvider.GetUtcNow()`. Timers and delays still use real time, and an application outside the test process, such as a container, needs its own way to control time.
 
 ## Check yourself
 

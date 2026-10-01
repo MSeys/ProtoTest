@@ -61,10 +61,14 @@ read in a hurry, often from a failing build, and come back later for depth.
 6. **Remember**: two or three lines. Then the next lesson.
 
 A lesson teaches one new idea. Words from the trace (operation, phase, gap) are taught in a lesson before another
-lesson uses them.
+lesson uses them. A lesson still gives each ProtoTest word a few plain words at its first use on that page, even
+when an earlier lesson taught it: readers skip around. [Words used in Learn](/learn/words) lists them all, and a
+new word gets a row there.
 
-A lesson stays under 750 reading words: prose, callouts and checkpoint answers, not code. `prose-check` counts
-them and flags a lesson over budget. A lesson says what is true for the steps the reader does. Exceptions, edge
+A lesson aims for 750 reading words or fewer: prose, callouts and checkpoint answers, not code. `prose-check`
+counts them and flags a lesson over that line. The number is a warning, not a cap: cut repetition and reference
+detail, never a step or the why a beginner needs. A lesson may go over when its report says what the extra words
+teach. A lesson says what is true for the steps the reader does. Exceptions, edge
 cases and limits belong on the reference page under **Go deeper**. A correction replaces the wrong sentence; it
 does not add a caveat beside it.
 

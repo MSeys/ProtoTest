@@ -43,7 +43,7 @@ Download [l0-state-fix.prototrace](pathname:///lessons/l0-state-fix.prototrace) 
 
 Teardown is the phase after the test body. In this recording, it includes these operations:
 
-- It publishes the attachments.
+- It publishes the attachments: the files the test kept, such as request and response bodies.
 - It runs the tenant's cleanup callback: `data.cleanup` TenantResponse, 9.0 ms, with a successful outcome.
 - It releases registered resources, including `data:TenantResponse:1`, application services, the database connection and the messaging consumer.
 
@@ -51,9 +51,9 @@ The tenant's `resource.release` contains its `data.cleanup` operation. They desc
 
 ### 3. Check who owns what
 
-Open the value list. The tenant item records `owned: true`. The project records `owned: false`: its provisioner returned a value without a separate cleanup callback.
+Open the State tab and find the group "What the test ran on". The tenant item records `owned: true`. The project records `owned: false`: its provisioner returned a value without a separate cleanup callback.
 
-The tenant provisioner returns a disposer that calls `NorthstarStore.DeleteTenant`. The database model cascades that deletion to the tenant's projects. ProtoTest registers the disposer as a resource owned by the test context.
+The tenant provisioner returns a disposer, an object whose disposal calls `NorthstarStore.DeleteTenant`. The database model cascades that deletion to the tenant's projects. ProtoTest registers the disposer as a resource owned by the test context.
 
 The successful operation means the disposer returned without throwing. It is not an independent query proving that no records remain.
 

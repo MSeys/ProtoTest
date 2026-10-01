@@ -54,13 +54,13 @@ public sealed record ProjectReportRow(
     [property: Column("Environments", Min = 0)] int Environments);
 ```
 
-The record names the `Summary` sheet and header row 1. Each property maps to a named column. The rules require distinct names, lowercase status text and nonnegative environment counts.
+`[Sheet]` and `[Column]` are attributes from ProtoTest's Sheets integration. The record names the `Summary` sheet and header row 1. Each property maps to a named column. The rules require distinct names, lowercase status text and nonnegative environment counts.
 
 Binding the model requires those headers to exist. The model reads typed values, so a changed cell position need not change the test when the header still matches.
 
 ### 3. Download and open the workbook
 
-First the test creates a project the report must contain, then it downloads the report:
+First the test creates a project the report must contain. `Data().For<T>()` starts a request with the sample's defaults, `With` changes one field, and `CreateAsync` creates it. Then the test downloads the report:
 
 ```csharp
 var project = await Proto.Context.Data()
@@ -106,7 +106,7 @@ Your new run writes its trace under `samples/Northstar.ProtoTest/bin/Debug/net8.
 
 ## What happened
 
-The setup class enables REST attachments with `CaptureAttachments()`. For this binary response, REST saves the downloaded bytes. Opening them with Sheets does not itself attach a workbook.
+The setup class tells the REST client to keep request and response bodies as attachments, with `CaptureAttachments()`. For this binary response, REST saves the downloaded bytes. Opening them with Sheets does not itself attach a workbook.
 
 The saved archive therefore carries the file the test read. Its embedded report lists the ranges read as coverage, `Summary!A2:C2` and `Summary!C2:C2`. Those ranges describe this one-row example. They do not prove that every workbook requirement was asserted.
 

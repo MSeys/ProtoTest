@@ -29,7 +29,7 @@ A deployed environment can outlive the test process. You want the suite to use i
 
 In topology mode, the suite started the product through Aspire. Here a script starts the product processes outside the suite and supplies their addresses. OpenCSMS rehearses that arrangement on one machine.
 
-This lesson explains the saved run. To run the commands yourself, use the optional OpenCSMS checkout and a container runtime.
+
 
 ## Do it
 
@@ -42,7 +42,7 @@ docker run -d --name opencsms-postgres -e POSTGRES_USER=opencsms -e POSTGRES_PAS
 docker run -d --name opencsms-rabbitmq -p 5672:5672 rabbitmq:3-alpine
 ```
 
-The script reuses the same containers across suite runs and leaves them running afterwards. These commands do not configure named volumes or guarantee data recovery after container recreation.
+The script reuses these containers across runs and leaves them running.
 
 ### 2. Run the mode
 
@@ -54,7 +54,7 @@ pwsh eng/run-suite.ps1 -Mode published
 
 The script builds the dashboard and product, then starts `OpenCsms.Api.dll` on `http://127.0.0.1:5080`. It starts both workers and waits until `/healthz` returns HTTP 200.
 
-It supplies the five keys below, runs the suite with `--no-build`, and stops the three product processes afterwards. This is a local deployment rehearsal, not a staging environment.
+It supplies the five keys below, runs the suite, and stops the three product processes afterwards.
 
 ### 3. Read the five keys
 
@@ -62,15 +62,11 @@ It supplies the five keys below, runs the suite with `--no-build`, and stops the
 | --- | --- |
 | `ConnectionStrings__Csms` | the product's PostgreSQL database |
 | `Messaging__RabbitMq__ConnectionString` | the product's RabbitMQ broker |
-| `ProtoTest__Messaging__RabbitMq__ConnectionString` | the address the suite's own messaging tap uses |
+| `ProtoTest__Messaging__RabbitMq__ConnectionString` | the broker for the suite's own tap, the listener a test uses to watch messages |
 | `ProtoTest__Applications__Csms__BaseUrl` | the API the suite calls and provisions through |
 | `ProtoTest__Applications__Dashboard__BaseUrl` | the same address, for the browser session |
 
-The script also clears Aspire selectors, the seed override and both notification-target environment keys. That prevents those shell settings from changing this rehearsal's configuration.
-
-`UseConfigured()` comes first in the relevant application and infrastructure chains. The supplied addresses replace the suite's API, dashboard, database and broker providers. The API's worker registrations follow that choice, so ProtoTest does not host those workers in the test process.
-
-The setup class still registers local HTTP fakes and other test resources. Selecting configured product addresses does not disable the rest of the suite.
+Each target is served by a chain: an ordered list of providers, where the first one that applies wins (lesson 1). `UseConfigured()` comes first, so these addresses replace the containers and in-process servers the suite would otherwise start. ProtoTest then hosts no workers in the test process. The suite's local HTTP fakes and other test resources still start.
 
 ### 4. Read the counts
 
@@ -78,11 +74,7 @@ The setup class still registers local HTTP fakes and other test resources. Selec
 Passed!  - Failed:     0, Passed:    61, Skipped:    13, Total:    74, Duration: 20 s - OpenCsms.Suite.dll (net8.0)
 ```
 
-This output comes from `artifacts/gates/opencsms-published-20260928-090106.log` in the OpenCSMS checkout. It lists the same 13 skipped names as the topology recording, without printing their reasons.
-
-The source explains their requirements: seven clock-dependent journeys, two outbox substitutions and four notification journeys requiring in-process services, hosted workers and the clock.
-
-This snapshot contains 74 tests. Lesson 1's later container snapshot contains 75, including the added tariff-repricing journey. That journey is absent from this log, not an additional skip. Do not expect identical totals across different source snapshots.
+This output comes from `artifacts/gates/opencsms-published-20260928-090106.log`. It skips the same 13 tests as the topology run, for the same missing in-process capabilities.
 
 ### 5. Read the worker logs beside it
 
@@ -92,7 +84,7 @@ The process logs sit beside the suite log, with `billing-worker` and `notificati
 SessionEndedConsumer consuming 'billing.session-ended'.
 ```
 
-The notification process had no target addresses. Each of its two consumers reported why it remained idle:
+The notification process had no target addresses. Each of its two consumers, the parts that react to broker messages, reported why it remained idle:
 
 ```text
 InvoiceIssuedNotificationConsumer is idle: No invoice-ready target is configured ('Notifications:InvoiceReadyBaseUrl').
@@ -101,11 +93,11 @@ BillingFailedNotificationConsumer is idle: No billing-failure target is configur
 
 ![An invoice detail: energy amount, start fee, idle fee and the total the billing worker calculated.](/images/opencsms/invoice.png)
 
-The product's invoice detail shows energy, start fee and idle fee, summed into the total. This screenshot illustrates the screen, not evidence from the quoted run.
+The invoice detail the billing worker fills. An illustration, not evidence from this run.
 
 ![The invoices screen with the monthly export: a month picker and a download button.](/images/opencsms/export.png)
 
-The monthly export screen offers an `.xlsx` download of stored invoice rows. Its browser download journey is one of the skips in this published recording.
+The monthly export screen. Its download journey is one of this run's skips.
 
 ## What happened
 
@@ -115,15 +107,9 @@ In this published rehearsal:
 - **The database and broker** run in existing containers that outlive the suite invocation.
 - **The suite** still owns clients, fixtures, local HTTP fakes and reports. The recorded run skips the same 13 tests as the topology recording.
 
-An idle notification consumer does not prove delivery works. These consumers deliberately stop before subscribing when their target address is missing. Their log messages explain why this run does not exercise outbound notifications.
+An idle notification consumer does not prove delivery works. It stops before subscribing when its target address is missing, and says so in its log.
 
-The mode has these limits:
-
-- The separate processes do not receive the suite's in-process service substitutions or clock bridge.
-- WireMock listens on HTTP ports, which another local process can reach when configured with their addresses. This script does not supply those addresses to the notification process.
-- Notification journeys also declare in-process, hosted-worker and clock requirements. A reachable fake alone does not satisfy those requirements.
-
-A team can supply the five keys for another compatible environment and run `dotnet test` with Aspire selection disabled. Capability requirements still determine which journeys can run there.
+Separate processes do not receive the suite's service substitutions or test clock. A team can supply the same five keys for another environment. Capability requirements still decide which journeys run there.
 
 ## Check yourself
 
@@ -133,7 +119,7 @@ A team can supply the five keys for another compatible environment and run `dotn
 
 `Notifications:InvoiceReadyBaseUrl` and `Notifications:BillingFailureBaseUrl` are unset in the notification process. The invoice consumer prints the invoice-ready message above. The failure consumer prints the billing-failure message.
 
-The suite configures its own local fakes, but that configuration does not automatically reach an already-started worker process. HTTP reachability and process configuration are separate concerns.
+The suite's own fakes do not reach a worker process the script already started.
 
 </Checkpoint>
 

@@ -31,7 +31,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
 Your suite passes when it runs one test at a time. You turn on parallelism to save time, and two tests now fail
 at random. Run them alone and they pass.
 
-Look for state the tests share. Two tests might create a project named `atlas` in the same tenant.
+Look for state the tests share. Two tests might create a project named `atlas` in the same tenant, the sample's space for one customer's data.
 One might write a static field that another reads, or remove a record another still needs.
 Running separately can hide those conflicts.
 
@@ -56,7 +56,7 @@ From the repository root, run the two tests whose saved traces appear below:
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~EachTenantSeesOnlyItsOwnProjects|FullyQualifiedName~ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock"
 ```
 
-Both tests should pass with the sample's default setup. To check whether their execution overlapped, compare their times in the trace from this run.
+Both tests pass. Compare their times in that run's trace to see whether they overlapped.
 
 ### 2. Give each test its own tenant
 
@@ -64,22 +64,19 @@ A tenant is the space where one test's durable records live. Its name carries th
 
 - The tenant name comes from `context.UniqueName("northstar")`, which reads `northstar-<test id>`.
 - Names inside separate tenants can be fixed. `PlatformJourney` uses `atlas`, and `SheetsJourney` uses `report-atlas`. Their projects belong to the tenant each test creates.
-- Member emails include `context.TestId`. The scenario correlation id includes both the test id and a generated GUID.
-- Teardown deletes the tenant using the slug returned during setup.
+- Member emails include `context.TestId`.
+- Teardown deletes the tenant using the short name (slug) the application returned during setup.
 
-The default test id combines a run prefix with a sequence allocated by the host. That sequence separates tests within one host.
-The random prefix reduces collisions between runs but cannot guarantee unique names across processes sharing a database. Those processes need an agreed naming scheme.
+The test id is unique within one host. Several processes sharing one database need an agreed naming scheme.
 
 ### 3. Keep per-test state on the context \{#3-keep-everything-else-on-the-context}
 
 `Proto.Context` resolves the test context for the current async flow. Tasks that inherit that flow use the same context.
 Keep those tasks within the test's lifetime. Do not pass a context between tests or store it in a static field.
 
-The context keeps per-test state, client registrations, resources and evidence together. Registering a shared object there does not make it private or safe for concurrent use.
-Use isolated state where possible. Shared mutable objects still need coordination.
+The context keeps per-test state, clients, resources and evidence together. Registering a shared object there does not make it private or safe for concurrent use.
 
-The run owns shared infrastructure, such as its store, broker and loopback listener. Tests use these resources, including writing to them, but must not dispose them.
-The host releases run-owned resources after the tests finish.
+The run owns shared infrastructure, such as its store, broker and loopback listener. Tests use these resources but must not dispose them.
 
 ### 4. Compare two traces
 
@@ -93,7 +90,7 @@ Open these two archives in the [viewer](https://trace.prototest.dev), one per ta
 In each setup layer, find the tenant name carrying the test id. Then find its release during teardown.
 The tenant resource's final state is `released` in both archives.
 
-These archives come from separate runs. They show ownership and cleanup, not concurrent execution. Neither contains the `atlas` or `report-atlas` examples from the other journeys.
+These archives come from separate runs. They show ownership and cleanup, not concurrent execution.
 
 ## What happened
 

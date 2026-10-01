@@ -38,7 +38,7 @@ This lesson reads the failures from the last lesson as if they were your own.
 
 ### 1. Open the two traces of one pair
 
-Each pair compares a deliberate failure with a different test that addresses it. The panes show selected evidence from saved sample traces, rather than the complete operation tree. Their durations describe those recorded executions, not a timing target for your machine.
+Each pair compares a deliberate failure with a different test that addresses it. The panes show selected evidence from saved sample traces, not the whole operation tree.
 
 <TraceDiff />
 
@@ -73,7 +73,7 @@ The time failure waited a real second, but that did not advance the test clock. 
 
 The environment drill used a plain `HttpClient` with a hardcoded address. It ran inside the test, but bypassed ProtoTest's REST request instrumentation. The trace records the resulting test failure without a separate request operation. The fix uses `Proto.Context.Rest()`, which resolves the configured application and records the request and checks.
 
-An absent operation is a clue, not proof that work ran outside the test. Check the source: the call may have been skipped, failed before recording began, or used an uninstrumented client. Here, the raw client explains the missing entry.
+A missing operation is a clue, not proof. Check the source: the call may have been skipped, may have failed before ProtoTest started recording, or may have used a client ProtoTest does not record. Here, the raw client explains the missing entry.
 
 ## Check yourself
 

@@ -57,9 +57,9 @@ In this sample, a tenant groups one customer's data. `NorthstarTenantAttribute` 
         tenant.ApiBaseUrl));
 }`}
   callouts={[
-    {line: 3, title: 'Provision through the data client', note: 'The request says what the test needs. The registered provisioner decides how it is created.'},
-    {line: 5, title: 'Include the test id in the name', note: 'UniqueName returns "northstar-<test id>". This distinguishes names within one host using the default id generator; it does not enforce access or cleanup.'},
-    {line: 8, title: 'Keep the tenant details in context', note: 'SetContext stores the returned ids, address and owner credentials for this test. Helpers and the sample authenticator use those details.'},
+    {line: 3, title: 'Provision through the data client', note: 'The registered provisioner decides how the tenant is created.'},
+    {line: 5, title: 'Include the test id in the name', note: 'UniqueName returns "northstar-<test id>". A name is not an access boundary.'},
+    {line: 8, title: 'Keep the tenant details in context', note: 'The ids and owner credentials stay with this test.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/NorthstarAttributes.cs</code>.</>}
 />
@@ -78,8 +78,8 @@ var page = response
     .Should.HaveHttpStatus(HttpStatusCode.OK)
     .ReadRequired<CursorPage<ProjectResponse>>();`}
   callouts={[
-    {line: 1, title: 'Make the name recognizable', note: 'The name includes TestId so you can associate it with the test. The provisioner creates the project in the authenticated member\'s tenant.'},
-    {line: 4, title: 'Read the member\'s tenant', note: 'The sample authenticator sends that tenant member\'s bearer token. The application lists projects for the authenticated tenant.'},
+    {line: 2, title: 'Create in this test\'s tenant', note: 'The provisioner uses the signed-in member\'s tenant.'},
+    {line: 3, title: 'Read the same tenant', note: 'The member\'s token makes the application list only this tenant\'s projects.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/FailureDrills.cs</code>. The drill next to it read <code>prj_1</code>.</>}
 />
@@ -96,26 +96,24 @@ The omitted NUnit assertions check `TotalCount == 1`, then compare the returned 
 
 ### 4. Find the creation in the trace
 
-Download [l0-state-fix.prototrace](pathname:///lessons/l0-state-fix.prototrace) and open it in the [viewer](https://trace.prototest.dev). Select `EachTenantSeesOnlyItsOwnProjects` and inspect Setup and Execution. These values belong to the saved recording:
+Download [l0-state-fix.prototrace](pathname:///lessons/l0-state-fix.prototrace) and open it in the [viewer](https://trace.prototest.dev). Select `EachTenantSeesOnlyItsOwnProjects`. The Steps tab shows its operations phase by phase: Setup before the test body (folded into one line, so open it), then Execution for the body. The first word of each kind, such as `data` or `http`, says what sort of step it is:
 
 | Layer | Entry | What it shows |
 | --- | --- | --- |
-| Setup | `data.create` ProvisionTenantRequest, 149.6 ms, with nested `data.provision`, 144.6 ms | the tenant exists before the body runs, named `northstar-553135000001` in this recording |
-| Setup | `attribute.before` SignedInAs, then `auth.user.sign-in` | the test declares its identity; the sample authenticator supplies the tenant member's token when needed |
-| Execution | `data.create` CreateProjectRequest, 100.2 ms | the project is created in the test's own tenant |
+| Setup | `data.create` ProvisionTenantRequest, 149.6 ms | the tenant `northstar-553135000001` exists before the body runs |
+| Setup | `attribute.before` SignedInAs, then `auth.user.sign-in` | the test declares its identity |
+| Execution | `data.create` CreateProjectRequest, 100.2 ms | the project, in the test's own tenant |
 | Execution | `http.request` REST `GET /api/v1/projects`, 72.6 ms, HTTP 200 | the read the check judged |
 
-Open the response attachment to see `totalCount: 1` and the project named `own-553135000001`. Fresh runs can have different ids and timings.
+Open the response attachment to see `totalCount: 1` and the project named `own-553135000001`.
 
 ## What happened
 
 The test arranged its own tenant and project. Its authenticated request selected that tenant, and the application limited the list to that tenant's projects. The name helped identify the record, but did not provide the access boundary.
 
-The sample configures up to eight parallel workers. Each test provisions a tenant and keeps its credentials in its own context. Tests must continue using their own tenant details rather than sharing credentials or mutable state.
+This holds under parallel runs too: each test keeps its own tenant credentials in its own context.
 
-The default id generator combines a random run prefix with a sequence within the host. It does not guarantee unique names across runs or processes. `UniqueName` also does not delete records or register their cleanup.
-
-Northstar's tenant provisioner explicitly returns a cleanup object that deletes the tenant. ProtoTest registers that object as a resource owned by the test. Merely calling `SetContext` would not register deletion. Lesson 6 follows that cleanup.
+Cleanup is a separate step. Northstar's tenant provisioner returns a cleanup that deletes the tenant, and ProtoTest registers it as a test-owned resource. Lesson 6 follows it.
 
 ## Check yourself
 

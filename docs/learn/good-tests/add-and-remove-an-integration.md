@@ -60,7 +60,7 @@ The runner reports the reason registered by the setup class: "No broker is confi
 
 Open [l2-broker-skip.prototrace](pathname:///lessons/l2-broker-skip.prototrace) in the [viewer](https://trace.prototest.dev). This recording has no test in it. Its three operations release run-owned resources: the messaging broker resource, readiness probe and loopback application. It contains no test setup, execution or checks.
 
-This capability check skips the test before its lifecycle starts. The reason appears in the runner output. A test that skips from inside its body can already have trace entries.
+The capability check skips the test before its lifecycle starts, so the reason is in the runner output.
 
 ### 3. Add the broker
 
@@ -128,9 +128,7 @@ With the default settings used above, the switch changes the adapter and the cap
 | The archive | the saved example has three releases and no test | the REST request, messaging await and container operations |
 | The test file | unchanged | unchanged |
 
-The capability check runs before the test's lifecycle starts. That is why this skipped run has no test in its trace.
-
-`AddMessaging` remains registered in both modes. This example adds or removes the RabbitMQ adapter through the host's setup, leaving the test unchanged. Changing the setting affects the next run, not a host already running.
+`AddMessaging` stays registered in both modes. Only the adapter changes. A new setting affects the next run, not a host already running.
 
 ## Check yourself
 

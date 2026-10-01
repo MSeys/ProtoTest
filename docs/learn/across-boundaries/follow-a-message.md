@@ -41,7 +41,7 @@ dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~PayingAnInv
 
 With the default sample settings, the result is one skipped test. Step 5 enables RabbitMQ so the test body below can run.
 
-The class selects the Northstar API and uses `NorthstarMember` to provision a tenant and configure authentication. The method declares `[SignedInAs]`.
+
 
 ### 2. Trigger the event
 
@@ -54,7 +54,7 @@ using var paid = await Proto.Context.Rest()
 paid.Should.HaveHttpStatus(HttpStatusCode.OK);
 ```
 
-The test issues an invoice through the data helper, then pays it over REST. With RabbitMQ configured, the payment endpoint publishes an `invoice.paid` event before returning HTTP 200.
+The test issues an invoice with `Proto.Context.Data()`, which creates test data for it, then pays the invoice over REST. With RabbitMQ configured, the payment endpoint publishes an `invoice.paid` event before returning HTTP 200.
 
 ### 3. Await the message
 
@@ -70,9 +70,9 @@ var message = await Proto.Context.Messaging().AwaitAsync(
 
 `Proto.Context.Messaging()` returns the messaging client. `AwaitAsync` takes the destination, a predicate and a timeout. It returns the first available, unconsumed message on `invoice.paid` for which the predicate is true.
 
-The sample searches the payload text for the invoice id. This is a substring check: an expected id of `12` could also match `123`. For strict correlation, parse the JSON and compare the complete id value. The snippet does not guarantee isolation from every other test's messages.
+The sample searches the payload text for the invoice id. This is a substring check: an expected id of `12` could also match `123`. For strict correlation, parse the JSON and compare the complete id value.
 
-If no matching message arrives within 15 seconds, the call throws a `TimeoutException` and the test fails. The await resumes when a matching delivery is available instead of imposing a fixed sleep. A failed broker connection or tap setup can fail the call earlier.
+If no matching message arrives within 15 seconds, the call throws a `TimeoutException` and the test fails. A failed broker connection can fail it earlier.
 
 ### 4. Assert the message
 
@@ -92,7 +92,7 @@ The class carries `[RequiresCapability(ProtoCapabilityKinds.Broker)]`. The sampl
 
 The setup class supplies this reason: "No broker is configured; set ProtoTest:Messaging:Broker=container." A configured address enables the capability, but does not prove the broker is reachable.
 
-To run the container path, start Docker and use the default local sample settings. In PowerShell, set the environment variable corresponding to that configuration key:
+To let the run start RabbitMQ in a container, start Docker and keep the default local sample settings. In PowerShell, set the environment variable corresponding to that configuration key:
 
 ```powershell
 $env:ProtoTest__Messaging__Broker = "container"
@@ -101,7 +101,7 @@ dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~PayingAnInv
 
 Without an existing broker address, the run starts a RabbitMQ container. It supplies the address to both the test adapter and the hosted application. A configured address takes precedence over starting a container. Container startup and connection failures are errors, not missing-capability skips.
 
-Afterwards, restore the variable's previous value, or remove it if you added it for this lesson. Otherwise later runs in this shell will also request a broker.
+Afterwards, remove the variable, or later runs in this shell also request a broker.
 
 In a successful run's trace, find `Messaging · await invoice.paid` under Execution and inspect its received-payload attachment. This is the test receiving the application's event. A skipped run has no payment or message await to inspect.
 

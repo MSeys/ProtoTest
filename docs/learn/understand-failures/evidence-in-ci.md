@@ -77,7 +77,7 @@ The `if: always()` line is the one that matters. Without it the upload is skippe
 
 ### 3. Post the digest
 
-The feedback action installs the CLI, uploads the trace and posts the digest:
+The feedback action installs the CLI, uploads the trace and posts the digest, a short summary of what failed and why:
 
 ```yaml
 - name: Post the evidence

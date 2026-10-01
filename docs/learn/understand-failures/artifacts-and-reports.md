@@ -40,7 +40,7 @@ Download [l4-artifacts.prototrace](pathname:///lessons/l4-artifacts.prototrace).
 
 ### 2. Open it in the viewer
 
-Drop it on the [viewer](https://trace.prototest.dev). You see the operations and the state. The viewer reads the file locally in your browser, so nothing is uploaded.
+Drop it on the [viewer](https://trace.prototest.dev). You see the operations, each recorded step, and the state: what existed during the run and how it changed. The viewer reads the file locally in your browser, so nothing is uploaded.
 
 ### 3. Open it with an archive tool
 

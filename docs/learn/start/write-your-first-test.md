@@ -31,13 +31,13 @@ import Link from '@docusaurus/Link';
 
 You have run the sample suite. Now add a test that creates a project and checks the response: one request, two checks, one filtered run.
 
-The sample already configures the application and its clients. You can focus on the test: select the application, prepare its data, send a request and check what comes back.
+The sample already configures the application and its clients, so you write only the test.
 
 ## Do it
 
 ### 1. Add the file
 
-Create `MyFirstJourney.cs` in `samples/Northstar.ProtoTest/` with the code below. It matches the example in the sample's README. The callouts explain the setup, request and checks.
+Create `MyFirstJourney.cs` in `samples/Northstar.ProtoTest/` with the code below. The callouts explain the setup, request and checks.
 
 <AnnotatedCode
   filename="MyFirstJourney.cs"
@@ -101,7 +101,7 @@ bin/Debug/net8.0/TestResults/prototest-{runId}.prototrace
 
 Run the same command a second time. You should see one passed test again and a new trace file.
 
-The project name contains `Proto.Context.TestId`. Its default generator combines a random run prefix with a test sequence number. Names usually differ between runs, but this is not a guarantee.
+The project name contains `Proto.Context.TestId`, which usually differs between runs but is not guaranteed to.
 
 The sample isolates project data in a tenant created for each test. Its tenant provisioner registers cleanup that removes the tenant and its projects at teardown. Repeatability depends on that isolation and cleanup, not on the project name changing.
 
@@ -138,5 +138,5 @@ The test id helps distinguish names within a run. Its random prefix does not gua
 ## Go deeper
 
 - [Your first test](/docs/getting-started/first-test): the same path against an application of your own.
-- Keep `MyFirstJourney.cs` for the next lesson, [Read the trace](/learn/start/read-the-trace). [Write your own attribute](/learn/extend/attributes) also reuses it. Delete the file when you no longer need it.
+- Keep `MyFirstJourney.cs` for the next lesson, [Read the trace](/learn/start/read-the-trace). [Write your own attribute](/learn/extend/attributes) also reuses it.
 - Next: [Read the trace](/learn/start/read-the-trace) breaks this test on purpose and finds out why.

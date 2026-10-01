@@ -3,10 +3,7 @@ import Link from '@docusaurus/Link';
 
 import useStrip from '@site/src/hooks/useStrip';
 import Frame from '@site/src/components/Frame';
-import CheckView from './CheckView';
-import RunView from './RunView';
-import StepsView from './StepsView';
-import TestViews from './TestViews';
+import ViewerMock from '@site/src/components/ViewerMock';
 import styles from './styles.module.css';
 
 /*
@@ -113,10 +110,7 @@ export default function ViewerWalkthrough(): ReactNode {
         role="tabpanel"
         aria-labelledby={`${baseId}-${view}`}
       >
-        {view === 'run' && <RunView />}
-        {view === 'steps' && <StepsView />}
-        {(view === 'timeline' || view === 'state' || view === 'evidence') && <TestViews view={view} />}
-        {view === 'check' && <CheckView />}
+        <ViewerMock screen={view} />
       </div>
     </Frame>
   );

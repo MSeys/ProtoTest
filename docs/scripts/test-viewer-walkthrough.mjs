@@ -14,10 +14,10 @@ try {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const screens = {
-    Run: ['Assertion', 'Runner failure', 'Run timeline', 'environment.processArchitecture'],
+    Run: ['Assertion', 'Runner failure', 'What this run could see'],
     Steps: ['Assertion', '1.01 s with no recorded operation', 'Teardown'],
-    Timeline: ['Operation excerpt', 'Assert response shape', '1.01 s with no recorded operation'],
-    State: ['invoice.issue', 'Invoice INV-202610-0001', 'Messaging consumer Default'],
+    Timeline: ['12 of 53 operations', 'Assert response shape', '1.01 s with no recorded operation'],
+    State: ['invoice.issue', 'Invoice INV-202610-0001', 'messaging:consumer:Default'],
     Evidence: ['scenario.started', '597539000012-rest-01-response', 'Assert response shape'],
     Check: ['Parts of this operation', 'FailureDrills.cs:36', 'Validated document'],
   };
@@ -49,9 +49,9 @@ try {
     await page.keyboard.press('End');
     await page.waitForFunction(() => document.activeElement?.textContent === 'Check');
     await page.click('[aria-label="Parts of this operation"] a:first-child');
-    assert.ok(await page.$eval('details[id$="-error"]', node => node.open));
-    await page.click('[aria-label="Parts of this operation"] a:last-child');
     assert.ok(await page.evaluate(() => location.hash.endsWith('-comparison')));
+    await page.click('[aria-label="Parts of this operation"] a:last-child');
+    assert.ok(await page.$eval('details[id$="-attributes"]', node => node.open));
     console.log(`walkthrough ${width}px: six views, keyboard navigation, section index and no horizontal overflow PASS`);
   }
   assert.deepEqual(errors, []);

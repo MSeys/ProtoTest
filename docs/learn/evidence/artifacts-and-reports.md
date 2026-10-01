@@ -1,61 +1,61 @@
 ---
 id: artifacts-and-reports
-title: The archive and the reports
-sidebar_label: The archive and the reports
+title: Archive and reports
+sidebar_label: Archive and reports
 sidebar_position: 3
-description: "What a .prototrace holds, where the reports live inside it, and how one journey keeps a downloaded workbook as evidence."
+description: "What a .prototrace holds, where the reports live inside it, and how to open one."
 ---
 
 import LearnShell from '@site/src/components/LearnShell';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
 import Link from '@docusaurus/Link';
 
-# The archive and the reports
+# Archive and reports
 
-One file from CI must explain the run to a reader who was not there. That file is the `.prototrace`: it holds the execution story, the state, the attachments and the reports the run wrote.
+One file from CI must explain the run to a reader who was not there. That file is the `.prototrace`.
 
 <LearnShell
   level="Level 4, lesson 3"
-  minutes="About 8 minutes"
+  minutes="About 6 minutes"
   outcome={[
     'Name what a .prototrace holds.',
     'Find the JSON and HTML reports inside an archive.',
-    'Read a downloaded workbook and the checks it went through.',
+    'Open an archive in the viewer and in an archive tool.',
   ]}
   before={[
-    <>Contract coverage, not code coverage (<Link to="/learn/evidence/contract-coverage">lesson 2</Link>).</>,
+    <>Contract coverage (<Link to="/learn/evidence/contract-coverage">lesson 2</Link>).</>,
     'Nothing installed. The archives are on this site.',
   ]}
   situation={
     <>
-      <p>Some evidence does not fit in a span. A downloaded workbook, a response body, a summary a hook attached: the run keeps those as attachments, with the bytes, so a reader two days later holds the same file the test checked.</p>
-      <p>The sheets journey is built to show that. The application writes a real OpenXML workbook, the test downloads it and asserts it through a record model, and the workbook lands in the archive.</p>
+      <p>A CI job uploads one file. The reviewer opens it and sees the run.</p>
+      <p>The sample configures both report sinks in one place, and the archive carries the reports next to the trace. This lesson opens that file.</p>
     </>
   }
   checkpoint={{
     question:
-      'The test never writes the workbook to disk. Where is it after the run, and what shows that the sheet model was checked?',
+      'A CI job uploads one archive. Where does the reviewer walk the operations, and where do they read the JSON report?',
     verify: (
       <>
-        Download <a href="pathname:///lessons/l4-artifacts.prototrace">l4-artifacts.prototrace</a>, open it with an archive tool (the file is a zip), and look under <code>resources/</code>.
+        Download <a href="pathname:///lessons/l4-artifacts.prototrace">l4-artifacts.prototrace</a> and open it twice: once in the viewer, once with an archive tool (the file is a zip).
       </>
     ),
     reveal: (
       <>
-        The response bytes are an attachment inside the archive, under <code>resources/&lt;test id&gt;/artifact-1/&lt;test id&gt;-rest-01-response</code>, 2,010 bytes of workbook. The execution layer holds the <code>sheets.open</code>, <code>sheets.model</code> and <code>assert.sheets</code> entries, and the embedded report carries the sheet coverage rows the model and the column check recorded, <code>Summary!A2:C2</code> and <code>Summary!C2:C2</code>.
+        The viewer walks the operations and the state. The JSON report sits inside the same file at <code>resources/run/JsonReportSink/run-artifact-1/report.json</code>. One upload carries both.
       </>
     ),
   }}
   learned={[
     'A .prototrace holds the operations, the state, the source files, the attachments and the reports.',
-    'Response bytes live in the archive as attachments, so the evidence travels with the run.',
+    'Both reports are written at the end of the run and copied into the archive.',
     'The viewer draws the execution story; the reports are files inside the same archive.',
   ]}
   next={[
     {
-      label: 'Read the findings and the run gate',
-      to: '/learn/evidence/read-the-findings-and-the-run-gate',
-      note: 'A teardown failure becomes a finding, and a gate turns it into a failed run.',
+      label: 'Workbook as attachment',
+      to: '/learn/evidence/workbook-as-attachment',
+      note: 'One journey keeps a downloaded workbook as evidence, and checks it through a record model.',
     },
     {
       label: 'Reporting',
@@ -92,40 +92,26 @@ The sample configures both report sinks in one place:
     sink.Title = "Northstar Learning demo";
 });`}
   callouts={[
-    {line: 3, title: 'The application spans', note: 'The domain activity source is captured into the trace. The trace path keeps its default TestResults/prototest-{runId}.prototrace, one archive per run, so a rerun never overwrites the last run.'},
+    {line: 3, title: 'The application spans', note: 'The domain activity source is captured into the trace, one archive per run, so a rerun never overwrites the last run.'},
     {line: 5, title: 'Both sinks copied into the archive', note: 'The JSON and HTML reports are written beside the trace and copied into resources/, so one upload carries all three.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The sink paths below <code>TestResults/Northstar.ProtoTest/</code> are the local default.</>}
 />
 
-Both files are written at the end of the run and copied into the archive, so the one artifact a CI job uploads carries the story and the report.
+Both files are written at the end of the run and copied into the archive.
 
-## The journey that proves it
+One artifact carries the story and the report.
 
-`SheetsJourney.TheMonthlyReportMatchesItsModel` creates a project, downloads the monthly report and reads it as records:
+## Reference
 
-<AnnotatedCode
-  filename="SheetsJourney.cs"
-  code={`[Sheet("Summary", HeaderRows = [1])]
-public sealed record ProjectReportRow(
-    [property: Column("Name", Unique = true)] string Name,
-    [property: Column("Status", Pattern = "^[a-z]+$")] string Status,
-    [property: Column("Environments", Min = 0)] int Environments);`}
-  callouts={[
-    {line: 1, title: 'Describe the sheet once', note: 'The record names the sheet, the header row and the columns, and the model check reads the workbook against it.'},
-    {line: 3, title: 'Rules per column', note: 'Unique, a pattern, a minimum: the model turns layout expectations into ordinary checks.'},
-  ]}
-  foot={<>The test body opens the response with <code>Proto.Context.Sheets()</code>, calls <code>report.Should.MatchModel()</code>, checks a column and reads the row it created.</>}
-/>
+Local defaults for one run:
 
-From the archive:
-
-| Entry | Reading |
+| Output | Default path |
 | --- | --- |
-| `http.request` REST `GET /api/v1/reports/monthly.xlsx`, 128.5 ms, HTTP 200 | the download, with the response attached |
-| `sheets.open`, 28.2 ms, then `sheets.model` | the workbook was opened and the record model built |
-| `assert.sheets`, `Summary.Environments` | the column check the model recorded |
-| `attachment.publish`, `<test id>-rest-01-response` | the workbook's bytes, kept in the run |
+| Trace archive | `TestResults/prototest-{runId}.prototrace`, one archive per run |
+| JSON report | `TestResults/Northstar.ProtoTest/report.json` |
+| HTML report | `TestResults/Northstar.ProtoTest/report.html` |
+| In-archive JSON report | `resources/run/JsonReportSink/run-artifact-1/report.json` |
 
 ## How to read one
 

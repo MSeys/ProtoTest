@@ -1,7 +1,4 @@
-import type {
-  WireArtifact, WireAttributes, WireChange, WireError, WireEvent, WireItem, WireResourceGroup, WireRunAttributes,
-  WireSection, WireSpans, WireState, WireTestAttributes
-} from "./wire";
+import type { WireAttributes, WireError } from "./wire";
 
 /*
  * The viewer's model: the two wire documents, normalized and cross-linked. Nothing here is a new model of

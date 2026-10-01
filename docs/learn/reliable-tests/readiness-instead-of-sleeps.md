@@ -33,11 +33,11 @@ request fails. So someone adds a sleep.
 await Task.Delay(TimeSpan.FromSeconds(3));
 ```
 
-On a loaded build agent three seconds is too short, and the test fails. On a fast laptop three seconds is wasted
-on every run. Either way the sleep records nothing, so you cannot tell which case you are in.
+On a loaded build agent, three seconds may be too short. On a fast laptop, the service may already be ready.
+The sleep adds elapsed time but records no evidence that the service can answer a request.
 
-The fix is to ask the service instead of guessing. A readiness probe polls an address until it answers, and the
-run records what it waited.
+Replace the fixed delay with a readiness probe: a check that retries until its condition passes or the wait ends.
+The trace records the attempts and elapsed time when the probe succeeds.
 
 ## Do it
 
@@ -58,17 +58,25 @@ if (run.RunsLocalApplications)
 The code is in `samples/Northstar.ProtoTest/Setup.cs`. Three things to notice:
 
 - The `if` means a run pointed at a deployed address skips both the listener and the probe.
-- `AddLoopbackApplication` binds a free port and publishes the address it got.
-- `AddHttpReadiness` resolves that published address and polls `/health` until it answers.
+- `AddLoopbackApplication` binds a free port and publishes the address, unless configuration already supplies an address for that application.
+- `AddHttpReadiness` resolves the address and polls `/health` until it receives an HTTP response.
 
-The order matters. The run waits on the probe at the position where it is registered. A probe registered before
-the listener has no address to check. The same order applies wherever a run starts a real process, including after
-an AppHost.
+The default probe accepts any HTTP response, including a 404 or 500. It proves the endpoint responds, without requiring a successful health status.
+To require a 2xx response, pass `ready: response => response.IsSuccessStatusCode` to `AddHttpReadiness`.
+
+The host starts infrastructure in registration order. Register the probe after the piece that publishes its address, such as the loopback application or an AppHost.
+If no address is available at the probe's turn, it skips and records `readiness.skipped`.
+An address supplied through configuration is already available, so it does not depend on a publisher starting first.
 
 ### 2. Write tests that do not wait
 
-A test in the sample starts, takes its client and calls. It never sleeps for the application, because the wait
-happened once, before the first test. Every test reads an address the run already checked.
+The host runs this probe once during startup, before the first test. The browser journey then uses the loopback address without adding its own startup delay.
+The API journeys use an in-process test server instead, so this probe does not check their transport.
+
+If the probe cannot satisfy its condition before the wait times out, host startup fails with the probe name and attempt count.
+Cancelling startup also cancels the wait. The configured timeout is checked between attempts, so an in-flight HTTP request can extend the elapsed time.
+
+Passing startup readiness does not guarantee that the application stays healthy throughout the tests.
 
 ### 3. Read the wait in the trace
 
@@ -82,34 +90,34 @@ readiness entity for the loopback instance:
 | `readiness.attempts` | `1` |
 | `readiness.waitedMs` | `85` |
 
-The port differs on every run. The entity is released with the run, shown as a `resource.release` entry in the
-same layer.
+The operating system chooses an available port, so your run may use a different one. The readiness entity is released with the run.
+Its `resource.release` entry appears in the same layer.
 
 ## What happened
 
-The probe answered on its first attempt, and the wait cost 85 milliseconds. A sleep could not tell you either
-number. A slower address would show up as more attempts and a larger wait, instead of a mystery failure in the
-first test that used it.
+The endpoint answered on the first attempt, and the trace recorded 85 milliseconds of waiting.
+That evidence distinguishes a successful readiness check from a fixed delay that never checks the service.
+An endpoint that initially refuses connections can require more attempts. One slow response can also increase the wait without increasing the attempt count.
 
-The run did the waiting once, and the probe stopped as soon as the address answered. No test paid for it.
+The host did this waiting during startup. The wait still contributes to the run's total time, but each test does not repeat it.
 
 ## Check yourself
 
 <Checkpoint
-  question="The API journeys run in-process, so they need no address. Why does the run layer still carry a readiness entity?"
+  question="The API journeys use an in-process test server without a network listener. Why does the run layer still carry a readiness entity?"
   verify={<>Read the run screen beside the test screen in <a href="pathname:///lessons/l3-clock-window.prototrace">l3-clock-window.prototrace</a>.</>}>
 
-The loopback instance binds a port at run time, so nothing knows the address is up until it answers. The probe
-waits for `/health` and records its URL, the attempts and the time waited. A sleep would record none of that,
-only a slower entry in one test's execution span.
+The browser journey needs the separate loopback listener. Its probe requests `/health` and records the URL, attempt count and elapsed time.
+The in-process API clients still use logical HTTP addresses, but their requests pass through the test server's handler without a network listener.
+A sleep adds time without recording whether either application is ready.
 
 </Checkpoint>
 
 ## Remember
 
-- A run that starts an application registers a readiness probe for its address.
+- Use a readiness condition to decide when tests can start calling a network service.
 - Register the probe after the piece that publishes the address.
-- Readiness records attempts and time waited. A sleep records nothing.
+- A successful probe records attempts and time waited. A sleep adds time without checking readiness.
 
 ## Go deeper
 

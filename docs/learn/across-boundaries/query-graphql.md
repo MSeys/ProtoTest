@@ -17,7 +17,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
   outcomes={[
     'Query a GraphQL endpoint from a test',
     'Describe the query and the expected answer with one object',
-    'Prove that two protocols see the same data',
+    'Check that a REST-created project appears through GraphQL',
   ]}
   needs={[
     <>The previous lesson, <a href="./call-an-api">Call an API and check its shape</a></>,
@@ -32,9 +32,15 @@ Some applications offer the same data through more than one protocol. A bug can 
 
 ### 1. Run the test alone
 
+From the repository root, run the existing test in `samples/Northstar.ProtoTest/PlatformJourney.cs`:
+
 ```bash
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~RestWritesAreVisibleThroughGraphQL"
 ```
+
+With the default sample settings, this test runs against the in-process application and should pass. You can also follow the excerpts with the saved trace in step 4.
+
+The class selects `NorthstarTargets.Api` with `[Application]`. Its `[NorthstarMember(PlanIds.Growth)]` attribute provisions a tenant and installs the sample authenticator. The method's `[SignedInAs]` declares the test user.
 
 ### 2. Write through REST
 
@@ -45,7 +51,7 @@ using var created = await Proto.Context.Rest()
 created.Should.HaveHttpStatus(HttpStatusCode.Created);
 ```
 
-This is the call from the previous lesson. The test checks the status so a failed write stops here, with a clear message, instead of showing up later as an empty query.
+This uses the same REST pattern as the previous lesson. The status check requires HTTP 201 before the test sends its GraphQL query.
 
 ### 3. Read through GraphQL
 
@@ -61,36 +67,42 @@ using var projects = await Proto.Context.GraphQL()
 projects.Should.HaveNoErrors();
 ```
 
-`Proto.Context.GraphQL()` is the GraphQL client. `Query("projects", new { first = 10 })` names the query field and passes its argument.
+`Proto.Context.GraphQL()` creates a GraphQL request builder. `Query("projects", new { first = 10 })` selects the root field `projects` and supplies the `first` argument. ProtoTest derives the operation name `Projects` from that field name.
 
-The object given to `ExpectAsync` does two jobs. ProtoTest builds the selection set from it, so the query asks for `totalCount` and `nodes` with `name` and `status`. Then it checks the answer against the same values.
+The object given to `ExpectAsync` does two jobs. Its structure supplies the selection set: the fields requested from the server. Here those fields are `totalCount` and `nodes` with `name` and `status`.
 
-`HaveNoErrors()` checks that the response carries no GraphQL errors. GraphQL can answer with HTTP 200 and still report errors, so this check matters.
+After sending the query, `ExpectAsync` matches `data.projects` against the expected object. It checks the count, name and active status shown above. This is a shape check of the selected data, not a comparison of the entire response envelope.
+
+`ExpectAsync` does not reject GraphQL errors by itself. `HaveNoErrors()` checks that the response carries no GraphQL errors. A response can contain matching data alongside errors, even with HTTP 200.
 
 ### 4. Look at the trace
 
-In the [viewer](https://trace.prototest.dev), the execution phase shows the REST operation, then `GraphQL · query Projects`, then the checks `Assert GraphQL data shape` and `Assert no GraphQL errors`. Both calls apply the same sign-in, so you see the authenticator entries twice.
+In the [viewer](https://trace.prototest.dev), select `RestWritesAreVisibleThroughGraphQL` and open Execution. Find the REST operation, then `GraphQL · query Projects`. The GraphQL checks are `Assert GraphQL data shape` and `Assert no GraphQL errors`.
 
-The recorded run is here: [l4-coverage.prototrace](pathname:///lessons/l4-coverage.prototrace).
+Open the GraphQL request attachment to inspect `operationName: "Projects"` and the generated query. The response attachment contains `data.projects`, with `totalCount: 1` and one node named `atlas` with status `active`.
+
+The saved trace is here: [l4-coverage.prototrace](pathname:///lessons/l4-coverage.prototrace). It records successful REST and GraphQL calls, each with `TestUserAuthenticator` and `NorthstarAuthenticator` operations. Fresh runs can have different ids and timings.
 
 ## What happened
 
-Both clients came from the same test context, so they reached the same application as the same signed-in member. The test did not copy an id or a token from one client to the other.
+Both clients use the same test context. In `Setup.cs`, REST and GraphQL belong to the `NorthstarTargets.Api` application, with GraphQL configured for `/graphql`. The test selects that application, and the sample authenticator supplies the same tenant member's bearer token to both requests.
 
-`totalCount = 1` only holds because the test works on data of its own. Other tests run at the same time, and their projects must not appear in this list.
+That setup lets the test cross protocols without copying a token between clients. A shared context alone does not guarantee the same target or credentials. Client registration, application selection and authentication settings still determine those choices.
+
+The tenant starts without projects, and this test creates one. The GraphQL resolver lists projects for the authenticated tenant, so projects in other tenants do not affect `totalCount = 1`. The test checks the project's name and status, but does not compare its REST and GraphQL ids.
 
 ## Check yourself
 
 <Checkpoint question="A hand-written GraphQL test needs a query string and a separate assertion. Why does this test need only one object?">
 
-ProtoTest derives the selection set from the expected object. The fields you assert are the fields it asks for, so the query and the assertion cannot drift apart.
+ProtoTest derives the selection set from the expected object, then uses that object to check the selected data. This avoids repeating the field list in a separate query string. You still choose the root field, arguments and expected values, and check GraphQL errors separately.
 
 </Checkpoint>
 
 ## Remember
 
-- One test can use several clients, and they share the test's identity.
-- `ExpectAsync(shape)` is both the selection set and the assertion.
+- Configure each client for the intended application and authentication before comparing results across protocols.
+- `ExpectAsync(shape)` derives selected fields and checks the returned data against the shape.
 - Add `HaveNoErrors()`, because a GraphQL error can arrive with a 200 status.
 
 Next: [Check what the application stored](./check-the-database.md).

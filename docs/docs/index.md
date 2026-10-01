@@ -39,7 +39,7 @@ ProtoTest is an integration testing foundation for .NET 8, 9 and 10. The integra
 
 ## See it in a real suite
 
-Examples in these docs come from [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/version/1.1/samples/Northstar.ProtoTest), which tests the multi-tenant [Northstar sample app](https://github.com/MSeys/ProtoTest/tree/version/1.1/samples/ProtoTest.SampleApp) across API, messaging, browser, database and workbook boundaries.
+Examples in these docs come from [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/HEAD/samples/Northstar.ProtoTest), which tests the multi-tenant [Northstar sample app](https://github.com/MSeys/ProtoTest/tree/HEAD/samples/ProtoTest.SampleApp) across API, messaging, browser, database and workbook boundaries.
 
 OpenCSMS, an independent EV charging platform, is the full product demo: its suite runs against containers, an Aspire AppHost and a published stack, with faults injected on purpose. The [Level 5 lessons](/learn/real-systems/containers) walk through it.
 

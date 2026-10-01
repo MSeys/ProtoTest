@@ -86,7 +86,7 @@ The sample configures both report sinks in one place:
     sink.Title = "Northstar Learning demo";
 });`}
   callouts={[
-    {line: 3, title: 'The application spans', note: 'The domain activity source is captured into the trace, one archive per run, so a rerun never overwrites the last run.'},
+    {line: 3, title: 'The application\'s own operations', note: 'The domain activity source is captured into the trace, one archive per run, so a rerun never overwrites the last run.'},
     {line: 5, title: 'Both sinks copied into the archive', note: 'The JSON and HTML reports are written beside the trace and copied into resources/, so one upload carries all three.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The sink paths below <code>TestResults/Northstar.ProtoTest/</code> are the local default.</>}

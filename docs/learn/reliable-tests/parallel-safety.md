@@ -17,10 +17,13 @@ import Checkpoint from '@site/src/components/Checkpoint';
   minutes={7}
   outcomes={[
     'Spot the shared name that breaks tests in parallel',
-    'Name the two rules that keep a test isolated',
+    'Separate per-test state from shared objects',
     'See per-test tenants in two traces',
   ]}
-  needs={[<>Per-test state and cleanup, from <a href="/learn/good-tests/per-test-state-and-cleanup">Keep state per test and clean it up</a></>]}
+  needs={[
+    <>Per-test state and cleanup, from <a href="/learn/good-tests/per-test-state-and-cleanup">Keep state per test and clean it up</a></>,
+    'The sample cloned to run the tests, or the two archives below to read their ownership records',
+  ]}
 />
 
 ## The problem
@@ -28,11 +31,11 @@ import Checkpoint from '@site/src/components/Checkpoint';
 Your suite passes when it runs one test at a time. You turn on parallelism to save time, and two tests now fail
 at random. Run them alone and they pass.
 
-The cause is almost always a hidden share. Two tests create a project named `atlas`. One test writes a static
-field that another reads. One test removes a record that another still needs. Nothing fails in a serial run,
-because the tests never overlap.
+Look for state the tests share. Two tests might create a project named `atlas` in the same tenant.
+One might write a static field that another reads, or remove a record another still needs.
+Running separately can hide those conflicts.
 
-The sample asks for parallelism on purpose, so those shares have nowhere to hide.
+The sample enables parallelism. This lesson follows how it separates test data and assigns cleanup to the right owner.
 
 ## Do it
 
@@ -44,29 +47,39 @@ The sample asks for parallelism on purpose, so those shares have nowhere to hide
 [assembly: FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
 ```
 
-These lines are in `samples/Northstar.ProtoTest/AssemblyInfo.cs`. The suite runs up to eight tests at once, and
-the runner starts any test as soon as a worker is free. Each test gets its own fixture instance, so nothing
-test-scoped lives on a shared object. Turn this on only when your tests isolate their own state, as this suite does.
+These lines are in `samples/Northstar.ProtoTest/AssemblyInfo.cs`. They let NUnit schedule eligible tests with up to eight parallel workers.
+NUnit decides which tests overlap. Each test gets its own fixture instance, but static fields and references to shared objects remain shared.
+
+From the repository root, run the two tests whose saved traces appear below:
+
+```bash
+dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~EachTenantSeesOnlyItsOwnProjects|FullyQualifiedName~ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock"
+```
+
+Both tests should pass with the sample's default setup. To check whether their execution overlapped, compare their times in the trace from this run.
 
 ### 2. Give each test its own tenant
 
 A tenant is the space where one test's durable records live. Its name carries the test id:
 
 - The tenant name comes from `context.UniqueName("northstar")`, which reads `northstar-<test id>`.
-- Names inside the tenant can be fixed. `atlas` and `report-atlas` are the same in every test, and no two meet, because no two tests share the tenant. A name only has to be unique where it can be seen.
-- A record visible outside the tenant still carries the test id. The member email is built from `context.TestId`, and so is the scenario correlation id.
-- The teardown removes the tenant by the identity that setup recorded, not by searching for a name.
+- Names inside separate tenants can be fixed. `PlatformJourney` uses `atlas`, and `SheetsJourney` uses `report-atlas`. Their projects belong to the tenant each test creates.
+- Member emails include `context.TestId`. The scenario correlation id includes both the test id and a generated GUID.
+- Teardown deletes the tenant using the slug returned during setup.
 
-The test id carries the run prefix, so the same journey in the same second on two workers still gets two tenants.
+The default test id combines a run prefix with a sequence allocated by the host. That sequence separates tests within one host.
+The random prefix reduces collisions between runs but cannot guarantee unique names across processes sharing a database. Those processes need an agreed naming scheme.
 
-### 3. Keep everything else on the context
+### 3. Keep per-test state on the context \{#3-keep-everything-else-on-the-context}
 
-Clients, state, resources, attachments and observations live on the test's execution context. The context is
-scoped to its async flow, so a test cannot read another test's context while both run. There is no shared object
-to guard and no lock to add.
+`Proto.Context` resolves the test context for the current async flow. Tasks that inherit that flow use the same context.
+Keep those tasks within the test's lifetime. Do not pass a context between tests or store it in a static field.
 
-What tests do share lives in one place, the run. The store, the broker, the loopback listener and the report
-sinks are started once and released at the end. Tests read them, and none of them owns them.
+The context keeps per-test state, client registrations, resources and evidence together. Registering a shared object there does not make it private or safe for concurrent use.
+Use isolated state where possible. Shared mutable objects still need coordination.
+
+The run owns shared infrastructure, such as its store, broker and loopback listener. Tests use these resources, including writing to them, but must not dispose them.
+The host releases run-owned resources after the tests finish.
 
 ### 4. Compare two traces
 
@@ -77,40 +90,39 @@ Open these two archives in the [viewer](https://trace.prototest.dev), one per ta
 | [l0-state-fix.prototrace](pathname:///lessons/l0-state-fix.prototrace) | `northstar-553135000001` | `EachTenantSeesOnlyItsOwnProjects` |
 | [l3-clock-window.prototrace](pathname:///lessons/l3-clock-window.prototrace) | `northstar-725654000001` | `ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock` |
 
-In each setup layer you should see a tenant provisioned under a name with its own test id. The value list records
-that tenant with `owned: true`, and the teardown releases it. The fixed names inside, `atlas` in the coverage
-journey and `report-atlas` in the sheets journey, repeat across tests without meeting.
+In each setup layer, find the tenant name carrying the test id. Then find its release during teardown.
+The tenant resource's final state is `released` in both archives.
+
+These archives come from separate runs. They show ownership and cleanup, not concurrent execution. Neither contains the `atlas` or `report-atlas` examples from the other journeys.
 
 ## What happened
 
-Two rules kept the tests apart. The context is per test, so one test cannot see another's clients, state or trace.
-The tenant is per test, so fixed names inside it never collide. Either rule alone leaves a way to collide: the
-context does not protect a record in a shared database, and a tenant does not protect a static field.
+The context and tenant address different kinds of shared state. The context associates values and evidence with a test.
+The tenant separates that test's records in the database. Neither protects a shared mutable object that tests use directly.
 
 Use these questions on your own tests:
 
-- Does it create a record another test can see, with a name that is not derived from the test? Use `UniqueName` or `TestId`.
-- Does it write a static or a fixture field another test could read? Move the value into the context.
+- Can another test see or delete its records? Use a separate tenant or names unique within the shared system.
+- Does it put per-test data in a static field or shared fixture? Move that data into the test context or a test-owned object.
 - Does it start or dispose something the run should own, or the reverse? Fix the lifetime.
 - Does its teardown remove everything it created? A missing release leaks more with every parallel run.
 
 ## Check yourself
 
 <Checkpoint
-  question="The suite runs eight tests at once, and some journeys create fixed project names like `atlas`. Every test still passes. Which two mechanisms keep the tests apart?"
+  question="Two tests use the same project name in different tenants. What does the tenant isolate, and what does the test context do?"
   verify={<>Read the setup layers of both archives above. Each provisioned its tenant under a name carrying its own test id.</>}>
 
-The execution context is per test and flow-local, so one test cannot read another's clients, state or trace. And
-every test works inside its own tenant. The tenant name carries the test id, and fixed names like `atlas` live
-inside it, so two tests can use the same name without meeting. Either one alone leaves a way for tests to collide.
+The tenant separates the projects in the database, so their names do not conflict across tenants.
+The test context associates state and evidence with the test's async flow. It does not make a shared client, static field or database record private.
 
 </Checkpoint>
 
 ## Remember
 
-- Each parallel test gets its own execution context, on its own async flow.
-- The per-test tenant keeps durable records apart. Per-test state keeps reads apart.
-- The run owns what tests share. A test owns what it creates.
+- Each test has its own context. Tasks within that test may share it.
+- Separate tenants keep records apart. Shared mutable objects still need coordination.
+- Release test-owned resources at teardown and run-owned resources after the run.
 
 ## Go deeper
 

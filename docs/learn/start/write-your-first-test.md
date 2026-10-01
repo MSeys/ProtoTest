@@ -29,15 +29,15 @@ import Link from '@docusaurus/Link';
 
 ## The problem
 
-The sample's tests cover every integration, so they are long. Your first test is smaller: one request, one check, one run of its own.
+You have run the sample suite. Now add a test that creates a project and checks the response: one request, two checks, one filtered run.
 
-A test you can read from top to bottom is easy to trust. The steps are always the same. Pick the application, take a client, send one request, check what comes back.
+The sample already configures the application and its clients. You can focus on the test: select the application, prepare its data, send a request and check what comes back.
 
 ## Do it
 
 ### 1. Add the file
 
-Create `MyFirstJourney.cs` in `samples/Northstar.ProtoTest/`. This is the path in the sample's README. The test is a short class, so the callouts explain each line.
+Create `MyFirstJourney.cs` in `samples/Northstar.ProtoTest/` with the code below. It matches the example in the sample's README. The callouts explain the setup, request and checks.
 
 <AnnotatedCode
   filename="MyFirstJourney.cs"
@@ -69,13 +69,15 @@ public sealed class MyFirstJourney
     }
 }`}
   callouts={[
-    {line: 4, title: 'Name the package namespaces with global::', note: 'The file lives in Northstar.ProtoTest, so a plain using would resolve ProtoTest to the sample namespace. global:: names the package namespace without ambiguity.'},
-    {line: 10, title: 'Select the application', note: 'Application picks the API the run composed for this test.'},
-    {line: 11, title: 'Provision the tenant and sign in', note: 'NorthstarMember is a composite: an isolated tenant for this test, and an authenticator that carries the member token. The tenant is removed at teardown.'},
-    {line: 14, title: 'Start the context', note: '[ProtoTest] is the runner attribute that creates the execution context around the test body and completes it afterwards.'},
-    {line: 18, title: 'Name the data after the test', note: 'TestId is unique per run, so the name cannot collide with another test.'},
-    {line: 19, title: 'Take the client from the context', note: 'Rest() carries the address the run composed; the test does not know a port.'},
-    {line: 25, title: 'Assert what the response is', note: 'The status check and the shape check both record what they read, and the shape check reports the JSON path and both values when it fails.'},
+    {line: 4, title: 'Use the package namespace', note: 'global:: starts namespace lookup at the root. This avoids confusing the ProtoTest packages with the enclosing Northstar.ProtoTest namespace.'},
+    {line: 10, title: 'Select the application', note: 'Application selects the API configured in the sample setup class.'},
+    {line: 11, title: 'Prepare a tenant and authentication', note: 'NorthstarMember groups tenant creation with an authenticator that sends the member token. The tenant provisioner also registers cleanup for teardown.'},
+    {line: 14, title: 'Run through the NUnit adapter', note: 'This NUnit attribute marks the method as a test and wraps its lifecycle. The adapter creates and completes the test context, including setup and teardown.'},
+    {line: 15, title: 'Declare the test identity', note: 'SignedInAs declares who the test acts as. With no role specified, the sample authenticator uses the tenant owner token.'},
+    {line: 18, title: 'Include the test id in the name', note: 'The default generator gives each test in this host a different id. That does not guarantee unique names across separate runs.'},
+    {line: 19, title: 'Retrieve the REST client', note: 'Rest() returns the client from this test context. The setup class supplies its address, so this test names no port.'},
+    {line: 24, title: 'Check the HTTP status', note: 'HaveHttpStatus checks for 201 Created and records the comparison in the trace.'},
+    {line: 25, title: 'Check the response fields', note: 'MatchShape checks name and status in the JSON body. A differing value produces a message with the JSON path, expected value and actual value.'},
   ]}
 />
 
@@ -87,7 +89,9 @@ From the repository root:
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~MyFirstJourney"
 ```
 
-The filter selects one test. You should see one passed test and no failures. The run also writes a trace for it, in the same folder as in lesson 1:
+The filter selects your new test. You should see one passed test and no failures. The run also writes a trace, the archive of recorded work from the run.
+
+Find it under `samples/Northstar.ProtoTest/`, in the same folder as in lesson 1:
 
 ```
 bin/Debug/net8.0/TestResults/prototest-{runId}.prototrace
@@ -95,38 +99,44 @@ bin/Debug/net8.0/TestResults/prototest-{runId}.prototrace
 
 ### 3. Run it again
 
-Run the same command a second time. It passes again. The project name in the request is different each time, because it contains `Proto.Context.TestId`. Nothing the first run created gets in the way of the second.
+Run the same command a second time. You should see one passed test again and a new trace file.
+
+The project name contains `Proto.Context.TestId`. Its default generator combines a random run prefix with a test sequence number. Names usually differ between runs, but this is not a guarantee.
+
+The sample isolates project data in a tenant created for each test. Its tenant provisioner registers cleanup that removes the tenant and its projects at teardown. Repeatability depends on that isolation and cleanup, not on the project name changing.
 
 ## What happened
 
-The test did four things, and each one came from the run instead of from your code.
+The example uses four parts of the configured sample:
 
-- **Context.** `[ProtoTest]` gave the test a test context, the object behind `Proto.Context`. It holds the test's clients, its own state and its files.
-- **Client.** `Proto.Context.Rest()` is a client, the object a test uses to talk to a system. It already knew the address of the API, so the test names a path and no port.
-- **Data.** `NorthstarMember` created a tenant for this test before it ran and removed it afterwards. The test saw only its own data.
-- **Checks.** The status check and the shape check each record what they compared. A shape check compares the whole response against the fields you list.
+- **Context.** The NUnit adapter creates a test context, the object behind `Proto.Context`. It holds this test's clients, state and attachments.
+- **Client.** `Proto.Context.Rest()` retrieves the REST client for the selected application. The client knows the API address, so the test supplies a path.
+- **Data.** `NorthstarMember` prepares a tenant and registers its cleanup. `[SignedInAs]` declares the identity that the sample authenticator uses for the request.
+- **Checks.** The status check expects HTTP 201 Created. The shape check compares `name` and `status`, allowing other response fields. Both checks record their comparisons.
 
-So a first test is a few attributes, one client call and one check. Everything else the run supplies.
+You wrote the request and its expected result. The existing setup class and attributes supply the application, client, identity and data cleanup.
 
 ## Check yourself
 
 <Checkpoint
-  question="The project name is built from Proto.Context.TestId. Run the test twice. What do the two runs share, and what differs?"
-  verify={<>Run the filter twice and compare the two traces. The name in the request changes between the runs.</>}
+  question="Why can this test run again without depending on the project name changing?"
+  verify={<>Run the filter twice. Both runs should pass. Find the attribute in the example that prepares the tenant and its cleanup.</>}
 >
 
-The two runs share the test and its checks. The name differs, because `TestId` is unique for every test run. The test never reads a name another run left behind, so two runs cannot collide on data.
+`NorthstarMember` prepares a tenant for each test and registers cleanup through its provisioner. The application keeps projects within that tenant, and teardown deletes its data.
+
+The test id helps distinguish names within a run. Its random prefix does not guarantee uniqueness between runs, so it does not replace isolation or cleanup.
 
 </Checkpoint>
 
 ## Remember
 
-- A first test is a few attributes, one client call and one check.
+- This test sends one request and checks its status and two response fields.
 - The client takes its address from the run, so the test names no port.
-- Data named after `TestId` belongs to one test run.
+- The sample's tenant setup and cleanup keep test data separate. A generated name alone does not.
 
 ## Go deeper
 
 - [Your first test](/docs/getting-started/first-test): the same path against an application of your own.
-- Keep `MyFirstJourney.cs` if you plan to do [Write your own attribute](/learn/extend/attributes), which reuses it. Otherwise delete the file. The suite is a fixture, and `git status` is clean without it.
+- Keep `MyFirstJourney.cs` for the next lesson, [Read the trace](/learn/start/read-the-trace). [Write your own attribute](/learn/extend/attributes) also reuses it. Delete the file when you no longer need it.
 - Next: [Read the trace](/learn/start/read-the-trace) breaks this test on purpose and finds out why.

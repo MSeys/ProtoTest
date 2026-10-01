@@ -21,6 +21,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
   ]}
   needs={[
     <>The previous lesson, <a href="./drive-the-browser">Drive the browser with a page object</a></>,
+    'A running Docker engine for the container-backed run in step 5',
   ]}
 />
 
@@ -32,11 +33,15 @@ When a user pays an invoice, the application publishes an event for other servic
 
 ### 1. Run the test alone
 
+From the repository root, run the existing test in `samples/Northstar.ProtoTest/BrokerJourney.cs`:
+
 ```bash
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~PayingAnInvoicePublishesAnInvoicePaidEvent"
 ```
 
-On a plain run the result is one skipped test. Step 5 explains why.
+With the default sample settings, the result is one skipped test. Step 5 enables RabbitMQ so the test body below can run.
+
+The class selects the Northstar API and uses `NorthstarMember` to provision a tenant and configure authentication. The method declares `[SignedInAs]`.
 
 ### 2. Trigger the event
 
@@ -49,7 +54,7 @@ using var paid = await Proto.Context.Rest()
 paid.Should.HaveHttpStatus(HttpStatusCode.OK);
 ```
 
-The test issues an invoice through the data helper, then pays it over REST. Paying makes the application publish an `invoice.paid` event.
+The test issues an invoice through the data helper, then pays it over REST. With RabbitMQ configured, the payment endpoint publishes an `invoice.paid` event before returning HTTP 200.
 
 ### 3. Await the message
 
@@ -63,9 +68,11 @@ var message = await Proto.Context.Messaging().AwaitAsync(
     TimeSpan.FromSeconds(15));
 ```
 
-`Proto.Context.Messaging()` is the broker client. `AwaitAsync` takes the destination, a predicate and a timeout. It returns the first message on `invoice.paid` for which the predicate is true. The predicate matches this test's invoice id, so a message from another test running in parallel cannot satisfy it.
+`Proto.Context.Messaging()` returns the messaging client. `AwaitAsync` takes the destination, a predicate and a timeout. It returns the first available, unconsumed message on `invoice.paid` for which the predicate is true.
 
-If no matching message arrives within 15 seconds, the call throws a `TimeoutException` and the test fails. Nothing sleeps.
+The sample searches the payload text for the invoice id. This is a substring check: an expected id of `12` could also match `123`. For strict correlation, parse the JSON and compare the complete id value. The snippet does not guarantee isolation from every other test's messages.
+
+If no matching message arrives within 15 seconds, the call throws a `TimeoutException` and the test fails. The await resumes when a matching delivery is available instead of imposing a fixed sleep. A failed broker connection or tap setup can fail the call earlier.
 
 ### 4. Assert the message
 
@@ -77,38 +84,50 @@ using (Assert.EnterMultipleScope())
 }
 ```
 
+These NUnit assertions check the content type and the literal paid-status text. They do not validate the entire JSON payload or prove that another service consumed the event.
+
 ### 5. See what happens without a broker
 
-The class carries `[RequiresCapability(ProtoCapabilityKinds.Broker)]`. A real broker makes the `Broker` capability true. The sample's setup class adds a broker only when you ask for one, so on a plain run the capability is absent and the test skips. The setup class also gives the reason: "No broker is configured; set ProtoTest:Messaging:Broker=container."
+The class carries `[RequiresCapability(ProtoCapabilityKinds.Broker)]`. The sample selects RabbitMQ when you set `ProtoTest:Messaging:RabbitMq:ConnectionString` or request a broker container. Without either setting, the capability is absent and the test skips before its body runs.
 
-To run it, start Docker and set the variable the message names:
+The setup class supplies this reason: "No broker is configured; set ProtoTest:Messaging:Broker=container." A configured address enables the capability, but does not prove the broker is reachable.
+
+To run the container path, start Docker and use the default local sample settings. In PowerShell, set the environment variable corresponding to that configuration key:
 
 ```powershell
 $env:ProtoTest__Messaging__Broker = "container"
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~PayingAnInvoicePublishesAnInvoicePaidEvent"
 ```
 
-The run then starts a RabbitMQ container, and the test runs against it instead of skipping.
+Without an existing broker address, the run starts a RabbitMQ container. It supplies the address to both the test adapter and the hosted application. A configured address takes precedence over starting a container. Container startup and connection failures are errors, not missing-capability skips.
+
+Afterwards, restore the variable's previous value, or remove it if you added it for this lesson. Otherwise later runs in this shell will also request a broker.
+
+In a successful run's trace, find `Messaging · await invoice.paid` under Execution and inspect its received-payload attachment. This is the test receiving the application's event. A skipped run has no payment or message await to inspect.
 
 ## What happened
 
-The test declared its tap in advance. The setup class calls `.Declare("invoice.paid")` and `.Tap("invoice.paid")`, so the host binds each test's listener during setup, before the payment happens. A message published a moment later cannot be missed.
+The setup class calls `.Declare("invoice.paid")` to declare the destination and `.Tap("invoice.paid")` to prepare a listener before the test acts. RabbitMQ gives each test's tap its own queue. Messages can arrive there before `AwaitAsync` starts, so the test avoids subscribing only after the payment.
 
-Without an adapter, ProtoTest runs an in-memory broker so the messaging API still works. That broker is a test double and registers no `Broker` capability. A skip is therefore honest: the test never passes against something that is not a real broker.
+Preparing the listener removes that timing race. It does not guarantee delivery through broker failures or make an imprecise predicate safe.
+
+Without an adapter, ProtoTest supplies an in-memory messaging double with no `Broker` capability. The sample application also uses a no-op event publisher when its broker address is absent. This journey's capability requirement prevents those defaults from producing a broker-test pass.
 
 ## Check yourself
 
-<Checkpoint question="The test passes in an environment with a broker and skips in one without. Which of the two results would hide a missing event, and which would not?">
+<Checkpoint question="What does a missing-broker skip tell you, compared with a successful message await?">
 
-Neither hides it. With a broker, a missing event ends in a `TimeoutException` and a failure. Without one, the skip is reported with its reason, so nobody reads it as a pass. Only a test that passed against the in-memory double could hide the problem, and the capability check prevents that.
+A skip says the required broker capability was unavailable. It provides no evidence that the application published an event.
+
+A successful await says the test received a message satisfying its predicate. The following assertions check its content type and status text. How precisely the test identifies the intended event depends on that predicate.
 
 </Checkpoint>
 
 ## Remember
 
 - Await a message with a predicate and a timeout, never with a sleep.
-- Match on something unique to your test, such as the invoice id.
-- No broker means no `Broker` capability, and the test skips with a reason.
+- Compare a complete correlation value, such as the invoice id, rather than a text prefix.
+- A missing broker capability skips this test. A configured but broken broker can fail it.
 
 Next: [Check a generated file](./workbook-as-attachment.md).
 

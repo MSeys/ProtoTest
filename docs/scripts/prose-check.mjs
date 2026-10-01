@@ -1,14 +1,18 @@
 // Mechanical prose checks for the docs, from docs/WRITING.md: long sentences, em-dashes, semicolon chains, stacked
 // asides, filler words, long paragraphs and likely passives. Code, front matter, imports and JSX are skipped.
-// Usage: node docs/scripts/prose-check.mjs [files or folders...]   (default: docs/docs and docs/learn)
-// It reports; it does not fail. The judgement on each finding stays with the writer.
-import {readFileSync, readdirSync, statSync} from 'node:fs';
+// Usage: node docs/scripts/prose-check.mjs [--base <git-ref>] [files or folders...]
+// Default: docs/docs and docs/learn, or with --base only the pages changed since that ref, with their word counts
+// before and after. It reports; it does not fail. The judgement on each finding stays with the writer.
+import {execFileSync} from 'node:child_process';
+import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const docs = join(fileURLToPath(import.meta.url), '..', '..');
 const LONG = 25;
 const TOO_LONG = 35;
+// A lesson a reader finishes in about ten minutes, counting callouts and checkpoint answers but not code.
+const LESSON_WORDS = 750;
 const FILLER = /\b(simply|just|easily|obviously|of course)\b/gi;
 // Words docs/WRITING.md replaces with one fixed term. Span is right on the
 // OpenTelemetry and archive-format pages, and the Aspire dashboard is Aspire's own.
@@ -25,6 +29,22 @@ function files(target) {
   if (statSync(target).isFile()) return /\.mdx?$/.test(target) ? [target] : [];
   return readdirSync(target).flatMap((name) => files(join(target, name)));
 }
+
+/** Every word a reader reads: prose, headings, component text and props, without code, front matter or tags. */
+export function readingWords(text) {
+  const body = text
+    .replace(/^---\n[\s\S]*?\n---\n/, '')
+    .replace(/^(```|~~~)[\s\S]*?^\1/gm, ' ')
+    .replace(/\bcode=\{`[\s\S]*?`\}/g, ' ')
+    .replace(/^(import|export) [^\n]*$/gm, ' ')
+    .replace(/<\/?[A-Za-z][\w.]*|\/?>/g, ' ')
+    .replace(/\b\w+[:=](?=\s*["'{`[\d])/g, ' ')
+    .replace(/\]\([^)]*\)/g, ']');
+  return (body.match(/[A-Za-z][\w'’.-]*/g) ?? []).length;
+}
+
+/** A Learn lesson, not the Learn index or a page at the Learn root. */
+export const isLesson = (path) => /[\\/]learn[\\/][^\\/]+[\\/](?!index\.mdx?$)[^\\/]+$/.test(path);
 
 /** The prose of a page: paragraphs and list items, without code, front matter, imports, JSX or tables. */
 export function prose(text) {
@@ -119,14 +139,35 @@ export function score(result) {
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const targets = process.argv.slice(2);
-  const paths = (targets.length ? targets : [join(docs, 'docs'), join(docs, 'learn')]).flatMap(files);
-  const rows = paths.map((path) => ({path: relative(join(docs, '..'), path), result: check(readFileSync(path, 'utf8'), path)}));
+  const at = targets.indexOf('--base');
+  const base = at >= 0 ? targets.splice(at, 2)[1] : null;
+  const root = join(docs, '..');
+  const git = (...args) => execFileSync('git', ['-C', root, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']});
+  const changed = () =>
+    git('diff', '--name-only', base, '--', 'docs/docs', 'docs/learn')
+      .split('\n')
+      .filter((name) => /\.mdx?$/.test(name) && existsSync(join(root, name)))
+      .map((name) => join(root, name));
+  const before = (path) => {
+    try {
+      return readingWords(git('show', `${base}:${relative(root, path).replaceAll('\\', '/')}`));
+    } catch {
+      return null;
+    }
+  };
+  const paths = (targets.length ? targets : base ? changed() : [join(docs, 'docs'), join(docs, 'learn')]).flatMap(files);
+  const rows = paths.map((path) => {
+    const text = readFileSync(path, 'utf8');
+    return {path: relative(root, path), result: check(text, path), words: readingWords(text), before: base ? before(path) : null};
+  });
   rows.sort((left, right) => score(right.result) - score(left.result));
-  const detail = targets.length > 0;
+  const detail = targets.length > 0 || Boolean(base);
   let total = 0;
-  for (const {path, result} of rows) {
+  for (const {path, result, words, before: old} of rows) {
     total += result.sentences;
     const parts = [
+      old === null ? `${words} words` : `${old} -> ${words} words`,
+      isLesson(path) && words > LESSON_WORDS && `over the ${LESSON_WORDS}-word lesson budget`,
       `${result.sentences} sentences`,
       `${result.long} over ${LONG} words`,
       result.tooLong.length && `${result.tooLong.length} over ${TOO_LONG}`,

@@ -59,7 +59,7 @@ builder
   foot={<>The sink registration the sample uses, with CI's artifact directory in front. Locally the fallback keeps the same files below <code>TestResults/ProtoTest/</code>.</>}
 />
 
-Look for `run.prototrace`, `report.json` and `report.html` together in that directory after a run.
+In the workflow, set the variable once for the job: `PROTOTEST_RESULTS: ${{ github.workspace }}/TestResults/ProtoTest`. After a run, `run.prototrace`, `report.json` and `report.html` sit together in that directory.
 
 ### 2. Upload it even when the test step fails
 
@@ -87,17 +87,7 @@ The feedback action installs the CLI, uploads the trace and posts the digest:
     trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
 ```
 
-The comment carries the failing tests, the cause and the artifact link. It also puts one check annotation on each failing test's source location. A missing target skips with its reason instead of failing the job.
-
-A digest comment reads like this (illustrative):
-
-```text
-ProtoTest evidence: 1 failed, 0 passed, 0 skipped
-FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow
-  $.status: expected past_due, actual active
-Trace: run.prototrace (open it in the viewer)
-Report: report.json, report.html
-```
+The comment carries the failing tests, the cause and the artifact link. It also puts one check annotation on each failing test's source location. A green run posts no comment. The workflow needs `issues: write` permission for the comment. A channel it cannot reach skips with its reason instead of failing the job. The [CI page](/docs/continuous-integration/) shows the output of a real run.
 
 Give the action a `baseline-report` and a `current-report` as well, and the step also fails the pull request when the run is worse than the baseline.
 
@@ -119,13 +109,7 @@ Each entry appears in the report's run metadata and on the run in the archive, s
 
 CI gave you one directory, one upload step and one comment. The `if: always()` on both steps means a failed run keeps its evidence and gets its comment. The reviewer opens the trace in the viewer without rerunning the job.
 
-The action and the artifact wiring are the contract. How you split the pipeline around them is a choice. The suite is the same in every job. What changes is the composition, which decides which capabilities exist and which journeys skip:
-
-| Job | What it runs | What the reviewer opens |
-| --- | --- | --- |
-| Pull request | the suite in-process, on every change | the digest comment with the failing tests and the trace artifact link |
-| Nightly | the same suite against the container topology | the same digest, with the store and the broker as real processes the run owned |
-| Smoke (optional) | the suite pointed at a deployed environment | the same digest; capability skips drop the journeys that need the test host |
+The same wiring works in every job you split the pipeline into: pull request, nightly or a smoke run against a deployed environment. Only the composition changes.
 
 ## Check yourself
 

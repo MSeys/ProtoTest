@@ -19,7 +19,7 @@ import Link from '@docusaurus/Link';
   minutes={8}
   outcomes={[
     'Say when the run builds, starts and stops the host',
-    'Write a setup class that composes the host',
+    'Find where the setup class composes the host',
     'Read the host\'s own releases at the end of a trace',
   ]}
   needs={[
@@ -36,9 +36,9 @@ You need to know who does that, and why a test can never add to the composition.
 
 ## Do it
 
-### 1. Write the setup class
+### 1. Find the setup class
 
-The setup class configures the host for a test project. `samples/Northstar.ProtoTest/Setup.cs` is short at the top because its base class does the work:
+The setup class configures the host for a test project. Open `samples/Northstar.ProtoTest/Setup.cs`. It is short at the top because its base class does the work:
 
 <AnnotatedCode
   filename="Setup.cs"
@@ -58,7 +58,7 @@ public sealed class Setup : ProtoTestAssembly
     }
 }`}
   callouts={[
-    {line: 1, title: 'NUnit\'s once-per-assembly hook', note: 'The base class carries the attribute, so deriving from ProtoTestAssembly is the whole registration. The other runners have their own assembly hook.'},
+    {line: 1, title: 'NUnit\'s once-per-assembly hook', note: 'The base class carries the attribute and the setup and teardown methods. Deriving from ProtoTestAssembly is the whole registration.'},
     {line: 4, title: 'You only write Configure', note: 'It receives the builder. A test body never sees the builder, so the composition stays one readable list.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>, trimmed to the declaration and the three composition calls.</>}
@@ -86,7 +86,7 @@ public abstract class ProtoTestAssembly
     {line: 6, title: 'Start once', note: 'Before any test, the base builds the host from Configure and starts it.'},
     {line: 9, title: 'Stop once', note: 'After the last test, the base stops the host and disposes it.'},
   ]}
-  foot={<>From <code>src/ProtoTest.NUnit/ProtoTestAssembly.cs</code>. The xUnit, xUnit v3, TUnit and MSTest packages ship the same base under their own assembly hooks.</>}
+  foot={<>From <code>src/ProtoTest.NUnit/ProtoTestAssembly.cs</code>. The other runner packages hook into their own runner's start and end, then take the same path below.</>}
 />
 
 Under that, every runner takes the same three steps:
@@ -99,29 +99,29 @@ var host = builder.Build();
 await host.StartAsync().ConfigureAwait(false);`}
   callouts={[
     {line: 2, title: 'Configure composes', note: 'Your Configure adds applications, integrations, sinks, hooks and gates to one builder.'},
-    {line: 3, title: 'Build is the last step', note: 'It validates the composition and creates the host. After it, any registration throws: "The ProtoHostBuilder has already built a ProtoHost; configure a new builder instead."'},
-    {line: 4, title: 'Start opens the run', note: 'Run hooks run, capabilities are recorded and infrastructure starts. Only then can the first test start.'},
+    {line: 3, title: 'Build is the last step', note: 'It creates the host. After it, any registration throws: "The ProtoHostBuilder has already built a ProtoHost; configure a new builder instead."'},
+    {line: 4, title: 'Start opens the run', note: 'Run hooks run, capabilities are recorded and infrastructure starts. Only then do tests start.'},
   ]}
-  foot={<>From <code>src/ProtoTest.Core/ProtoTestHostLifetime.cs</code>, the shared start path behind every adapter.</>}
+  foot={<>From <code>src/ProtoTest.Core/ProtoTestHostLifetime.cs</code>, the shared start path behind every runner.</>}
 />
 
 ### 3. Look for the end of the run in a trace
 
-Open [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace) in the [viewer](https://trace.prototest.dev). The host writes its own work in the run layer, outside every test. At the end, three entries release run pieces after the test's teardown:
+Open [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace) in the [viewer](https://trace.prototest.dev). The host writes its own work in the run layer, outside every test. At the end, three entries release run resources after the test's teardown:
 
 | Entry | What it releases |
 | --- | --- |
-| `Release · messaging:broker` | the broker |
-| `Release · readiness:application:Northstar web` | the readiness probe for the web application |
+| `Release · messaging:broker` | the run's messaging adapter, in memory in this recording |
+| `Release · readiness:application:Northstar web` | the readiness check for the web application |
 | `Release · application:loopback:Northstar web` | the listener the browser journey follows |
 
 ## What happened
 
-The runner called your `Configure` once per test assembly, built the host, started it, ran every test, then stopped it. The test never owned the broker or the listener, so no test teardown could release them. The host did, once, at the end.
+The runner called your `Configure` once, built the host, started it, ran the tests, then stopped it. The test never owned the messaging adapter or the listener, so no test teardown could release them. The host did, once, at the end.
 
-Build is the last step on purpose. A registration after it would change a run that already started, so the builder throws. A second `Build()` throws the same message, and a second start throws `ProtoHost has already been initialized for this assembly.`
+Build is the last step on purpose. A registration after it would change a run that already started, so the builder throws. Each test still gets its own context and clients. Those are per-test state, not registrations.
 
-A run that skips every test still has this shape. [l2-broker-skip.prototrace](pathname:///lessons/l2-broker-skip.prototrace) holds only the three releases. The host started, served its capability list and stopped once.
+In [l2-broker-skip.prototrace](pathname:///lessons/l2-broker-skip.prototrace) the only selected test skipped. The host still started, recorded its capabilities and released the same three resources.
 
 ## Check yourself
 
@@ -135,11 +135,11 @@ The host releases them, in the run layer, after the test's teardown. The test ne
 
 ## Remember
 
-- One host per test assembly: built from `Configure`, started before the first test, stopped after the last.
+- One host per test project: built from `Configure`, started before the first test, stopped after the last.
 - A test cannot add to the host. Registrations after `Build()` throw.
 - The run layer of a trace records the host's own work: capabilities, resources and releases.
 
 ## Go deeper
 
-- [Host and lifecycle](/docs/foundation/lifecycle): the full sequence of run hooks, gates, reports, resources and the archive.
+- [Host and lifecycle](/docs/foundation/lifecycle): the full sequence of run hooks, gates, reports, resources and the archive, and how a failing stop is reported.
 - Next: [Add and remove an integration](/learn/good-tests/add-and-remove-an-integration).

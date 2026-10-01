@@ -4,7 +4,7 @@ import Frame from '@site/src/components/Frame';
 import styles from './styles.module.css';
 
 /*
- * The three Level 5 modes side by side. One suite, three owners of the product:
+ * The three recorded modes side by side. One suite, three owners of the product:
  * the test process, the AppHost, or processes started outside the suite. Counts
  * are the runs the lessons quote: container 75/0, topology 61/13, published 61/13.
  */
@@ -42,17 +42,17 @@ export default function ModesComparison(): ReactNode {
       head={
         <>
           <strong>Three modes, one suite</strong>
-          <span className={styles.headMeta}>Level 5 comparison</span>
+          <span className={styles.headMeta}>Recorded mode comparison</span>
         </>
       }
       foot={
         <>
-          Container mode runs the full 75 including the seven Chromium journeys. Topology and
-          published skip the same 13 clock-gated and in-process-gated journeys, so their counts
-          match. Each lesson quotes its own run log beside its counts.
+          These rows quote separate recorded runs. The container run had 75 tests. The earlier
+          topology and published runs had 74. Both earlier runs skipped 13 journeys. Each lesson
+          names its source log. Your counts depend on the checkout and configuration.
         </>
       }>
-      <div className={styles.scroll} tabIndex={0} role="region" aria-label="Level 5 mode comparison">
+      <div className={styles.scroll} tabIndex={0} role="region" aria-label="Recorded mode comparison">
       <table className={styles.table}>
         <thead>
           <tr>

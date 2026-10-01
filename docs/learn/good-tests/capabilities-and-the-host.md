@@ -24,7 +24,7 @@ import Link from '@docusaurus/Link';
   ]}
   needs={[
     <>The Start track, especially <Link to="/learn/start/read-the-trace">read the trace</Link></>,
-    'The sample cloned. Reading the archive alone also works',
+    'An optional sample checkout for inspecting Setup.cs. The archive and excerpt below are enough to follow along',
   ]}
 />
 
@@ -32,7 +32,7 @@ import Link from '@docusaurus/Link';
 
 A test asks for a REST client, a database connection or a browser, and it works. Somebody decided those would exist before the test started. When one is missing, you need to know where that decision lives.
 
-It lives in one place: the setup class. This lesson finds it, and finds what it produced in the trace.
+Start with the setup class, which configures what the suite provides. This lesson matches its registrations to the capabilities listed in a recorded run.
 
 ## Do it
 
@@ -40,7 +40,7 @@ It lives in one place: the setup class. This lesson finds it, and finds what it 
 
 Download [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace) and open it in the [viewer](https://trace.prototest.dev). Read the run screen. It lists the capabilities this run declared.
 
-A capability is something the run lets a test do, such as calling an API or driving a browser. Each one has a kind and the package that declares it:
+A capability describes support registered for the run, such as making REST calls or driving a browser. The recorded list includes each capability's kind and declaring package:
 
 | Capability | Kind | Declared by |
 | --- | --- | --- |
@@ -54,7 +54,9 @@ A capability is something the run lets a test do, such as calling an API or driv
 
 ### 2. Find where each one comes from
 
-Open `samples/Northstar.ProtoTest/Setup.cs`. The method `ConfigureApplications` adds the integrations. An integration is a ProtoTest package for one kind of system, and adding it to the host is what creates its capability.
+If you have the checkout, open `samples/Northstar.ProtoTest/Setup.cs`. Otherwise, read the excerpt below. Its `ConfigureApplications` method registers the API and browser integrations.
+
+An integration is a ProtoTest package for one kind of system. Its registration can declare a capability and configure clients or services that tests will use.
 
 <AnnotatedCode
   filename="Setup.cs"
@@ -93,26 +95,35 @@ Open `samples/Northstar.ProtoTest/Setup.cs`. The method `ConfigureApplications` 
         .AddWeb(options => options.Headless = true));
 }`}
   callouts={[
-    {line: 3, title: 'Name the application', note: 'Api is the target a test selects with [Application]. The clients and the trace use the same name.'},
-    {line: 8, title: 'ASP.NET Core capability', note: 'AddAspNetCoreServer hosts the application inside the test process.'},
-    {line: 12, title: 'REST and GraphQL', note: 'Each Add call adds a client and the capability that serves it.'},
+    {line: 3, title: 'Name the application', note: 'NorthstarTargets.Api identifies the application a test selects with [Application]. Its value is Northstar, the name used in the trace.'},
+    {line: 8, title: 'ASP.NET Core capability', note: 'AddAspNetCoreServer registers an in-process application server when this run hosts the application locally.'},
+    {line: 12, title: 'REST and GraphQL', note: 'AddRest and AddGraphQL declare protocol capabilities. Their AddClient calls register the clients for this application.'},
     {line: 33, title: 'The browser', note: 'AddWeb adds the Playwright capability.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The store and the broker follow the same shape. Lesson 3 covers the broker.</>}
 />
 
-Match the table to the code. `AddRest` and `AddGraphQL` give REST and GraphQL. `AddAspNetCoreServer` gives ASP.NET Core. `AddWeb` gives Playwright. SQL, Data and Sheets come from registrations elsewhere in `Setup.cs`.
+Match the table to the code. `AddRest` and `AddGraphQL` declare REST and GraphQL. `AddAspNetCoreServer` declares ASP.NET Core. In this sample, `AddWeb` selects Playwright.
+
+For the remaining rows, find `AddSql` in `ConfigureDomain` and `AddSheets` in `Configure`. The Data row comes from `AddNorthstarData`, which calls `AddData` in `NorthstarTestHost.cs`.
 
 ## What happened
 
-You read the same list twice: once as code, once as a record of what the run did with it. The run screen is a map of the composition.
+The setup code describes what to register. The trace shows which capabilities this recorded run declared. Configuration can change that list, so compare it with the run you are investigating.
 
-Two rules keep that list true:
+Use the list to identify registered support, then check what the test still needs:
 
-- A capability is declared by the piece that can serve it. A test cannot declare one by hoping it exists.
-- A capability the run cannot serve is left out, and the composition can register the reason.
+- Integration registration supplies capability metadata. A capability does not prove that a remote service is healthy or that a request will succeed.
+- Some declarations depend on configuration. For example, the sample leaves out its broker capability when no broker is configured.
 
-The split of ownership follows lifetime. The **host** is the one object per test process that builds what the run shares: applications, a database, a broker, report sinks. It starts them once and releases them when the run ends. A **test** owns its own context: the data it creates, the state it sets, its checks and attachments. The next lesson shows when the host is built and released.
+Playwright illustrates the distinction. `AddWeb` declares browser support. `[RequiresPlaywrightBrowser]` separately checks availability, or allows the test when automatic browser installation is enabled.
+
+The **host** is the suite's shared object for registrations, services and resources that belong to the run. It manages the resources the framework owns, such as a container the run starts.
+An existing database or broker supplied through configuration remains externally owned. Individual integrations can also create resources for each test.
+
+Each test has a **test context** for its clients, state, checks and attachments. External data needs an explicit cleanup strategy.
+For example, Northstar's tenant provisioners register cleanup that deletes the test's tenant. Creating a context alone does not delete arbitrary application data.
+The next lesson follows the host's lifetime.
 
 ## Check yourself
 
@@ -120,15 +131,17 @@ The split of ownership follows lifetime. The **host** is the one object per test
   question="The first journey's trace lists capabilities. Name three and the call in Setup.cs that each comes from."
   verify={<>Open the run screen in <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, then find each registration in <code>samples/Northstar.ProtoTest/Setup.cs</code>.</>}>
 
-REST and GraphQL come from `AddRest` and `AddGraphQL`. ASP.NET Core comes from `AddAspNetCoreServer`. SQL comes from `AddSql`, Data from `AddData`, Sheets from `AddSheets` and Playwright from `AddWeb`. Each capability names the package that serves it.
+REST and GraphQL come from `AddRest` and `AddGraphQL`. ASP.NET Core comes from `AddAspNetCoreServer`. SQL comes from `AddSql`, Sheets from `AddSheets` and Playwright from this sample's `AddWeb` registration.
+
+Data comes from `AddNorthstarData` in `Setup.cs`, through its call to `AddData` in `NorthstarTestHost.cs`. Each capability names its declaring package.
 
 </Checkpoint>
 
 ## Remember
 
-- A capability exists because something in setup can serve it.
-- The composition is written once, and the trace records what it declared.
-- The host owns what the run shares. A test owns its own data and checks.
+- A capability describes registered support, not a successful connection or request.
+- The trace records the capabilities declared for that run's configuration.
+- The host manages shared resources it owns. Each test has its own context, and external data needs explicit cleanup.
 
 ## Go deeper
 

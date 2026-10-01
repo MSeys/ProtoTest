@@ -449,3 +449,82 @@ div[class*='codeBlockTitle'] {
 [data-strip][data-more='end'] { mask-image: linear-gradient(to right, black calc(100% - var(--space-6)), transparent); }
 [data-strip][data-more='start'] { mask-image: linear-gradient(to left, black calc(100% - var(--space-6)), transparent); }
 [data-strip][data-more='both'] { mask-image: linear-gradient(to right, transparent, black var(--space-6), black calc(100% - var(--space-6)), transparent); }
+
+/* ── Changelog ────────────────────────────────────────────────────────────────────────────────
+   One block per release: the version with its date, then Features, Fixes and Breaking changes, each with a
+   coloured label. Areas read as quiet eyebrows and each entry's docs link is a small chip at its end. */
+.changelog-page h2 {
+  margin-top: var(--space-7);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+  font-size: 1.9rem;
+  margin-bottom: var(--space-1);
+}
+.changelog-date {
+  margin-bottom: var(--space-5);
+  color: var(--muted);
+  font: var(--weight-medium) 13px var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.changelog-group {
+  --group: var(--muted);
+  --group-soft: var(--hover);
+  margin-top: var(--space-6);
+}
+.changelog-group--features { --group: var(--success); --group-soft: var(--success-soft); }
+.changelog-group--fixes { --group: var(--blueprint); --group-soft: var(--blueprint-soft); }
+.changelog-group--breaking { --group: var(--warning); --group-soft: var(--warning-soft); }
+.changelog-group h3 {
+  display: inline-block;
+  margin: 0 0 var(--space-3);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--group-soft);
+  color: var(--group);
+  font: var(--weight-semibold) var(--text-meta) / 1.8 var(--font-mono);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.changelog-group h3 .hash-link { display: none; }
+.changelog-group h4 {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.changelog-group > ul { padding-left: 0; list-style: none; }
+.changelog-group > ul > li {
+  position: relative;
+  margin: 0;
+  padding: var(--space-2) 0 var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+.changelog-group > ul > li:last-child { border-bottom: 0; }
+.changelog-group > ul > li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: calc(var(--space-2) + 0.62em);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--group);
+  opacity: 0.7;
+}
+.changelog-group--breaking > ul > li { padding-left: var(--space-5); border-left: 2px solid var(--warning-line); }
+.changelog-group--breaking > ul > li::before { display: none; }
+.changelog-ref a {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: 0.78em;
+  line-height: 1.6;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.changelog-ref a:hover { border-color: var(--blueprint-line); color: var(--blueprint); }

@@ -8,13 +8,32 @@ All ProtoTest packages share one version; breaking API changes are called out be
 ## [1.1.0] - 2026-09-30
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
-CLI), the devices family (WebSocket and MQTT), the topology integrations (Aspire, WireMock,
+CLI), the devices family (WebSocket, MQTT, TCP and serial), the topology integrations (Aspire, WireMock,
 Testcontainers), the extended runner surface, and a rewritten documentation site with the Learn track.
-It ships 46 packages, 18 more than 1.0; the breaking changes are listed at the end.
+It ships 46 packages: 19 new, listed first below, and `ProtoTest.OpenTelemetry` removed. The breaking changes are listed at the end.
 See [Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0) for the renames
 and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the rest.
 
 ### Features
+
+#### New packages
+
+- `ProtoTest.Analyzers`: compile-time rules for what the framework cannot catch at run time.
+- `ProtoTest.Aspire`: runs an Aspire AppHost with the suite and publishes its resources as targets.
+- `ProtoTest.Cli`: the `prototest` command that summarizes, indexes and verifies traces.
+- `ProtoTest.Devices`: typed devices, one per test, with every exchange in the trace.
+- `ProtoTest.Devices.WebSocket` and `ProtoTest.Devices.WebSocket.AspNetCore`: devices over WebSocket, or in-process without a socket.
+- `ProtoTest.Devices.Mqtt` and `ProtoTest.Devices.Mqtt.Testcontainers`: devices over MQTT, with a Mosquitto broker for the run.
+- `ProtoTest.Devices.Tcp` and `ProtoTest.Devices.Serial`: devices over TCP and serial lines, with stream framing.
+- `ProtoTest.Diagnosis`: names a failure's cause from the recorded evidence.
+- `ProtoTest.Feedback`: posts a run's digest to a pull request, check annotations or a webhook.
+- `ProtoTest.Hosting`: hosts background workers in the test process.
+- `ProtoTest.Mcp`: an MCP server that lets a coding agent read runs.
+- `ProtoTest.Messaging.MassTransit`: uses the application's MassTransit test harness as the broker.
+- `ProtoTest.Traces`: reads `.prototrace` archives for the CLI, MCP and tools.
+- `ProtoTest.Verification`: compares a run's report with a baseline.
+- `ProtoTest.Web.Pages`: the page model and coverage, shared by the web backends and ASP.NET Core.
+- `ProtoTest.WireMock`: WireMock.Net fakes owned by a test or the run.
 
 #### Core
 
@@ -124,6 +143,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the backend building blocks are public (`WebBackendOptions`, `WebBackendErrors`, `WebBackendDefaults`). [Web](https://prototest.dev/docs/integrations/web/)
 - `PlaywrightWebOptions.MaxTraceBytes` caps a browser trace; 0 turns the cap off. [Web](https://prototest.dev/docs/integrations/web/)
 - sessions are created when requested and complete through the shared client lifecycle. [Web](https://prototest.dev/docs/integrations/web/)
+- sessions key by name and application, and `Web()` without an application finds the one session with that name, such as one `[WebSession(Application = ...)]` opened. [Web](https://prototest.dev/docs/integrations/web/)
+- `WebDownload` implements `IProtoBinaryContent`, so a download feeds `ProtoSheets.Open` in one line. [Web](https://prototest.dev/docs/integrations/web/)
 
 #### Sheets
 
@@ -201,6 +222,9 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the viewer stays responsive on a 1,000-test run; the benchmark page states the open and search times. [Benchmarks](https://prototest.dev/docs/project/benchmarks)
 - a skipped test reads as planned in the run strip, keyboard focus and touch targets work across the viewer, and the run header's outcome pill moves under the title on narrow screens. [Trace viewer](https://trace.prototest.dev)
 - each screen answers its question in order: failing rows name their reason, the failure names where in the test it started, step rows read stated observations inline, and an empty evidence list separates no files from no match. [Trace viewer](https://trace.prototest.dev)
+- the run splits into Overview, Timeline, Operations, Details and Files instead of stacking every panel. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- a Framework switch shows, dims or hides framework operations in Steps and Timeline, and the machinery in State. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- the viewer works on a phone and with a keyboard: one tablist with arrow keys, readable rows on narrow screens, and text that meets WCAG AA. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 
 #### Docs and samples
 
@@ -225,15 +249,11 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Start here opens with one paragraph and four starting points (try it, learn it, weigh it, use it) in two columns, and the sidebar narrows between tablet and wide screens so the text keeps its measure. [Docs](https://prototest.dev/docs/)
 - the READMEs follow one shape per kind, from the root to the package pages. [Docs](https://prototest.dev/docs/)
 - Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
+- a message-to-fix table in troubleshooting, a where-your-evidence-goes map and a which-runner chooser. [Troubleshooting](https://prototest.dev/docs/getting-started/troubleshooting)
 
 #### Packaging
 
 - 46 packages pack in one version, 18 more than 1.0; the installation page lists the supported and preview tiers. [Installation](https://prototest.dev/docs/getting-started/installation)
-
-#### Engineering
-
-- one `./proto` command runs the repository's gates, packs, traces, docs builds and releases; `./proto help` lists them. Each step prints one line and keeps its full output under `artifacts/logs`.
-- the docs check accepts a path through a project's `bin/` or `obj/` folder on an unbuilt checkout, and still fails when the project itself is missing.
 
 ### Fixes
 
@@ -241,48 +261,26 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 - assertion messages across GraphQL, gRPC, messaging, REST and Sheets use a plain hyphen separator. [Assertions](https://prototest.dev/docs/foundation/assertions)
 - ambient-context errors name the fix (`FindTraceWriter`, `SetContext`, the runner setup). [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
-- `ReplaceClient` with the already-registered instance keeps its owner instead of double-disposing. [Clients](https://prototest.dev/docs/foundation/clients)
 - trace snapshots can be read while other tests record observations, attachments and findings. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the test-clock lookup is scoped to its host, so two hosts sharing a prefix keep separate clocks. [Time](https://prototest.dev/docs/foundation/time)
 - diagnostic request URLs keep a root-relative path on Linux and macOS instead of turning it into a `file://` address. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- `ProtoClock.Advance` is atomic, so concurrent advances add up and each records its event. [Time](https://prototest.dev/docs/foundation/time)
-- capability conditions are evaluated per declaration; one server no longer skips another. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
-- a conditional declaration's key set compares by content, so a repeat leaves one declaration. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
 - `Build()` is terminal; every public registration after it throws the single-build message. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
-- `AddHttpReadiness` names the later publishing piece instead of claiming in-process. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
-- `AddHttpReadiness` rejects a non-absolute address at run start, naming the configuration key. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 - shape mismatches with value constraints record every mismatch, not an internal type name. [Shape matching](https://prototest.dev/docs/foundation/shape-matching)
 - malformed JSON bodies and report metadata are redacted with the same policy as the trace. [Attachments](https://prototest.dev/docs/foundation/attachments)
-- resources restarted by a retry release with their new ownership period. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
 - a failed run start unwinds completed run hooks in reverse and keeps the trace silent. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
 - a scope disposed off its async flow records a `Lifecycle` finding and throws. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
 - a throwing run gate keeps its exception and stack in the trace and report metadata. [Hooks](https://prototest.dev/docs/foundation/hooks)
 - telemetry capture failures record one coalesced `telemetry.capture_failed` event. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - `[Application]` runs before every other setup attribute. [Attributes](https://prototest.dev/docs/foundation/attributes)
 - a sink added directly to the service collection is exported once, like one added with `AddSink`. [Reporting](https://prototest.dev/docs/observability/reporting)
-- readiness waits ride the shared `ProtoPolling` loop, with behavior and messages unchanged. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
-- a readiness timeout names the probed URL and the last error. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 - gRPC and messaging share one failure record and the `{protocol}.diagnostics.failed` event. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - `ResolveState` returns only the state the `[Application]` attribute set during the lifecycle. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
 - container starts and device connects are bounded on release and recorded as abandoned. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
-- a cancelled step in a collect-mode flow no longer skips the remaining steps; a cancelled flow token still stops the flow. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
 - an off-flow dispose releases the orphaned test's context before it throws. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
-
-#### Hosting
-
-- a worker's `Program.Main` sees the run's configuration as `--key=value` arguments. [Hosting](https://prototest.dev/docs/integrations/hosting)
-- a worker entry point always gets the run's `--contentRoot`/`--applicationName`. [Hosting](https://prototest.dev/docs/integrations/hosting)
-- `AddWorkerHost` throws for a repeated name with another program. [Hosting](https://prototest.dev/docs/integrations/hosting)
-- `ProtoWorkerOptions.Set(key, null)` delivers an empty setting. [Hosting](https://prototest.dev/docs/integrations/hosting)
 
 #### ASP.NET Core
 
 - the in-process HTTP client is owned by its test, fixing a teardown crash. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
-- a malformed `ProtoTest-User` header leaves the request anonymous instead of a 500. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
 - a repeated `AddAspNetCoreServer` name with another program throws naming both. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
-- an unnamed `[ReplaceService]`/`[FailDependency]` gates on the selected application. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
-- a substituting test's dedicated server is owned before it starts. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
-- a method-level `[SignedInAs]` keeps the class-level authenticators. [Authentication](https://prototest.dev/docs/integrations/rest/authentication)
 
 #### REST and HTTP
 
@@ -298,15 +296,12 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### gRPC
 
-- the built-in test user's metadata is redacted by default (`prototest-user`). [gRPC](https://prototest.dev/docs/integrations/grpc/)
 - a transport with no base address fails naming `AddClient` and the application's keys. [gRPC](https://prototest.dev/docs/integrations/grpc/)
 - client options are per named client; the shared section binds over each callback. [gRPC](https://prototest.dev/docs/integrations/grpc/#options-and-keys)
 - a call that misses its deadline in-process reports `DeadlineExceeded`, as over a socket, instead of the transport's abort. [gRPC](https://prototest.dev/docs/integrations/grpc/#limits)
 
 #### Messaging
 
-- a null payload on a positional MassTransit contract fails naming the contract. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit)
-- a MassTransit consumer re-baselines when a substituting test replaces the harness. [MassTransit](https://prototest.dev/docs/integrations/messaging/masstransit)
 - awaiting two destinations no longer misses the second destination's first delivery. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - awaits serialize and an unmatched delivery is kept for a later await, across brokers. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - `UseRabbitMq` declares the Broker capability only when a connection string is available. [Messaging](https://prototest.dev/docs/integrations/messaging/)
@@ -316,34 +311,13 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - RabbitMQ uses `RabbitMQ.Client` 7.x end to end (async connect, channel, publish, consume). [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - a tap with a missing exchange fails only the tests that await it, with the named error. [Messaging](https://prototest.dev/docs/integrations/messaging/)
 - publishing to a released broker throws instead of reopening, and a repeated release is a no-op. [Messaging](https://prototest.dev/docs/integrations/messaging/)
-- no coverage collector ships; destinations are deliberately not a coverage category. [Coverage](https://prototest.dev/docs/observability/coverage)
-
-#### Devices
-
-- an in-process connect carries the test id, so the application resolves the test's clock. [Devices](https://prototest.dev/docs/integrations/devices)
-- a canceled connect is cleared, so the next send starts a fresh connect. [Devices](https://prototest.dev/docs/integrations/devices)
-- reusing a client name under a second application fails naming the client and both applications. [Devices](https://prototest.dev/docs/integrations/devices)
-- in-process transports are keyed by program and application; a path-only client fails naming the app. [Devices](https://prototest.dev/docs/integrations/devices)
-- the in-process transport validates its options and applies `ConnectTimeout`. [Devices](https://prototest.dev/docs/integrations/devices)
-- `DeviceSession` connects single-flight and serializes sends. [Devices](https://prototest.dev/docs/integrations/devices)
-- device resource and entity ids include the device type. [Devices](https://prototest.dev/docs/integrations/devices)
-- teardown disconnects and records `device.disconnect`. [Devices](https://prototest.dev/docs/integrations/devices)
-- the in-process transport declares its capability only while the application runs in-process. [Devices](https://prototest.dev/docs/integrations/devices)
-- a device capability needs a provided address; `ProtoDeviceClientBuilder.WithAddressKeys` declares the keys, and the MQTT client is inert without its broker. [Devices](https://prototest.dev/docs/integrations/devices)
-- an oversized frame fails naming the address and limit (`WebSocketDeviceOptions.MaxMessageBytes`). [Devices](https://prototest.dev/docs/integrations/devices)
-- an MQTT broker set through `configure` keeps the device capabilities, so gated tests no longer skip. [Devices](https://prototest.dev/docs/integrations/devices)
 
 #### Web
 
-- `Proto.Context.Web()` without an application returns the session a `[WebSession(Application = ...)]` attribute opened for another application, instead of opening a second, addressless one; the shared client resolution finds it. [Web](https://prototest.dev/docs/integrations/web/)
 - a failed backend creation is no longer cached, so a session retries from a clean slate. [Web](https://prototest.dev/docs/integrations/web/)
 - only the backend that wins the first-wins registration declares the browser capability. [Web](https://prototest.dev/docs/integrations/web/)
 - Selenium `Check`/`SelectOption` verify the resulting state or fail within the action timeout. [Interactions](https://prototest.dev/docs/integrations/web/interactions)
 - assertions poll at `IWebBackend.PollInterval`; over-cap traces and stuck pumps are recorded. [Diagnostics](https://prototest.dev/docs/integrations/web/diagnostics)
-- framework routes (`/_`, `/.well-known`) are never page-inventoried. [Web](https://prototest.dev/docs/integrations/web/)
-- `WebDownload` implements `IProtoBinaryContent`, so a download feeds `ProtoSheets.Open` in one line. [Web](https://prototest.dev/docs/integrations/web/)
-- sessions key by name and application, so the same name under two applications stays distinct. [Web](https://prototest.dev/docs/integrations/web)
-- assertion, wait and actionability messages end their last observation with one full stop. [Interactions](https://prototest.dev/docs/integrations/web/interactions)
 
 #### Sheets
 
@@ -362,84 +336,12 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - container readiness honors the run's readiness policy. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 - a released container can be started again, and its connection string is cleared. [Infrastructure](https://prototest.dev/docs/foundation/infrastructure)
 
-#### Aspire
-
-- an AppHost for a partly configured topology publishes only the missing keys. [Aspire](https://prototest.dev/docs/integrations/aspire)
-- a published connection string is recorded redacted, so credentials never reach the trace, while its address stays readable. [Aspire](https://prototest.dev/docs/integrations/aspire)
-
-#### WireMock
-
-- a run-scoped fake keeps its stubs and request log for the whole run; `Reset()` clears it. [WireMock](https://prototest.dev/docs/integrations/wiremock)
-- pinning Humanizer 3.0.10 avoids a `NU1608` next to Aspire. [WireMock](https://prototest.dev/docs/integrations/wiremock)
-- `WireMockAssertionException` derives from `ProtoAssertionException`. [WireMock](https://prototest.dev/docs/integrations/wiremock)
-
 #### Runners and analyzers
 
 - an NUnit test body that throws is recorded failed with its exception and source location. [NUnit](https://prototest.dev/docs/runners/nunit)
 - a body `OperationCanceledException` records `Cancelled` under xUnit v2 as under the other adapters. [Runners](https://prototest.dev/docs/runners/overview)
 - TUnit parameterized rows record their arguments in the trace name. [TUnit](https://prototest.dev/docs/runners/tunit)
 - the MSTest floor accepts the standard template's version, and every runner page states its framework minimum. [Runners](https://prototest.dev/docs/runners/overview)
-- `PT0002` no longer reports a plain test under `[assembly: ProtoTestAutoWrap]`, which runs in the lifecycle. [Analyzers](https://prototest.dev/docs/project/analyzers)
-
-#### Agent workflows
-
-- output is written as UTF-8, so the middle-dot separator renders in a default Windows console. [CLI](https://prototest.dev/docs/agent-workflows/cli#summary)
-- the MCP host prints its usage on an unknown argument, like the CLI does. [Coding agents](https://prototest.dev/docs/agent-workflows/setup)
-- `prototest summary` and the pull request comment print the failing operation once. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
-- the shared failure selector prefers a failed operation over a deeper cancelled one that recorded an error, in the CLI, the MCP tools and the viewer. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
-
-#### Traces and reporting
-
-- an unreadable archive under `TestResults` no longer hides readable runs elsewhere from `prototest index` and MCP discovery. [Setup](https://prototest.dev/docs/agent-workflows/setup)
-- `prototest index` and MCP discovery read the `TestResults` folders under `bin`, where a suite's trace lands by default. [Setup](https://prototest.dev/docs/agent-workflows/setup#where-it-reads)
-
-#### Viewer
-
-- the header keeps the brand, the path and the actions apart on a phone instead of drawing them over each other. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the tab strip is one tablist with a roving focus and arrow keys. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the run strip names each tick with the test it opens, and the inspector resizer takes arrow keys. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- every key-value list in the details (an item's state, request and response fields, attributes, metadata, finding and moment facts) uses one property list: rows with a single line across both columns and keys aligned; state and fields sit in a card whose head names the namespace and the count. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- a tracked item's details read as properties: the shared namespace once, short keys, values as text with their unit; its trail folds the creating change's values and shows later changes as before and after, one line each; a long path or id no longer pushes the details' head past the panel. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- run operations keep their name on one line on a phone instead of breaking it letter by letter in the number column. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the run timeline reads one line per test, with the reason a hover away and the test list's filters named rather than repeated; State rows read two lines, with the change count on the ticks' hint. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the run splits into views instead of stacking every panel: Overview (Needs attention beside what the run could see, or a plain all-clear), Timeline, Operations, Details and Files, each at `#/run/<view>`; a view with nothing in it has no tab, and the walkthrough shows the same shape. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- sideways strips (view tabs, the details' section index, workbook sheets) scroll with a plain mouse wheel while they have room, fade only on the sides that have more, and keep the selected entry in view. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- fewer alarms at once: the run's Needs attention reads rule and reason on one line, the verdict bar names the rule as text and keeps its place in a tooltip, the test list's reasons are muted beside their red marks, and panel explanations move from a standing line to a styled hint beside the title, opened on hover or keyboard focus. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- one Framework switch beside the view tabs shows, dims or hides framework operations in Steps and Timeline, and the machinery a test ran on in State; dim is the default, the choice is remembered, and a failing framework operation always stays. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- Steps and Timeline rows name their kind as quiet text instead of a filled chip, passing checks drop their outline so only a failing one stands out, and duration bars lose the track behind them. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- tertiary text on hover rows meets WCAG AA in both themes. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the inspector frames source, validated shapes, JSON bodies and code in one card with the same head, opens attached files from a row like the other links, and keeps its path and section index on one line. It leads with what went wrong: a comparison comes before the source, and the exception and check verdicts that repeat it fold to the end with the response and the attributes; the head keeps two lines. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-
-#### Docs and samples
-
-- the home, Learn lessons, integration catalog and recipes use a clearer reading hierarchy; figures follow the reader theme, product previews retain blueprint, and code controls share accessible copying. Navigation and the API reference follow the existing design tokens. [Home](https://prototest.dev/)
-- the sample and the template write a per-run trace, so a passing rerun cannot overwrite a failed run's evidence. [Learn](https://prototest.dev/learn)
-- the ProtoTrace page states what `Enabled = false` disables. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
-- the Devices page no longer lists the unshipped `device.replay`. [Devices](https://prototest.dev/docs/integrations/devices)
-- the site self-hosts its typefaces, and the viewer drops three unused Inter files. [Design system](https://prototest.dev/docs/advanced/design-system)
-- the coverage page's viewer mock shows the shipped 44-test demo, and the home page's structured data names 1.1.0. [Coverage](https://prototest.dev/docs/observability/coverage)
-- the accessibility gate also covers the Learn track, the changelog, search and the 404 route. [Design system](https://prototest.dev/docs/advanced/design-system)
-- the Learning demo's drill archives and lesson values are regenerated from the current code, and the sample README's counts match a fresh run. [Learn](https://prototest.dev/learn)
-- every value quoted from a lesson archive matches the committed trace; the first-test walk, the readiness waits, the tenant ids and the artifact sizes were reconciled. [Learn](https://prototest.dev/learn)
-- the teardown finding reads the same in the reporting, lifecycle and Learn pages, and the first test registers the report sink it promises. [Reporting](https://prototest.dev/docs/observability/reporting)
-- the viewer walkthrough carries the shipped demo's records and the viewer's own chrome, so the mocks and the real screens agree. [Coverage](https://prototest.dev/docs/observability/coverage)
-- the Learn track adds four lessons: the run's one host, signing in as a test user, findings and the run gate, and swapping a dependency for one test. [Learn](https://prototest.dev/learn)
-- the home's command box offers every runner's commands, with a proof strip and a link to the conversion page. [Home](https://prototest.dev/)
-- a vocabulary page for the foundation terms and the trace entities. [Vocabulary](https://prototest.dev/docs/foundation/vocabulary)
-- a message-to-fix table in troubleshooting, built from the errors readers hit. [Troubleshooting](https://prototest.dev/docs/getting-started/troubleshooting)
-- a where-your-evidence-goes map for the archive, the viewer, reports, OpenTelemetry, the CLI and MCP. [Observability](https://prototest.dev/docs/observability/where-evidence-goes)
-- a which-runner chooser in the runner overview. [Runners](https://prototest.dev/docs/runners/overview)
-- the navbar groups the API reference, trace viewer and changelog under Resources; the footer keeps focused entry points. [Reference](https://prototest.dev/docs/)
-- the reference pages lead with a runnable example, the real output and the resolution tables, and the obsolete shims move to the migration page. [Docs](https://prototest.dev/docs/)
-- the runner chooser, the observability first screens, the CI digest and the agent quickstart show real output. [Runners](https://prototest.dev/docs/runners/overview)
-- the integration pages gain the sequence diagrams, the isolation table and the trace examples. [Integrations](https://prototest.dev/docs/integrations/overview)
-- the home leads with the task, the recipes end in trace anatomy, and the project pages lead with their verdict. [Home](https://prototest.dev/)
-- the Learn track corrects the published case, the report claim and the decision tables, and names the sample consistently. [Learn](https://prototest.dev/learn)
-- the package READMEs state the queue, container and runner semantics the code does, with one container contract. [Runners](https://prototest.dev/docs/runners/overview)
-
-#### Packaging
-
-- every package packs again (44), verified in one `eng/pack.ps1` run. [Installation](https://prototest.dev/docs/getting-started/installation)
 
 ### Breaking changes
 
@@ -451,7 +353,6 @@ These are the 1.0 to 1.1 migration changes; from 1.1 onward the 1.x surface stay
   - Register clients under an application and configure its base URL or endpoints, or use an `AddClient` resolver ([Clients](https://prototest.dev/docs/foundation/clients)).
 - registration, observation and runner implementation types are internal; use the public APIs.
 - `ProtoHost` can no longer be constructed from a service provider; use `ProtoHostBuilder` ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
-- `ProtoFlow` steps declare their operation; unused retry and timeout options are gone.
 - `IProtoClientInitializer.TryInitializeAsync` no longer takes a cancellation token.
   - Pass one to `StartTestAsync`, or use a run hook as the cancellable extension point ([Lifecycle](https://prototest.dev/docs/foundation/lifecycle)).
 - `ProtoExecutionContext.RegisterClient<T>` takes `ProtoClientOwnership` instead of a `bool`.

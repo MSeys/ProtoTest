@@ -1,7 +1,7 @@
 ---
 sidebar_position: 1
 title: Why I built ProtoTest
-description: The problems and earlier experience that led to ProtoTest.
+description: "The problems in .NET integration testing, and the earlier experience, that led to building ProtoTest."
 ---
 
 # Why I built ProtoTest

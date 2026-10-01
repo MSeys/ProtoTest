@@ -1,12 +1,11 @@
 ---
 sidebar_position: 9
-title: Background workers
+title: Test .NET background workers and hosted services
 sidebar_label: Workers
 description: "Run a background worker or generic host in-process with the suite: it starts with the run, reads the run's settings and stops with the run."
 ---
 
-# Background workers
-
+# Test .NET background workers and hosted services
 `ProtoTest.Hosting` runs a background worker inside the test process. It starts with the run, reads the run's settings and stops with the run.
 
 ```csharp

@@ -1,7 +1,7 @@
 ---
 sidebar_position: 7
 title: AI usage
-description: How and why AI was used while building ProtoTest.
+description: "How and why AI was used while building ProtoTest, and how its output was checked before it shipped."
 ---
 
 # AI usage

@@ -7,6 +7,7 @@ description: "Create data through the API, then read the row from the database t
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
+import Link from '@docusaurus/Link';
 
 # Check what the application stored
 
@@ -20,7 +21,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
     'Say why the sample keeps its writes instead of rolling them back',
   ]}
   needs={[
-    <>The previous lesson, <a href="./query-graphql">Write over REST, read over GraphQL</a></>,
+    <>The previous lesson, <Link to="/learn/across-boundaries/query-graphql">Write over REST, read over GraphQL</Link></>,
     'A sample checkout and the .NET SDK to run the command',
   ]}
 />

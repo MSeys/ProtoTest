@@ -1,11 +1,11 @@
 ---
 sidebar_position: 1
-title: GraphQL integration testing
+title: Test GraphQL APIs in .NET
 sidebar_label: Overview
 description: "A per-test GraphQL client for queries, mutations and subscriptions over WebSocket or SSE, with uploads, shape assertions and schema coverage."
 ---
 
-# GraphQL
+# Test GraphQL APIs in .NET
 
 `ProtoTest.GraphQL` gives each test a GraphQL client for queries, mutations and subscriptions (WebSocket or SSE), with file uploads, shape assertions and schema coverage.
 

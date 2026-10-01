@@ -1,11 +1,11 @@
 ---
 sidebar_position: 6
-title: OpenAPI
+title: Check API coverage against your OpenAPI spec
+sidebar_label: OpenAPI
 description: "Compare what your REST tests did against your OpenAPI document, and find the endpoints, responses and properties no test has checked."
 ---
 
-# OpenAPI
-
+# Check API coverage against your OpenAPI spec
 `ProtoTest.OpenApi` compares what your REST tests did against your OpenAPI document, and reports the endpoints, responses and properties no test has touched.
 
 ```csharp

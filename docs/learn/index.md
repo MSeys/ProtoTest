@@ -3,7 +3,7 @@ id: index
 title: Learn integration testing
 sidebar_label: Overview
 sidebar_position: 0
-description: "Hands-on lessons for .NET integration testing with ProtoTest: write your first test, test real boundaries, make tests reliable, and understand why a test failed."
+description: "Hands-on lessons for .NET integration testing: write your first test, test real boundaries, make tests reliable, read failures."
 ---
 
 import LearnTracks from '@site/src/components/LearnTracks';

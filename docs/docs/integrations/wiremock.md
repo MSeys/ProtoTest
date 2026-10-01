@@ -1,11 +1,11 @@
 ---
 sidebar_position: 8
-title: WireMock fakes
+title: Fake HTTP dependencies with WireMock.Net
 sidebar_label: WireMock
 description: "Stub an HTTP dependency per test with WireMock.Net: scenario-like stubs, REST-shaped trace evidence and stub coverage."
 ---
 
-# WireMock
+# Fake HTTP dependencies with WireMock.Net
 
 `ProtoTest.WireMock` starts a fake HTTP service per test, backed by [WireMock.Net](https://github.com/WireMock-Net/WireMock.Net). Stub the dependency your system calls, point it at the fake, and verify the requests it received. Matched requests land in the trace with the [REST](./rest/index.md) response shape, and registered stubs contribute coverage.
 

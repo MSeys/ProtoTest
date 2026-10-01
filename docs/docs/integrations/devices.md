@@ -1,12 +1,11 @@
 ---
 sidebar_position: 10
-title: Devices
+title: Test devices over WebSocket, MQTT, TCP or serial
 sidebar_label: Devices
 description: "Talk to devices over WebSocket, MQTT, TCP or a serial port, build their data strings as typed messages, and keep every exchange in the trace."
 ---
 
-# Devices
-
+# Test devices over WebSocket, MQTT, TCP or serial
 `ProtoTest.Devices` talks to devices the way other integrations talk to APIs: a typed device class per kind of device, one instance per test, and every exchange in the same trace.
 
 ```csharp

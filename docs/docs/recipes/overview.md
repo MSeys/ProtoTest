@@ -2,7 +2,7 @@
 sidebar_position: 1
 title: Integration testing recipes
 sidebar_label: Overview
-description: "Scenarios that combine several ProtoTest capabilities in one test: an API call and its event, a write and its row, an API and a browser, a download and its workbook."
+description: "Scenarios that combine ProtoTest capabilities in one test: an API call and its event, a write and its row, an API and a browser."
 ---
 
 import RecipeIndex from '@site/src/components/RecipeIndex';

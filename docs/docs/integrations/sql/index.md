@@ -1,11 +1,11 @@
 ---
 sidebar_position: 9
-title: SQL
+title: Check the database in .NET integration tests
+sidebar_label: SQL
 description: "A database connection each test owns, optionally wrapped in a transaction that is rolled back at the end, with Entity Framework Core on top."
 ---
 
-# SQL
-
+# Check the database in .NET integration tests
 `ProtoTest.Sql` gives each test a database connection it owns. Writes made through that connection disappear at teardown:
 
 ```csharp

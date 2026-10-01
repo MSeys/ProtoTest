@@ -1,10 +1,11 @@
 ---
 sidebar_position: 3
-title: Configuration
+title: Configure ProtoTest
+sidebar_label: Configuration
 description: "Set ProtoTest options in code, in configuration, or both, so one suite runs in-process on a laptop and against a deployed environment in CI."
 ---
 
-# Configuration
+# Configure ProtoTest
 
 You can set most ProtoTest options in code, in configuration files, or in both. This lets one suite run in-process on a laptop and against a deployed environment in CI. Only the settings file changes.
 

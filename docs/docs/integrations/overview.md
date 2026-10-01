@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-title: Integrations map
+title: "What ProtoTest can test: the integrations"
 sidebar_label: Map
 description: "Every ProtoTest integration on one page: protocols, browsers, messaging, devices, data and files, applications, runners and the tooling around the run."
 ---
@@ -8,8 +8,7 @@ description: "Every ProtoTest integration on one page: protocols, browsers, mess
 import StackBuilder from '@site/src/components/StackBuilder';
 import CapabilityIndex from '@site/src/components/CapabilityIndex';
 
-# Integrations map
-
+# What ProtoTest can test: the integrations
 Every ProtoTest integration on one page, grouped by the kind of system it reaches. Compose the capabilities your scenario needs. Every integration joins the same [host, context and lifecycle](../foundation/overview.md).
 
 **Supported** packages follow the 1.x compatibility promise. **Preview** packages work today, but their surface may change before the next minor release. [Installation](../getting-started/installation.md) explains the stability tiers and framework requirements.

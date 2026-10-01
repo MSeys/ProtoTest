@@ -1,11 +1,11 @@
 ---
 sidebar_position: 1
-title: Browser integration testing
+title: Browser tests with Playwright or Selenium in .NET
 sidebar_label: Overview
 description: "A driver-independent browser-testing model for pages, components, flows and login, run by Playwright or Selenium underneath."
 ---
 
-# Web
+# Browser tests with Playwright or Selenium in .NET
 
 `ProtoTest.Web` gives each test a browser session behind page objects, with Playwright or Selenium underneath.
 

@@ -1,12 +1,11 @@
 ---
 sidebar_position: 1
-title: Test data
+title: Create test data per test in .NET
 sidebar_label: Overview
 description: "Build test objects with deterministic defaults, so a test only states the values it is about, and create them in the system under test."
 ---
 
-# Test data
-
+# Create test data per test in .NET
 `ProtoTest.Data` builds test objects from deterministic defaults. Write only the values the test is about. Hand the object to your application to create it for real.
 
 ```csharp

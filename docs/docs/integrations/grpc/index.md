@@ -1,11 +1,11 @@
 ---
 sidebar_position: 5
-title: gRPC
+title: Test gRPC services in .NET
+sidebar_label: gRPC
 description: "A named gRPC client per test for unary and streaming calls, with metadata authentication, shape and status assertions, per-call tracing and method coverage."
 ---
 
-# gRPC
-
+# Test gRPC services in .NET
 `ProtoTest.Grpc` gives each test a named gRPC client for unary and streaming calls, with metadata authentication, shape and status assertions, per-call tracing and method coverage.
 
 ```csharp

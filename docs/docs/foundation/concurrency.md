@@ -1,11 +1,11 @@
 ---
 sidebar_position: 18
-title: Concurrency
+title: Run .NET integration tests in parallel safely
+sidebar_label: Concurrency
 description: "How ProtoTest keeps parallel tests isolated, what to do when a test fans out internally, and the parallelism the project has actually exercised."
 ---
 
-# Concurrency
-
+# Run .NET integration tests in parallel safely
 ## What it is
 
 ProtoTest scopes the execution context to the async flow. `Proto.Context` is per test and flow-local. Two parallel tests do not share clients, resources or trace. That is why the runner's own parallelism is safe to use.

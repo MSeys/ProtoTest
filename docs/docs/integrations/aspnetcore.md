@@ -1,11 +1,11 @@
 ---
 sidebar_position: 7
-title: ASP.NET Core
+title: Test ASP.NET Core apps in-process
+sidebar_label: ASP.NET Core
 description: "Run your ASP.NET Core application in-process with WebApplicationFactory and hand its HttpClient to REST and GraphQL: no deployment, no ports."
 ---
 
-# ASP.NET Core
-
+# Test ASP.NET Core apps in-process
 `ProtoTest.AspNetCore` runs your ASP.NET Core application in-process with `WebApplicationFactory`, and hands its `HttpClient` to the REST and GraphQL clients. No deployed environment, no ports.
 
 ```csharp

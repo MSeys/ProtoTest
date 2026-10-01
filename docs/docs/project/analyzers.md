@@ -1,7 +1,7 @@
 ---
 sidebar_position: 8
 title: Analyzers
-description: "ProtoTest.Analyzers: the warnings for what the framework cannot catch at runtime and the shortcuts a test should not take, and what the package deliberately does not check."
+description: "ProtoTest.Analyzers warns about what the framework cannot catch at runtime and the shortcuts a test should not take."
 ---
 
 import CommandBox from '@site/src/components/CommandBox';

@@ -7,7 +7,7 @@ description: "The execution context pieces a suite reaches for less often: servi
 
 # Execution context advanced topics
 
-The compartments below build on [Execution context](./execution-context.md). Most tests use clients and typed state; these five cover services, ownership, reporting and the trace.
+The compartments below build on [Execution context](./execution-context.md). Most tests use clients and typed state. These five cover services, ownership, reporting and the trace.
 
 ## Services
 
@@ -25,7 +25,7 @@ Register services with `builder.ConfigureServices(...)`. Scoped services are per
 
 ## Resources
 
-A test can own resources, such as temporary files, provisioned data or an enlistment, and have them released in reverse registration order during teardown, before the DI scope is disposed.
+A test can own resources, such as temporary files, provisioned data or an enlistment. They are released in reverse registration order during teardown, before the DI scope is disposed.
 
 ```csharp
 void RegisterResource(IProtoResource resource);

@@ -12,7 +12,7 @@ import TraceExample from '@site/src/components/TraceExample';
 
 Many applications write through REST and read through GraphQL. Testing each API alone misses the question that matters: does a write through one show up in the other?
 
-Both clients can target the same application in one test. The GraphQL read checks the row the REST write just created. The sample suite runs this journey in [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs).
+Both clients can target the same application in one test. The GraphQL read checks the row the REST write created. The sample suite runs this journey in [PlatformJourney.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/PlatformJourney.cs).
 
 ## The code
 
@@ -109,14 +109,14 @@ The sample suite's own run:
 
 ## Variations
 
-- **A published application.** Configure the application's `BaseUrl` and the same clients follow that address; the in-process server steps aside.
+- **A published application.** Configure the application's `BaseUrl` and the same clients follow that address. The in-process server steps aside.
 - **Read one value.** `ReadDataAs<T>("$.order.total")` reads a single JSON path when a full shape is more than the assertion needs. See [Responses](../integrations/graphql/responses.md).
 - **Exact matching.** `MatchShape(shape, exact: true)` fails when the response carries a field the shape does not mention, so a forgotten field cannot slip past the assertion.
 
 ## What it does not prove
 
-- **Filter to what the test created.** `totalCount = 1` only holds if the query is narrowed to this test's data. The sample suite gets that from its provisioned tenant; a shared database needs its own filter.
-- **The two APIs name things differently.** REST and GraphQL often disagree on casing and enum values (`active` and `ACTIVE`). Assert each in its own terms; the shape matcher compares exactly.
+- **Filter to what the test created.** `totalCount = 1` only holds if the query is narrowed to this test's data. The sample suite gets that from its provisioned tenant, and a shared database needs its own filter.
+- **The two APIs name things differently.** REST and GraphQL often disagree on casing and enum values (`active` and `ACTIVE`). Assert each in its own terms, because the shape matcher compares exactly.
 - **Assume the read may lag the write until the test proves otherwise.** If the read side updates asynchronously, the first query can miss the write. Poll with a deadline instead of adding a delay, so the wait ends as soon as the write is visible.
 
   ```text

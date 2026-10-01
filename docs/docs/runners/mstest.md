@@ -14,7 +14,7 @@ description: "Register ProtoTest with MSTest: the assembly hooks, the [ProtoTest
 dotnet add package ProtoTest.MSTest
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **MSTest.TestFramework 4.0.2 or newer**; the standard `dotnet new mstest` template already pins it. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **MSTest.TestFramework 4.0.2 or newer**. The standard `dotnet new mstest` template already pins it. The `dotnet new prototest` template defaults to `net10.0`. Pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 ## Register
 
@@ -89,7 +89,7 @@ skip condition fails → ignored TestResult (lifecycle never starts, no trace)
 
 ## Limits
 
-- MSTest 4.4 has no public dynamic-skip API. The reason is not a first-class MSTest property; it only reaches the display name and `LogOutput`.
+- MSTest 4.4 has no public dynamic-skip API. The reason is not a first-class MSTest property. It only reaches the display name and `LogOutput`.
 - `TestMethodAttribute.ExecuteAsync(ITestMethod)` exposes no cancellation token, so a test starts with `CancellationToken.None`.
 - There is no assembly-wide auto-wrap. MSTest offers no assembly hook for one, so every test method carries `[ProtoTest]`.
 - A skipped test is reported only by MSTest. ProtoTest records nothing for it.

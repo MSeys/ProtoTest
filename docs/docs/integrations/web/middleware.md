@@ -10,8 +10,8 @@ Real applications have their own notion of "ready": a loading spinner, an in-fli
 
 | Need | Register |
 | --- | --- |
-| The app is not ready around ops (spinner, XHR, animation) | a [wait condition](#wait-conditions) |
-| Logging, timing, retries, or extra diagnostics on every op | [middleware](#middleware) |
+| The app is not ready around operations (spinner, XHR, animation) | a [wait condition](#wait-conditions) |
+| Logging, timing, retries, or extra diagnostics on every operation | [middleware](#middleware) |
 
 ```mermaid
 flowchart TD
@@ -112,7 +112,7 @@ If the condition is not ready in time, the operation fails with `WebWaitTimeoutE
 | `IsVisibleAsync(element)` | check an element's visibility |
 | `CountAsync(elements)` | count matches |
 
-The latter two take a `WebElementReference`; get one from any element's [`Reference`](./interactions.md#element-metadata) property. `EvaluateBooleanAsync` throws `WebBackendCapabilityException` when the active backend does not implement `IWebBackendJavaScript` (a custom backend without JavaScript support).
+The last two take a `WebElementReference`. Get one from any element's [`Reference`](./interactions.md#element-metadata) property. `EvaluateBooleanAsync` throws `WebBackendCapabilityException` when the active backend does not implement `IWebBackendJavaScript` (a custom backend without JavaScript support).
 
 ### Built in: jQuery
 

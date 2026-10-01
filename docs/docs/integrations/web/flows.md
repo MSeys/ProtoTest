@@ -6,7 +6,7 @@ description: "Group steps on one component into a named flow that reads as one o
 
 # Flows
 
-A flow is a named sequence of steps on one component. It reads better than repeating the component on every line, and it shows up in the trace as **one** operation with the steps nested underneath, so a failed checkout reads as "`Checkout` › step 3 failed", not as a flat list of clicks.
+A flow is a named sequence of steps on one component. It reads better than repeating the component on every line. The trace shows it as **one** operation with the steps nested underneath. A failed checkout then reads as "`Checkout` › step 3 failed", not as a flat list of clicks.
 
 ```text
 WEB flow · Pay by card (5 steps) › step 3 failed

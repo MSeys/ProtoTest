@@ -128,7 +128,7 @@ This is the sample suite's own run:
 ## What it does not prove
 
 - **Only OpenXML `.xlsx` is supported.** It does not read `.xls` or CSV, and it does not write files.
-- **`Should.MatchModel()` collects all column failures into one result.** A missing header fails when the model is read, naming it; broken column rules are collected, each with its cell reference, into one failure.
+- **`Should.MatchModel()` collects all column failures into one result.** A missing header fails when the model is read, naming it. Broken column rules are collected, each with its cell reference, into one failure.
 - **Formulas are cached values.** Nothing is recalculated, and dates are detected from the cell's style, not a schema.
 - **Ranges are capped at 1,000,000 cells**, and hidden sheets are skipped unless the options ask for them.
 - **Coverage is read-based.** A column present in the file but never read is uncovered.

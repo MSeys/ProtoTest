@@ -171,11 +171,11 @@ Some features need the application's own process. A published environment cannot
 
 | Feature | Why it is in-process only | Suite pattern |
 | --- | --- | --- |
-| `Proto.Context.ApplicationServices<TProgram>()` | resolves from the in-process server's container; with no server registered, `ApplicationServices` throws | `[RequiresInProcess]` |
+| `Proto.Context.ApplicationServices<TProgram>()` | resolves from the in-process server's container. With no server registered, `ApplicationServices` throws. | `[RequiresInProcess]` |
 | `ServerService<TProgram, TService>()` | resolves from the in-process server's container | `[RequiresInProcess]` |
 | `ServerFactory<TProgram>()` | resolves from the in-process server's container | `[RequiresInProcess]` |
 | `IGraphQLWebSocketFactory` over the test server | subscriptions ride the in-process WebSocket connection | `[RequiresInProcess]` |
-| Transactional isolation of the application's writes (`SqlIsolation.Transaction` + `ShareConnectionWith`) | the transaction covers only the connection ProtoTest owns; a deployed process cannot share it | `[RequiresInProcess]` |
+| Transactional isolation of the application's writes (`SqlIsolation.Transaction` + `ShareConnectionWith`) | the transaction covers only the connection ProtoTest owns, and a deployed process cannot share it | `[RequiresInProcess]` |
 
 The tests' own domain code runs wherever the suite has a database, whether from a container or from a configured connection string. `[RequiresCapability(ProtoCapabilityKinds.Store)]` on `DomainAccessJourney` matches the capability that `AddSql` registers. The journey therefore skips exactly when the domain code cannot be set up. The sample sets `SqlIsolation.None` for that domain. Its application has its own connection, and a test transaction would hide the test's writes from it.
 
@@ -198,7 +198,7 @@ Each key also works as an environment variable, with `__` in place of the colon 
 The [recipes](../recipes/overview.md) work in all three modes unchanged: [REST, then GraphQL](../recipes/rest-then-graphql.md), [a write that lands in the database](../recipes/write-lands-in-the-database.md) and [API, then browser](../recipes/api-then-browser.md).
 
 :::note[The same shapes in a product suite]
-OpenCSMS, an independent EV charging platform in its own repository, runs one suite in every shape on this page and one more: an Aspire AppHost that starts the product's own processes. Each target declares its providers in priority order with `UseConfigured()` first, so the environment decides which link serves the store, the broker and the application.
+OpenCSMS, an independent EV charging platform in its own repository, runs one suite in every shape on this page. It adds one more: an Aspire AppHost that starts the product's own processes. Each target declares its providers in priority order with `UseConfigured()` first, so the environment decides which link serves the store, the broker and the application.
 
 ![The OpenCSMS station screen showing a charge point, its sessions and the operator's remote-start panel.](/images/opencsms/station-timeline.png)
 :::

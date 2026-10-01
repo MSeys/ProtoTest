@@ -6,7 +6,8 @@ description: "Click, type, select and assert on a WebElement; every action waits
 
 # Actions and assertions
 
-Everything you do to a page goes through a `WebElement`.
+Everything you do to a page goes through a `WebElement`. This page shows how to act on an element, read it and
+assert on it. Actions wait until the element can take them and then act once. Assertions retry until they hold.
 
 ## Actions
 
@@ -32,11 +33,11 @@ await page.RememberMe.CheckAsync();
 
 | | Playwright | Selenium |
 | --- | --- | --- |
-| Mechanism | its own auto-waiting: an action waits until the element is attached, visible, stable and enabled | retries until the element is displayed and enabled, and, for fills and selects, not read-only; for clicks and checks, not moving (when `WaitForStableBounds`) and not covered by another element (when `CheckClickObstruction` and the driver supports JavaScript) |
+| Mechanism | its own auto-waiting: an action waits until the element is attached, visible, stable and enabled | retries until the element is displayed and enabled. Fills and selects also wait until it is not read-only. Clicks and checks also wait until it stops moving (with `WaitForStableBounds`) and nothing covers it (with `CheckClickObstruction`, when the driver supports JavaScript). |
 | Bound | `ActionTimeout` (5 s by default) | `ActionTimeout` (5 s by default), polling every `PollInterval` |
-| On timeout | `WebActionabilityException`; a read of an element that never appears becomes `WebElementResolutionException` | `WebActionabilityException` with the component path, locator and last observation |
+| On timeout | `WebActionabilityException`. A read of an element that never appears becomes `WebElementResolutionException`. | `WebActionabilityException` with the component path, locator and last observation |
 
-ProtoTest resolves the locator and calls the native action; it never re-issues a failed one. The shared exceptions keep polling assertions and negations identical on either backend.
+ProtoTest resolves the locator and calls the native action. It never re-issues a failed one. The shared exceptions keep polling assertions and negations identical on either backend.
 
 To wait for something application-specific, such as a spinner or a pending XHR, add a [wait condition](./middleware.md#wait-conditions).
 
@@ -66,7 +67,7 @@ download.MediaType;                               // text/csv (guessed from the 
 download.Size;                                    // bytes
 ```
 
-`WebSession.DownloadAsync` and its `WebPage` shortcut run the trigger through the normal operation pipeline. They wait for the file, return a `WebDownload`, and register it as a test attachment. A trigger that runs other session operations (like the semantic click above) nests them inside the download's operation. An explicit `name` replaces the browser's suggested file name for the record and the attachment; its extension refines the media type guess. A non-positive `timeout` throws `ArgumentOutOfRangeException`.
+`WebSession.DownloadAsync` and its `WebPage` shortcut run the trigger through the normal operation pipeline. They wait for the file, return a `WebDownload`, and register it as a test attachment. A trigger that runs other session operations (like the semantic click above) nests them inside the download's operation. An explicit `name` replaces the browser's suggested file name for the record and the attachment. Its extension refines the media type guess. A non-positive `timeout` throws `ArgumentOutOfRangeException`.
 
 - **Playwright** captures natively: the trigger runs, Playwright waits for the download, and ProtoTest reads the completed file. This covers link, form and generated (`blob:`, `data:`) downloads.
 - **Selenium** has no download API in the WebDriver protocol, so `DownloadAsync` throws `WebBackendCapabilityException` before the trigger runs, naming the limitation. Fetch the file over HTTP with [ProtoTest.Rest](../rest/index.md) instead.
@@ -81,7 +82,7 @@ ValueTask<bool> IsEnabledAsync(CancellationToken cancellationToken = default);
 ValueTask<bool> IsCheckedAsync(CancellationToken cancellationToken = default);
 ```
 
-These read **once**, right now. For checks in a test, prefer the assertions below; they retry.
+These read **once**, right now. For checks in a test, prefer the assertions below, because they retry.
 
 ## Assertions
 
@@ -123,7 +124,8 @@ flowchart LR
 
 Assertions poll every 50 ms until the condition holds or the timeout passes. The default timeout is 5 seconds. While polling, "element not found yet" and "not actionable yet" are treated as "not yet", not as failures. When time runs out you get a `WebAssertionException` describing the last thing observed.
 
-- `HaveTextAsync` compares the element's rendered text exactly and ordinally; `ContainTextAsync` checks for an ordinal substring. The read is the browser's rendered text (Playwright's inner text, Selenium's `Element.Text`), so runs of whitespace and line breaks arrive collapsed; when the failure message shows two identical-looking strings, the expected one still carries the source formatting. `ShouldNot` is the inverse of each.
+- `HaveTextAsync` compares the element's rendered text exactly and ordinally. `ContainTextAsync` checks for an ordinal substring. `ShouldNot` is the inverse of each.
+- The text is what the browser renders: Playwright's inner text or Selenium's `Element.Text`. Runs of whitespace and line breaks arrive collapsed. When a failure message shows two strings that look identical, the expected one still carries the source formatting.
 - `HaveValueAsync` compares the value ordinally, but the failure message reports only the value's length.
 - A timeout of zero or less throws `ArgumentOutOfRangeException`.
 
@@ -136,7 +138,7 @@ assert.web · Status should have text "saved"
 └─ pass → web.page.verified observation (the page counts as covered)
 ```
 
-Each assertion is a `assert.web` operation on the element, with `web.expectation`, `web.assert.negated` and `web.assert.timeout` attributes. A passing assertion records a `web.page.verified` [coverage observation](./page-coverage.md) for the page it was checked on; that is what makes a page count as covered.
+Each assertion is a `assert.web` operation on the element, with `web.expectation`, `web.assert.negated` and `web.assert.timeout` attributes. A passing assertion records a `web.page.verified` [coverage observation](./page-coverage.md) for the page it was checked on. That observation is what makes a page count as covered.
 
 :::note[Form values stay out of the trace]
 `FillAsync` records only the *length* of what was typed (`web.value` is `[REDACTED]`), and `HaveValueAsync` failures report the value's length rather than the value. Passwords and personal data you type in tests never end up in a `.prototrace` file.

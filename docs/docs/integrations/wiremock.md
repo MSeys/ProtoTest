@@ -32,7 +32,7 @@ builder.AddWireMock("Ledger", fake => fake.PerRun());         // one server for 
 builder.AddWireMock("Legacy", fake => fake.Port(8089));       // fixed port
 ```
 
-A repeated name with equal settings composes; a repeated name with different settings throws naming the fake. Registration declares a `protocol` capability named `WireMock` with the fake as its instance, so `[RequiresCapability(ProtoCapabilityKinds.Protocol, CapabilityName = "WireMock")]` gates on it.
+A repeated name with equal settings composes. A repeated name with different settings throws and names the fake. Registration declares a `protocol` capability named `WireMock` with the fake as its instance, so `[RequiresCapability(ProtoCapabilityKinds.Protocol, CapabilityName = "WireMock")]` gates on it.
 
 In a test, reach the fake by name:
 
@@ -40,7 +40,12 @@ In a test, reach the fake by name:
 var fake = Proto.Context.WireMock("Payments");
 ```
 
-`fake.BaseUrl` is the URL to point the system under test at, and `fake.Port` is the bound port. Ownership is explicit: a per-test fake starts on the first `WireMock(name)` call of the test and stops with the test's resources; a per-run fake starts on first use, keeps its stubs and request log for the whole run, and stops with the run's resources. [Infrastructure](../foundation/infrastructure.md) explains run-owned resources and their release.
+`fake.BaseUrl` is the URL to point the system under test at, and `fake.Port` is the bound port. Ownership is explicit:
+
+- A per-test fake starts on the first `WireMock(name)` call of the test and stops with the test's resources.
+- A per-run fake starts on first use, keeps its stubs and request log for the whole run, and stops with the run's resources.
+
+[Infrastructure](../foundation/infrastructure.md) explains run-owned resources and their release.
 
 ## The tasks
 
@@ -60,17 +65,17 @@ public async Task Balance_endpoint_returns_the_stubbed_amount()
 }
 ```
 
-- **Serve a stubbed response.** `fake.Stub("GET", "/balance/*").RespondJson(HttpStatusCode.OK, new { available = 1200 })` stubs the route; `fake.Stub(HttpMethod.Post, "/charges").RespondWith(HttpStatusCode.Accepted)` and `RespondWith(status, body, contentType)` cover the rest. Paths follow the WireMock path syntax, where `*` matches a segment. A stub serves nothing until a response is set on it, and a response method replaces the mapping, so re-stubbing never stacks two mappings. `WithHeader(name, values)` adds response headers.
-- **Verify the call arrived.** The stub handle answers `ReceivedCount`, `StatusCode` and `VerifyHappened()` / `VerifyHappenedOnce()` / `VerifyHappened(times)`, which fail naming the stub. Assert before the test completes; after teardown the server is gone.
-- **Fail on a route nothing stubbed.** `fake.ReceivedRequests` lists every request the fake served (method, path, matched, status) and `fake.UnmatchedRequests` lists what no stub matched. `VerifyNoUnmatchedRequests()` fails naming the fake and every unmatched request, so call it at the end of a test that must only hit stubbed routes.
-- **Clean a shared fake between tests.** A per-run fake keeps its stubs and request log for the whole run, so parallel tests share the log. `fake.Reset()` clears both without waiting for teardown; reset a per-run fake when a test must start from a clean one.
+- **Serve a stubbed response.** `fake.Stub("GET", "/balance/*").RespondJson(HttpStatusCode.OK, new { available = 1200 })` stubs the route. `fake.Stub(HttpMethod.Post, "/charges").RespondWith(HttpStatusCode.Accepted)` and `RespondWith(status, body, contentType)` cover the rest. Paths follow the WireMock path syntax, where `*` matches a segment. A stub serves nothing until a response is set on it, and a response method replaces the mapping, so re-stubbing never stacks two mappings. `WithHeader(name, values)` adds response headers.
+- **Verify the call arrived.** The stub handle answers `ReceivedCount`, `StatusCode` and `VerifyHappened()` / `VerifyHappenedOnce()` / `VerifyHappened(times)`, which fail naming the stub. Assert before the test completes, because after teardown the server is gone.
+- **Fail on a route nothing stubbed.** `fake.ReceivedRequests` lists every request the fake served (method, path, matched, status). `fake.UnmatchedRequests` lists what no stub matched. `VerifyNoUnmatchedRequests()` fails naming the fake and every unmatched request. Call it at the end of a test that must only hit stubbed routes.
+- **Clean a shared fake between tests.** A per-run fake keeps its stubs and request log for the whole run, so parallel tests share the log. `fake.Reset()` clears both without waiting for teardown. Reset a per-run fake when a test must start from a clean one.
 - **Reach beyond the facade.** `fake.Given(matcher)` and `fake.Server` expose the WireMock server for matchers the facade does not cover. Requests those mappings serve are still observed, with the concrete request path as the identifier.
 
 ## In the trace and coverage
 
-Each stub registration records a `wiremock.stub` observation. Each request the fake served records `http.response` when a stub matched (method, route template, status, sanitized body and headers, duration, the same payload [REST](./rest/index.md) records) or `http.failure` when nothing matched. An unmatched request records `http.failure` with exception type `WireMockUnmatchedRequest`. No exception was thrown; the type field carries the reason. The fake is a `server` run entity (`server:WireMock:{name}`) with its URL, lifetime and state.
+Each stub registration records a `wiremock.stub` observation. Each request the fake served records `http.response` when a stub matched. It carries the same payload [REST](./rest/index.md) records: method, route template, status, sanitized body and headers, duration. An unmatched request records `http.failure` with exception type `WireMockUnmatchedRequest`. No exception was thrown, and the type field carries the reason. The fake is a `server` run entity (`server:WireMock:{name}`) with its URL, lifetime and state.
 
-Coverage is automatic: every registered fake gets a `WireMock` collector, no `AddCollector` needed. Each stub is an item, uncovered until a matched request covers it, so a stub no test's system under test called stays visible as a gap. [Coverage](../observability/coverage.md) explains what covered and gap mean in a report.
+Coverage is automatic. Every registered fake gets a `WireMock` collector, with no `AddCollector` needed. Each stub is an item, uncovered until a matched request covers it. A stub that the system under test never called stays visible as a gap. [Coverage](../observability/coverage.md) explains what covered and gap mean in a report.
 
 ```text
 stub                  status    hits
@@ -86,11 +91,11 @@ POST /charges         gap       0  (registered, never called)
 
 ## Limits
 
-- HTTP only: the fake serves stubbed responses; it does not proxy, record traffic, or validate against an OpenAPI document.
-- Response headers are recorded as WireMock logs them, which for stubbed responses is usually empty; the status, body and request URL are always recorded with the shared HTTP redaction applied.
-- A per-run fake is shared: its stubs and request log live for the whole run, parallel tests share the log, and matched observations are attributed to the test whose teardown observed them. Call `Reset()` to clear the shared fake between tests.
+- HTTP only. The fake serves stubbed responses. It does not proxy, record traffic, or validate against an OpenAPI document.
+- Response headers are recorded as WireMock logs them, which for stubbed responses is usually empty. The status, body and request URL are always recorded, with the shared HTTP redaction applied.
+- A per-run fake is shared. Its stubs and request log live for the whole run, and parallel tests share the log. Matched observations are attributed to the test whose teardown observed them. Call `Reset()` to clear the shared fake between tests.
 - A fixed-port fake cannot be shared by parallel tests.
-- The server stops with its owner; read `ReceivedCount` and `ReceivedRequests` before the test completes.
+- The server stops with its owner. Read `ReceivedCount` and `ReceivedRequests` before the test completes.
 
 ## Learn more
 

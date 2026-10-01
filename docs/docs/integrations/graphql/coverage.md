@@ -27,9 +27,9 @@ GraphQL input type    CreateOrderInput                       (no verdict: totals
 └─ GraphQL input field   product        2 hits                (declared type)
 ```
 
-Each field, argument and input-field item carries `IsCovered` and a hit count; fields add `returnType` and `deprecated` metadata, and arguments and input fields carry their declared `type`. Type rows total their fields' hits and carry no verdict.
+Each field, argument and input-field item carries `IsCovered` and a hit count. Fields add `returnType` and `deprecated` metadata, and arguments and input fields carry their declared `type`. Type rows total their fields' hits and carry no verdict.
 
-One aggregate item records the schema identity: identifier `spec`, display `Schema`, metadata `spec.source` (the configured source) and `spec.hash` (SHA-256 of the loaded SDL). It has no covered verdict, so the type and field totals ignore it, and a cross-run comparison can tell the same schema from a changed one.
+One aggregate item records the schema identity: identifier `spec`, display `Schema`, metadata `spec.source` (the configured source) and `spec.hash` (SHA-256 of the loaded SDL). It has no covered verdict, so the type and field totals ignore it. A cross-run comparison uses it to tell the same schema from a changed one.
 
 ## Point at the schema
 
@@ -46,7 +46,7 @@ builder.AddApplication("Api", app => app
         .WithSchemaCoverage(Path.Combine(AppContext.BaseDirectory, "control-plane.graphql"))));
 ```
 
-`schemaSource` accepts a file path, an inline SDL string, or a URL. Leave it out to read it from configuration instead:
+Leave `schemaSource` out to read it from configuration instead:
 
 ```csharp
 builder.AddApplication("Api", app => app
@@ -69,10 +69,10 @@ Copy the `.graphql` file to the output directory so `AppContext.BaseDirectory` f
 ```
 :::
 
-The collector is added by `WithSchemaCoverage()` or `WithSchemaCoverage(schemaSource)`, which is shorthand for `.AddCollector<GraphQLSchemaCoverageCollector>(schemaSource)`; the parameterless overload binds the schema from configuration instead. Every executed document is parsed and walked against the schema, following fragments and inline fragments (each fragment is walked once per document).
+`WithSchemaCoverage(schemaSource)` is shorthand for `.AddCollector<GraphQLSchemaCoverageCollector>(schemaSource)`. The parameterless `WithSchemaCoverage()` binds the schema from configuration. Every executed document is parsed and walked against the schema, following fragments and inline fragments. Each fragment is walked once per document.
 
 ## Operation coverage
 
-`GraphQLCoverageCollector` is the operation-level collector that sits alongside the schema collector. Where the schema collector reports fields, arguments and input fields, this one aggregates every `graphql.response` observation, shape-driven, fluent, raw, or a subscription event, into one covered `GraphQL operation` item per operation identifier, with a hit count. Operation names are case-sensitive. Register it the same way with `.AddCollector<GraphQLCoverageCollector>()`; it ignores other observation kinds such as `graphql.contract.shape`.
+`GraphQLCoverageCollector` is the operation-level collector that sits alongside the schema collector. It aggregates every `graphql.response` observation into one covered `GraphQL operation` item per operation identifier, with a hit count. That includes shape-driven, fluent and raw operations and subscription events. Operation names are case-sensitive. Register it with `.AddCollector<GraphQLCoverageCollector>()`. It ignores other observation kinds such as `graphql.contract.shape`.
 
 The report is written by whichever [sinks](../../observability/reporting.md) you register. See [Coverage](../../observability/coverage.md) for the bigger picture.

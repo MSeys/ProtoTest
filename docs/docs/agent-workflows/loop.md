@@ -11,7 +11,7 @@ The **evidence loop** is fail, evidence, fix, verify, report. One file carries t
 
 ## What the reviewer sees
 
-A failing run leaves three things on the pull request. The comment below is illustrative; its values come from the committed failing fixture:
+A failing run leaves three things on the pull request. The comment below is illustrative, and its values come from the committed failing fixture:
 
 ```markdown
 ## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
@@ -30,11 +30,11 @@ Coverage: 2/4 (50%)
 [Full trace](https://github.com/you/your-repo/actions/runs/1/artifacts/prototest-trace)
 ```
 
-Next to it, one check annotation per failing test at its source location, one per failed run gate, and one artifact: the `.prototrace` archive with the report inside. A green run posts no comment; its status check is the report.
+Next to it are one check annotation per failing test at its source location, one per failed run gate, and one artifact: the `.prototrace` archive with the report inside. A green run posts no comment, and its status check is the report.
 
 | Step | What happens | Who reads it |
 | --- | --- | --- |
-| Fail | the suite runs and one test does not pass; the trace and its report are written | `list_runs`, the check annotations |
+| Fail | the suite runs and one test does not pass. The trace and its report are written. | `list_runs`, the check annotations |
 | Evidence | the failure and its context are read | `get_failure`, `get_diagnosis` with `detail=context`, `prototest summary` |
 | Fix | the code the context named is edited | the source snippet, the subject, the mismatches |
 | Verify | the suite reruns and the new report is compared with the baseline | `prototest verify`, `get_coverage` |
@@ -42,7 +42,7 @@ Next to it, one check annotation per failing test at its source location, one pe
 
 ## Run it locally
 
-The same four commands in order, with the output each one prints. Start with a failing test.
+The commands in order, with the output each one prints. Start with a failing test.
 
 **1. Run the suite and summarize the trace:**
 
@@ -61,7 +61,7 @@ FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.
   cause: runner-reported failure
 ```
 
-Run ids and timestamps are new on every run; compare the shape, not the values.
+Run ids and timestamps are new on every run, so compare the shape, not the values.
 
 [Diagnosis](./diagnosis.md) reads that output line by line. A coding agent reads the same story through the MCP tools ([Setup](./setup.md)), or you can read the whole run in the viewer.
 
@@ -87,7 +87,7 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The first line is stdout: the annotations GitHub renders on the pull request. It is the bare form because this failure carries no source location; with one the command reads `::error file=path/to/OrderTests.cs,line=42::message`. The rest is stderr: one outcome per channel. `--digest` writes the digest JSON to the path you gave it. With no target configured the network channels skip with their reason, so a local run is safe.
+The first line is stdout: the annotations GitHub renders on the pull request. It is the bare form because this failure carries no source location. With one, the command reads `::error file=path/to/OrderTests.cs,line=42::message`. The rest is stderr, with one outcome per channel. `--digest` writes the digest JSON to the path you gave it. With no target configured the network channels skip with their reason, so a local run is safe.
 
 The [CLI reference](./cli.md#environment-targets) lists every target the comment and the webhook read, and the exit codes.
 

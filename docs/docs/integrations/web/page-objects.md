@@ -6,7 +6,8 @@ description: "Model a browser UI with pages, components, elements and tables, so
 
 # Pages and components
 
-The web model has four building blocks:
+A page object describes a browser UI as the things a user sees: pages, the parts on them, and the fields and buttons
+you act on. Tests then read as what a user does, not as markup. The web model has four building blocks:
 
 | Type | What it is |
 | --- | --- |
@@ -32,7 +33,7 @@ var page = Proto.Context.Web().Page<InvoicesPage>();
 await page.OpenAsync("https://portal.example.test/invoices");
 ```
 
-`Page<T>()` doesn't navigate; it gives you a page object bound to the session, one instance per page type per session. `OpenAsync` navigates:
+`Page<T>()` does not navigate. It gives you a page object bound to the session, one instance per page type per session. `OpenAsync` navigates:
 
 ```csharp
 ValueTask OpenAsync(string address, CancellationToken cancellationToken = default);
@@ -55,7 +56,7 @@ protected WebComponentCollection<TComponent> Components<TComponent>(WebLocator i
     where TComponent : WebComponent, new();
 ```
 
-The `name` defaults to the property name (or the component type name), and shows up in traces and failure messages as a path like `InvoicesPage.Table.Invoice.Open`. Prefer properties over local variables for this reason.
+The `name` defaults to the property name, or to the component type name. It shows up in traces and failure messages as a path like `InvoicesPage.Table.Invoice.Open`. Prefer properties over local variables for this reason.
 
 ### Scoping
 
@@ -76,13 +77,13 @@ public sealed class AddressForm : WebComponent
 
 `page.Billing.Street` and `page.Shipping.Street` find different fields even though both are labelled "Street": one reusable class, two scopes. Each `root` appends one level to the component path (`{parentPath}.{name}`).
 
-`Component<T>()` without a root doesn't add a scope level; it just groups elements under a name.
+`Component<T>()` without a root does not add a scope level. It only groups elements under a name.
 
 ### The session inside a component
 
 `WebComponent` also exposes `protected WebSession Web { get; }`, for components that need to open another page or reach the backend.
 
-Components must be created through `Page<T>()`, `Component<T>()` or `Components<T>()`; instantiating one with `new` and using it throws, and a component can only be initialised once.
+Create components through `Page<T>()`, `Component<T>()` or `Components<T>()`. A component created with `new` throws when it is used, and a component can only be initialised once.
 
 ## Lists of components
 
@@ -105,7 +106,7 @@ public sealed class WebComponentCollection<TComponent>
 }
 ```
 
-`Matching` composes its condition with the collection's locator using `And`, so it is strict: no match or more than one match is an error, not a default. A generated component name includes the index, e.g. `Messages[1]`.
+`Matching` composes its condition with the collection's locator using `And`. It is strict: no match or more than one match is an error, not a default. A generated component name includes the index, e.g. `Messages[1]`.
 
 ```csharp
 var count = await inbox.Messages.CountAsync();
@@ -155,9 +156,9 @@ public abstract class WebTableRow : WebComponent
 }
 ```
 
-Rows are components, so a row class can hold nested components and elements exactly like any other component, and it can itself be used as the `TRow` of a `WebTable`. `Cell("Total")` finds the cell in the column whose conventional header cell reads "Total", so tests keep working when columns are reordered; the header lookup uses `ancestor::table[1]//tr[1]`.
+Rows are components. A row class can hold nested components and elements like any other component, and it can be the `TRow` of a `WebTable`. `Cell("Total")` finds the cell in the column whose conventional header cell reads "Total", so tests keep working when columns are reordered. The header lookup uses `ancestor::table[1]//tr[1]`.
 
-Note that row numbers count every `role=row`, **including the header row**: `RowNumber(2)` is the first data row in a table with one header row.
+Row numbers count every `role=row`, **including the header row**: `RowNumber(2)` is the first data row in a table with one header row.
 
 ## Next
 

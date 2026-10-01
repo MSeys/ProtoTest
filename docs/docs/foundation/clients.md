@@ -57,11 +57,11 @@ TClient Client<TClient>(string name = "Default") where TClient : class;
 TClient? TryClient<TClient>(string name = "Default") where TClient : class;
 ```
 
-Clients are keyed by **type and case-insensitive name**: an `HttpClient` named `Api` and a web session named `Api` can coexist. Registering the same type and name twice throws, and registering after release has begun throws `ObjectDisposedException`. A failed `Client<T>` lookup records a `client.resolve` event before throwing; `TryClient` never traces.
+Clients are keyed by **type and case-insensitive name**, so an `HttpClient` named `Api` and a web session named `Api` can coexist. Registering the same type and name twice throws, and registering after release has begun throws `ObjectDisposedException`. A failed `Client<T>` lookup records a `client.resolve` event before throwing. `TryClient` never traces.
 
 ### When clients are created and released
 
-Before any of your hooks or attributes run, ProtoTest's client hook groups initializers by protocol, client type and name, then tries each group in registration order. The trace records one `client.initialize` operation per group, not one per attempt, and the winning initializer is written as the client entity's `client.initializer` state. A candidate that returns `false` is not traced individually; an initializer that throws fails the `client.initialize` operation.
+Before any of your hooks or attributes run, ProtoTest's client hook groups initializers by protocol, client type and name. It then tries each group in registration order. The trace records one `client.initialize` operation per group, not one per attempt, and the winning initializer is written as the client entity's `client.initializer` state. A candidate that returns `false` is not traced individually. An initializer that throws fails the `client.initialize` operation.
 
 Integrations such as REST and GraphQL set `Protocol`, so they can each register an `HttpClient` named `Default`. Their clients are stored under names such as `Rest:Default` and `GraphQL:Default`, and the integration accessors resolve those names for you. A client with an unambiguous name can also be looked up by its bare name. If several protocols use that name, use the scoped name with `Client<T>` or use the integration accessor.
 
@@ -73,7 +73,7 @@ Integrations such as REST and GraphQL set `Protocol`, so they can each register 
 
 If no initializer in a group succeeds, the test fails in setup with *"No registered initializer could create a client of type 'X' with name 'Y'."*
 
-If a client implements `IDisposable` or `IAsyncDisposable`, it is disposed when the test ends, in reverse order of registration. Client resources are framework-managed: a successful release is recorded as the client entity's `resource.state = released` rather than a `resource.release` operation, and a **failed** release writes a `resource.release` event so the failure is explainable.
+If a client implements `IDisposable` or `IAsyncDisposable`, it is disposed when the test ends, in reverse order of registration. Client resources are framework-managed. A successful release is recorded as the client entity's `resource.state = released` rather than a `resource.release` operation. A **failed** release writes a `resource.release` event, so the failure is explainable.
 
 A client that implements `IProtoClientCompletion` also gets `CompleteAsync()` after normal teardown hooks, before disposal and report publication. A bare-name alias does not cause completion to run twice.
 
@@ -93,15 +93,15 @@ bare name under one app, one match?  ->  resolves
 bare name, two apps, same name?  ->  ambiguous error naming both; qualify or bind
 ```
 
-A name that is already qualified (`App:Client`, containing `:`) is exact: it is not re-qualified with the selected application and does not fall back to the unique-name lookup.
+A name that is already qualified (`App:Client`, containing `:`) is exact. It is not re-qualified with the selected application, and it does not fall back to the unique-name lookup.
 
-When two applications register the same client name (`Csms:Api` and `Dashboard:Api`), the bare name is ambiguous: the lookup fails naming both qualified candidates. Qualify the call (`Rest("Csms:Api")`) or bind it for the test with `[Application("Csms", "Rest:Api")]`. The unnamed accessor (`Rest()`) always keeps the selected application's binding, then its first registered client for the protocol, then `"Default"`. A collision never changes that choice.
+When two applications register the same client name (`Csms:Api` and `Dashboard:Api`), the bare name is ambiguous, and the lookup fails naming both qualified candidates. Qualify the call (`Rest("Csms:Api")`) or bind it for the test with `[Application("Csms", "Rest:Api")]`. The unnamed accessor (`Rest()`) always keeps the selected application's binding, then its first registered client for the protocol, then `"Default"`. A collision never changes that choice.
 
 ### Fallback chains
 
 Several initializers can offer the same protocol, client type and name. They are tried **in registration order**, and the first to return `true` wins. Returning `false` means "not me", and the initializer must leave the context untouched when it does. An initializer without `Protocol` can serve as a fallback for matching protocol chains.
 
-This is how a client bound to an application is served by a real URL when the application has an address, configured or published by a started infrastructure piece, and by the [in-process ASP.NET Core server](../integrations/aspnetcore.md) otherwise:
+This is how a client bound to an application is served by a real URL when the application has an address. The address is configured or published by a started infrastructure piece. Otherwise the [in-process ASP.NET Core server](../integrations/aspnetcore.md) serves it:
 
 ```csharp
 public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
@@ -114,7 +114,7 @@ public Task<bool> TryInitializeAsync(ProtoExecutionContext context)
 }
 ```
 
-A client whose address resolves is built over **its own primary handler for that test**, with the named client's configured handlers still in the chain. The handler owns the cookie container, so a sign-in one test performs never reaches a parallel test through a shared handler pool: every test starts with an empty jar. A client with no address keeps the pooled client that the application's in-process transport replaces.
+A client whose address resolves is built over **its own primary handler for that test**, with the named client's configured handlers still in the chain. The handler owns the cookie container, so a sign-in one test performs never reaches a parallel test through a shared handler pool. Every test starts with an empty jar. A client with no address keeps the pooled client that the application's in-process transport replaces.
 
 ## How to use it
 
@@ -211,7 +211,7 @@ With `ProtoClientOwnership.Caller` the test registers the client as shared and d
 | Ownership | Teardown | Trace |
 | --- | --- | --- |
 | `Context` (the default) | the test disposes the client, in reverse registration order | `client.owned` true, `resource.state` released |
-| `Caller` (shared) | the test leaves it alone; the owner disposes it with the run | `client.owned` false, release writes state, not a dispose |
+| `Caller` (shared) | the test leaves it alone, and the owner disposes it with the run | `client.owned` false, release writes state, not a dispose |
 
 ## What the trace shows
 
@@ -225,12 +225,12 @@ With `ProtoClientOwnership.Caller` the test registers the client as shared and d
 
 - One `client.initialize` operation per (protocol, type, name) group, with the winning initializer recorded as the client entity's `client.initializer` state. A group with no winner fails the operation.
 - A failed `Client<T>` lookup writes a `client.resolve` event before it throws. `TryClient` never traces.
-- A successful release is the client entity's `resource.state = released` with `client.owned` set by the registration. Only a failed release writes a `resource.release` operation.
+- A successful release is the client entity's `resource.state = released` with `client.owned` set by the registration. Only a failed release writes a `resource.release` event.
 - An initializer that throws fails the `client.initialize` operation, and the test fails in setup.
 
 ## Limits
 
-- Initializers are singleton services: a shared client must tolerate concurrent tests, and a per-test client must still be created fresh inside `TryInitializeAsync`.
-- Ordering is registration order only; there is no `Order` property on an initializer.
+- Initializers are singleton services. A shared client must tolerate concurrent tests, and a per-test client must still be created fresh inside `TryInitializeAsync`.
+- Ordering is registration order only. There is no `Order` property on an initializer.
 - A group with no successful initializer fails the test's setup. There is no silent fallback.
 - Registration after the context starts releasing throws, so a client can only be registered during setup or while the test body runs.

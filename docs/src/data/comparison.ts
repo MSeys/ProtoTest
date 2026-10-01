@@ -77,7 +77,7 @@ public sealed class BillingTests
         Assert.Multiple(() =>
         {
             Assert.That(page!.State, Is.EqualTo("open"));
-            Assert.That(page.Invoices, Is.Not.Empty);
+            Assert.That(page.Invoices, Has.Count.EqualTo(1));
             Assert.That(page.Invoices[0].Id, Is.GreaterThan(0));
             Assert.That(page.Invoices[0].State, Is.EqualTo("open"));
             Assert.That(page.Invoices[0].Total, Is.GreaterThan(0m));
@@ -180,7 +180,7 @@ public sealed class BillingTests
             state = "open",
             invoices = new[]
             {
-                new { id = JsonValue.GreaterThan(0), state = "open" }
+                new { id = JsonValue.GreaterThan(0), state = "open", total = JsonValue.GreaterThan(0m) }
             }
         });
     }
@@ -420,8 +420,11 @@ export const comparisonConcerns: ComparisonConcern[] = [
     },
     with: {
       home: 'suite host',
-      summary: 'Registered once for the suite. Every test gets the running app.',
-      slices: [{file: 'Setup.cs', ranges: [[19, 19]]}],
+      summary: 'Registered once for the suite. [Application] on the class selects it, and every test gets the running app.',
+      slices: [
+        {file: 'BillingTests.cs', ranges: [[9, 9]]},
+        {file: 'Setup.cs', ranges: [[19, 19]]},
+      ],
     },
   },
   {
@@ -473,7 +476,7 @@ export const comparisonConcerns: ComparisonConcern[] = [
       home: 'authenticator',
       summary: 'ProtoTest applies it per request from the test context, so parallel tests keep separate headers.',
       slices: [
-        {file: 'BillingTests.cs', ranges: [[9, 9], [11, 11]]},
+        {file: 'BillingTests.cs', ranges: [[11, 11]]},
         {file: 'Scenario.cs', ranges: [[61, 75]]},
       ],
     },
@@ -533,7 +536,7 @@ export const comparisonConcerns: ComparisonConcern[] = [
     with: {
       home: 'suite host',
       summary: 'Steps, requests, and assertions land in a .prototrace file and an HTML report, with contract coverage.',
-      slices: [{file: 'Setup.cs', ranges: [[17, 23]]}],
+      slices: [{file: 'Setup.cs', ranges: [[17, 18], [20, 23]]}],
     },
   },
 ];

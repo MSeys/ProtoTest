@@ -56,7 +56,7 @@ cd Shop
 dotnet test
 ```
 
-When it works, the tests pass. The run also leaves two files next to the test build output: `Shop.Tests/bin/Debug/net10.0/TestResults/prototest-{runId}.prototrace` and `Shop.html`. The first is the run's **trace**, the record of everything the run did. The second is the HTML report. Each run writes its own trace, so a rerun never overwrites the previous one.
+When it works, the tests pass. The run also leaves two files in `Shop.Tests/bin/Debug/net10.0/TestResults/`: `prototest-{runId}.prototrace` and `Shop.html`. The first is the run's **trace**, the record of everything the run did. The second is the HTML report. Each run writes its own trace, so a rerun never overwrites the previous one.
 
 To look at the results, open the report. It shows the verdict and the API routes the run covered. You can also drop the trace on [trace.prototest.dev](https://trace.prototest.dev), the viewer for traces.
 

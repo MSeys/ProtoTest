@@ -8,7 +8,7 @@ import TabbedCode from '@site/src/components/TabbedCode';
 
 # Created through the API, shown in the browser
 
-Arrange over REST, check in the browser, keep one trace. A green run prints `Passed AProjectCreatedThroughTheApiAppearsOnThePage`, and the trace holds the REST create, the sign-in flow and the two page checks in that order. The test is first; the listener it needs follows under [Compose](#compose).
+Arrange over REST, check in the browser, keep one trace. A green run prints `Passed AProjectCreatedThroughTheApiAppearsOnThePage`, and the trace holds the REST create, the sign-in flow and the two page checks in that order. The test is first, and the listener it needs follows under [Compose](#compose).
 
 ## The situation
 
@@ -89,7 +89,7 @@ public sealed class ProjectRow : WebComponent
   ]}
 />
 
-`Project(...)` and `Status` are page-object members, so the locators live in one place. All of it is the sample suite's own code: the page objects live in [Pages.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Pages.cs) and the sign-in screen is the application's real exchange of a tenant token for a session. See [Page objects](../integrations/web/page-objects.md) and [Logging in](../integrations/web/login.md).
+`Project(...)` and `Status` are page-object members, so the locators live in one place. All of it is the sample suite's own code. The page objects live in [Pages.cs](https://github.com/MSeys/ProtoTest/blob/main/samples/Northstar.ProtoTest/Pages.cs), and the sign-in screen is the application's real exchange of a tenant token for a session. See [Page objects](../integrations/web/page-objects.md) and [Logging in](../integrations/web/login.md).
 
 ## Compose
 
@@ -141,11 +141,11 @@ A failure in the page checks points at the arrange step or the sign-in flow. All
 | The application ships as an image | Start it with `ApplicationContainer` instead of the listener. It maps the port the application listens on and publishes the mapped address as the same `BaseUrl`. See [Infrastructure](../foundation/infrastructure.md). |
 | The application already runs elsewhere | Point the application's `BaseUrl` at that instance. A configured address takes precedence over the loopback listener. |
 | The API and the page live in one instance | Register one application with `AddRest` and `AddWeb`. The sample suite uses two because only its in-process instance carries the test clock. |
-| Selenium instead of Playwright | `AddWeb` selects the backend; its options live under `ProtoTest:Web:Selenium` and `ProtoTest:Web:Playwright`. |
+| Selenium instead of Playwright | `AddWeb` selects the backend. Its options live under `ProtoTest:Web:Selenium` and `ProtoTest:Web:Playwright`. |
 
 ## What it does not prove
 
 - **A published instance is not the test host.** `ServerFactory`, `ApplicationServices` and `[RequiresInProcess]` work only with `AddAspNetCoreServer`. The page inventory and test clock need it too. Reach the loopback or containerized application through its API instead, or register a second application backed by `AddAspNetCoreServer`.
-- **Assertions poll, with a bounded wait.** `Should.HaveTextAsync` waits for the text to appear until the timeout instead of reading once; a slow client still fails if it arrives later.
-- **Search for your own row.** Other tests create projects in the same application; a name built from `TestId` keeps the row matching independent of whatever else is listed.
+- **Assertions poll, with a bounded wait.** `Should.HaveTextAsync` waits for the text to appear until the timeout instead of reading once. A slow client still fails if it arrives later.
+- **Search for your own row.** Other tests create projects in the same application. A name built from `TestId` keeps the row matching independent of whatever else is listed.
 - **The sign-in is application-specific.** The sample suite's exchange of a tenant token for a session is the application's own flow, not a framework feature.

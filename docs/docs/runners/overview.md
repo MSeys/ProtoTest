@@ -132,7 +132,7 @@ All adapters evaluate [`[RequiresCapability]`, `[RequiresInProcess]` and `[Requi
 | TUnit | `TUnit.Core.Skip.Test(reason)` | as-is |
 | MSTest | an ignored `TestResult` | on the display name and `LogOutput` |
 
-MSTest has no public dynamic-skip API in the version ProtoTest targets, so the adapter returns an ignored result and the reason travels on `LogOutput` and the display name.
+MSTest has no public dynamic-skip API in the version ProtoTest targets. The adapter returns an ignored result, and the reason travels on `LogOutput` and the display name.
 
 ### Attachments
 
@@ -148,7 +148,7 @@ Artifacts ProtoTest captures (request and response bodies, screenshots, Playwrig
 
 ### Test names
 
-NUnit and xUnit v3 record the name the runner gives the test case: the fully qualified method name for a plain method, with the row's arguments included for a parameterized one. xUnit v2 records xUnit's display name. MSTest and TUnit compose `DeclaringType.MethodName[args]` through `ProtoTestName.ForRow`, so parallel rows stay apart.
+NUnit and xUnit v3 record the name the runner gives the test case. That is the fully qualified method name for a plain method, with the row's arguments included for a parameterized one. xUnit v2 records xUnit's display name. MSTest and TUnit compose `DeclaringType.MethodName[args]` through `ProtoTestName.ForRow`, so parallel rows stay apart.
 
 ## Limits
 
@@ -156,8 +156,8 @@ NUnit and xUnit v3 record the name the runner gives the test case: the fully qua
 - Four adapters pass the runner's per-test token into the lifecycle. MSTest has no token, so those tests use `CancellationToken.None`.
 - NUnit and xUnit v3 call the host synchronously, so the test project needs a synchronizing context.
 - xUnit v3 starts its context after class construction and `IAsyncLifetime.InitializeAsync`, and completes it before class disposal. Class-level setup and cleanup stay outside the context.
-- xUnit v2 has no dynamic skip and no attachment API, so its skip reason is decided before the test method is invoked and artifact paths go to the console.
-- MSTest has no public dynamic-skip API and no assembly-wide hook: every test method carries `[ProtoTest]`, and the skip reason is not a first-class MSTest property.
+- xUnit v2 has no dynamic skip and no attachment API. Its skip reason is decided before the test method is invoked, and artifact paths go to the console.
+- MSTest has no public dynamic-skip API and no assembly-wide hook. Every test method carries `[ProtoTest]`, and the skip reason is not a first-class MSTest property.
 - TUnit runs a test with no reflection `MethodInfo` unwrapped, because the executor has nothing to prepare from.
 
 ## Learn more

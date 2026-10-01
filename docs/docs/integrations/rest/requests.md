@@ -30,11 +30,11 @@ using var response = await Proto.Context.Rest()
 
 Each returns `Task<RestResponse>` and takes the same route template and optional route-and-query object.
 
-`RestResponse` is `IDisposable`; use `using var` (the response body is already buffered, so disposing doesn't cut anything short).
+`RestResponse` is `IDisposable`, so use `using var`. The response body is already buffered, so disposing does not cut anything short.
 
 ## Route templates and parameters
 
-The second argument fills `{placeholders}` in the route; whatever is left over becomes the query string.
+The second argument fills `{placeholders}` in the route. Whatever is left over becomes the query string.
 
 ```csharp
 await Proto.Context.Rest().GetAsync(
@@ -55,7 +55,7 @@ The rules:
 | collection value | a repeated key (`tags=[a,b]` → `tags=a&tags=b`) |
 | `bool`, date or time value | invariant text (`true`, round-trip `"O"` dates) |
 | `#fragment` in the template | preserved, re-appended after the query string |
-| absolute URL as the template | used as-is; the client's base address is bypassed |
+| absolute URL as the template | used as-is, bypassing the client's base address |
 | non-HTTP(S) scheme, or a relative route with no base address | `InvalidOperationException` |
 | colon in the first segment (`orders:search`) | a relative path, as RFC 3986 requires |
 
@@ -94,7 +94,7 @@ See [Authentication](./authentication.md) for how these interact with `[Auth<T>]
 
 ## Response size limit
 
-Responses are buffered with a cap of 10 MiB by default. A known `Content-Length` above the cap fails before the body is read; otherwise the buffer stops mid-read. Either way the failure is `ProtoResponseTooLargeException`, whose `MaximumBytes` and `ObservedBytes` tell you the configured cap and the observed size. `HEAD`, `204`, `304` and `1xx` responses never carry a body, so their headers are not measured against the cap. Change it in code or configuration:
+Responses are buffered with a cap of 10 MiB by default. A known `Content-Length` above the cap fails before the body is read. Otherwise the buffer stops mid-read. Either way the failure is `ProtoResponseTooLargeException`, whose `MaximumBytes` and `ObservedBytes` tell you the configured cap and the observed size. `HEAD`, `204`, `304` and `1xx` responses never carry a body, so their headers are not measured against the cap. Change it in code or configuration:
 
 ```csharp
 builder.AddApplication("Api", app => app.AddRest(rest => rest

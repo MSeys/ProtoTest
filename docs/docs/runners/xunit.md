@@ -14,7 +14,7 @@ description: "Register ProtoTest with xUnit v2: the collection fixture, [ProtoTe
 dotnet add package ProtoTest.Xunit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit 2.9.3 or newer**; the standard `dotnet new xunit` template already pins it. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit 2.9.3 or newer**. The standard `dotnet new xunit` template already pins it. The `dotnet new prototest` template defaults to `net10.0`. Pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 ## Register
 
@@ -86,7 +86,7 @@ flowchart TD
 
 ## Bring an existing suite
 
-Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps running unchanged, and a class that joins the collection can mix converted and plain tests: only `[ProtoTestFact]` and `[ProtoTestTheory]` start a context. Convert a class when its tests need a host, a trace or capability skips. Add the collection attribute in the same change: the fixture starts the host. [Bring an existing xUnit suite](./bring-your-existing-suite.md) walks the order.
+Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps running unchanged. A class that joins the collection can mix converted and plain tests, because only `[ProtoTestFact]` and `[ProtoTestTheory]` start a context. Convert a class when its tests need a host, a trace or capability skips. Add the collection attribute in the same change, because the fixture starts the host. [Bring an existing xUnit suite](./bring-your-existing-suite.md) walks the order.
 
 ## What the adapter changes
 

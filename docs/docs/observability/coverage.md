@@ -11,7 +11,7 @@ import VisibilityPanel from '@site/src/components/VisibilityPanel';
 
 Code coverage tells you which lines ran. It cannot tell you which **parts of your API** your tests actually checked. A setup helper can call an endpoint many times without any test asserting its response.
 
-ProtoTest measures coverage against the *contract*: your OpenAPI document, your GraphQL schema. For REST, it counts a response property as covered only when a shape assertion actually matched it, and gRPC coverage counts the services and methods your calls reached.
+ProtoTest measures coverage against the *contract*: your OpenAPI document, your GraphQL schema. For REST, a response property counts as covered only when a shape assertion matched it. gRPC coverage counts the services and methods your calls reached. This page shows how coverage is built, how to turn it on, and how to write your own collector.
 
 ## What it is
 
@@ -26,9 +26,9 @@ flowchart LR
     Sinks --> Archive[".prototrace"]
 ```
 
-Each edge carries a concrete payload. A REST response produces `http.response` (method, route, status, body); a matched shape assertion produces `http.contract.shape` (the paths it matched). The collector turns those into report items (endpoint, response, property with covered or uncovered). The sink writes the items into `report.json` and `report.html`. The archive embeds both files under `resources/run/`.
+Each edge carries a concrete payload. A REST response produces `http.response` (method, route, status, body). A matched shape assertion produces `http.contract.shape` (the paths it matched). The collector turns those into report items (endpoint, response, property with covered or uncovered). The sink writes the items into `report.json` and `report.html`. The archive embeds both files under `resources/run/`.
 
-1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion. GraphQL records `graphql.response` and `graphql.contract.shape`; gRPC records `grpc.response` per call and `grpc.contract.shape`; messaging records `messaging.published` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
+1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion. GraphQL records `graphql.response` and `graphql.contract.shape`. gRPC records `grpc.response` per call and `grpc.contract.shape`. Messaging records `messaging.published` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
 2. Each observation is offered to every registered **collector** whose `CanCollect` accepts it. Collectors live for the whole run, so they aggregate across all tests.
 3. When the run stops, every collector's **report items** are gathered, sorted by target, category and identifier, and passed to every **sink**.
 4. Files the sinks wrote are added to the `.prototrace` archive.
@@ -60,12 +60,12 @@ builder
 | Collector | Reports |
 | --- | --- |
 | `RestCoverageCollector` | every REST endpoint your suite called, with hit counts |
-| `RestTrafficCoverageCollector` | the fields that arrived in REST responses but that no shape assertion mentioned, in their own section (opt-in; never counted as covered) |
+| `RestTrafficCoverageCollector` | the fields that arrived in REST responses but that no shape assertion mentioned, in their own section. Opt-in, and never counted as covered. |
 | [`OpenApiCoverageCollector`](../integrations/openapi.md) | the **whole** OpenAPI document: endpoints, responses and response properties, covered or not |
 | [GraphQL schema coverage](../integrations/graphql/coverage.md) | the whole schema: types, fields and arguments, and input types with their input fields |
 | `GrpcCoverageCollector` | every gRPC service and method your suite called, from the client's `grpc.response` observations. A failed call records `grpc.failure` and does not count as covered |
 
-Collectors gather; [sinks](./reporting.md) write the results. Without a sink you see nothing.
+Collectors gather, and [sinks](./reporting.md) write the results. Without a sink you see nothing.
 
 `AddCollector` hangs off the `IProtoTargetBuilder` returned by a client registration. REST, GraphQL and gRPC all support it. The collector's first constructor argument is the target name, and any extra arguments to `AddCollector` follow it.
 
@@ -114,7 +114,7 @@ Property coverage comes from the paths `Should.MatchShape` matched. A test that 
 
 ### Traffic coverage (observed but unasserted)
 
-`RestCoverageCollector` counts the routes your suite called; traffic coverage looks inside the responses. It reports the fields that arrived in a response and that no shape assertion mentioned, in its own report section. The two count different things:
+`RestCoverageCollector` counts the routes your suite called. Traffic coverage looks inside the responses. It reports the fields that arrived in a response and that no shape assertion mentioned, in its own report section. The two count different things:
 
 ```text
 REST coverage (asserted)                    Traffic (observed, never covered)
@@ -141,7 +141,7 @@ REST traffic  GET /api/v1/organizations/{id} · 200
               └ $.owner.email
 ```
 
-Observed fields never count as covered. That is the point. The report's coverage percentage, the run gates and the OpenAPI property table keep counting only what an assertion matched, so a field can appear here and still be uncovered there. The section is built from the observations the run already records: response bodies (`http.response`) and the matched paths of shape assertions (`http.contract.shape`).
+Observed fields never count as covered. That is the point. The report's coverage percentage, the run gates and the OpenAPI property table keep counting only what an assertion matched. A field can appear here and still be uncovered there. The section is built from the observations the run already records: response bodies (`http.response`) and the matched paths of shape assertions (`http.contract.shape`).
 
 The rules, so the section is read correctly:
 
@@ -155,9 +155,9 @@ The rules, so the section is read correctly:
 
 ## The artifact
 
-Coverage reaches the outside world as **report items**. The [sinks](./reporting.md) receive them once, at the end of the run, and write them into the JSON and HTML reports, which in turn travel inside the `.prototrace` archive. A coverage percentage in CI is the same item tree a run gate reads.
+Coverage reaches the outside world as **report items**. The [sinks](./reporting.md) receive them once, at the end of the run, and write them into the JSON and HTML reports. Those reports travel inside the `.prototrace` archive. A coverage percentage in CI is the same item tree a run gate reads.
 
-`ProtoReportItem` is one normalized row. The positional order is stable; a positional record is the whole type.
+`ProtoReportItem` is one normalized row. It is a positional record, and the order of its parameters is stable.
 
 | Field | What it holds | Default |
 | --- | --- | --- |
@@ -175,7 +175,7 @@ Coverage reaches the outside world as **report items**. The [sinks](./reporting.
 | `Metadata` | anything the collector wants to carry | `null` |
 | `DisplayName`, `DisplayGroup` | how a sink should label and group the row | `null` |
 
-Items nest through `Children`. The kinds cover more than coverage: a `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own. The built-in ones are named by `ProtoReportItemKinds`, and the HTML report keeps the kinds in their own sections (coverage, traffic, findings, run gates, resources, run metadata). An unknown kind gets its own section titled after it, so a passed gate is never read as a finding.
+Items nest through `Children`. The kinds cover more than coverage. A `Metric` with a `Value` and `Unit`, or a `Finding` with a `Warning` status and a `Message`, show up in the same reports. A kind is an open string, so an integration can define its own. The built-in ones are named by `ProtoReportItemKinds`, and the HTML report keeps the kinds in their own sections (coverage, traffic, findings, run gates, resources, run metadata). An unknown kind gets its own section titled after it, so a passed gate is never read as a finding.
 
 ### Writing a collector
 
@@ -191,9 +191,9 @@ public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageColle
 }
 ```
 
-The base class matches observations whose `TargetName` equals its own (ignoring case) and records one covered item per distinct `Identifier` with a hit count. `RestCoverageCollector` and `GrpcCoverageCollector` are built the same way. Under an `[Application]` the client is registered under its qualified name (`Api` becomes `Northstar:Api`), and observations carry that same qualified name, so collectors attached to the client keep matching.
+The base class matches observations whose `TargetName` equals its own, ignoring case. It records one covered item per distinct `Identifier`, with a hit count. `RestCoverageCollector` and `GrpcCoverageCollector` are built the same way. Under an `[Application]` the client is registered under its qualified name (`Api` becomes `Northstar:Api`), and observations carry that same qualified name, so collectors attached to the client keep matching.
 
-To report things that were **not** observed, which is the valuable part, override `GetReportItems` and enumerate the full set, as the OpenAPI collector does with the specification:
+The valuable part is what was **not** observed. To report it, override `GetReportItems` and enumerate the full set, as the OpenAPI collector does with the specification:
 
 ```csharp
 public sealed class InvoiceStateCoverage(string targetName) : ProtoCoverageCollector(targetName)
@@ -226,7 +226,7 @@ builder.ConfigureServices(services =>
     services.AddSingleton<IProtoCollector>(new InvoiceStateCoverage("Billing")));
 ```
 
-A messaging collector is one of these: the observation target is the broker name, not a client target, so construct the collector with that name (`RabbitMQ`) and register it directly.
+A messaging collector is one of these. The observation target is the broker name, not a client target. Construct the collector with that name (`RabbitMQ`) and register it directly.
 
 Collectors must be thread-safe, because tests run in parallel. Use the base class's `protected readonly ProtoLock _lock`.
 
@@ -248,12 +248,11 @@ public interface IProtoReportSource
 ## Limits
 
 - A field counts as covered only when a shape assertion matched it. A test that checks the status code covers the endpoint and the status, and none of the fields.
-- Observed fields never count as covered. The traffic section reports a gap; it does not close it.
-- `ProtoTest.Messaging` ships no collector. Its destinations are not a coverage category: the `messaging.published`, `messaging.receive` and `messaging.contract.shape` observations reach a report only through a collector you register with the broker's target name (`RabbitMQ`, or `InMemory` for the default broker). The same is true of `ProtoTest.Messaging.RabbitMq`.
-- A body truncated by the diagnostic cap cannot be analyzed and contributes nothing to traffic coverage.
-- A shape assertion made without an execution context records no structured route and cannot claim a field.
+- Observed fields never count as covered. The traffic section reports a gap, but does not close it.
+- `ProtoTest.Messaging` ships no collector, and its destinations are not a coverage category. The `messaging.published`, `messaging.receive` and `messaging.contract.shape` observations reach a report only through a collector you register with the broker's target name (`RabbitMQ`, or `InMemory` for the default broker). The same is true of `ProtoTest.Messaging.RabbitMq`.
+- Traffic coverage ignores a truncated body and a shape assertion made without an execution context, as [its rules](#traffic-coverage-observed-but-unasserted) say.
 - A report is a snapshot taken before the run's own resources are released. A run-scoped resource still reads as registered and neutral there, and its release is recorded in the [ProtoTrace](./prototrace.md) afterwards.
-- A kind is an open string. The built-in kinds get their own HTML sections and an unknown kind gets one titled after it, so choose a name that reads as a section title.
+- A kind is an open string. An unknown kind gets an HTML section titled after it, so choose a name that reads as a section title.
 
 ## Learn more
 

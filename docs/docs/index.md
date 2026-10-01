@@ -11,7 +11,7 @@ description: "Start with the path that matches what you bring: learn integration
 
 import StartPaths from '@site/src/components/StartPaths';
 
-ProtoTest is an integration testing foundation for .NET 8, 9 and 10. The integrations a suite needs share one host, one context per test, one lifecycle and one trace, so a single test can write through REST, read back through GraphQL and check the database on the way.
+ProtoTest is an integration testing foundation for .NET 8, 9 and 10. The integrations a suite needs share one host, one context per test, one lifecycle and one trace. A single test can then write through REST, read back through GraphQL and check the database on the way.
 
 <StartPaths />
 
@@ -41,6 +41,6 @@ ProtoTest is an integration testing foundation for .NET 8, 9 and 10. The integra
 
 Examples in these docs come from [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/HEAD/samples/Northstar.ProtoTest), which tests the multi-tenant [Northstar sample app](https://github.com/MSeys/ProtoTest/tree/HEAD/samples/ProtoTest.SampleApp) across API, messaging, browser, database and workbook boundaries.
 
-OpenCSMS, an independent EV charging platform, is the full product demo: its suite runs against containers, an Aspire AppHost and a published stack, with faults injected on purpose. The [Level 5 lessons](/learn/real-systems/containers) walk through it.
+OpenCSMS, an independent EV charging platform, is the full product demo. Its suite runs against containers, an Aspire AppHost and a published stack, with faults injected on purpose. The [Real systems lessons](/learn/real-systems/containers) walk through it.
 
 ![The OpenCSMS stations screen listing three stations and their charge points.](/images/opencsms/dashboard.png)

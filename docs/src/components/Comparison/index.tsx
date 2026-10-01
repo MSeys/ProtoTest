@@ -1,8 +1,9 @@
-import {useState, type ReactNode} from 'react';
+import {useId, useState, type ReactNode} from 'react';
 
+import CodeSnippet from '@site/src/components/CodeSnippet';
 import Frame from '@site/src/components/Frame';
+import tabStyles from '@site/src/components/TabbedCode/styles.module.css';
 import CodePane, {type ComparisonFold} from './CodePane';
-import Concerns, {type ComparisonConcern} from './Concerns';
 import styles from './styles.module.css';
 
 export interface ComparisonFile {
@@ -17,193 +18,164 @@ export interface ComparisonFile {
   folds?: ComparisonFold[];
 }
 
-export type {ComparisonConcern};
+export interface ComparisonSlice {
+  /** A file of the same side. */
+  file: string;
+  /** 1-based inclusive line ranges. */
+  ranges: [number, number][];
+}
+
+/** One task both sides must do, and where each side does it. */
+export interface ComparisonConcern {
+  id: string;
+  task: string;
+  without: {summary: string; slices: ComparisonSlice[]};
+  with: {summary: string; home: string; slices: ComparisonSlice[]};
+}
 
 interface ComparisonProps {
   without: ComparisonFile[];
   with: ComparisonFile[];
-  /** The same comparison task by task; the full files stay one click away. */
+  /** The same comparison task by task, as the table under the code. */
   concerns: ComparisonConcern[];
-  /** Side names. Default to the framework pair; a recipe pair names its own sides. */
   withoutLabel?: string;
   withLabel?: string;
-  /** One-line verdict above the bars, so the point lands before the numbers. */
-  verdict?: string;
 }
 
-interface Ledger {
-  /** Every line in the file. */
-  total: number;
-  /** Lines that are not blank: the lines the bar is drawn from. */
-  meaningful: number;
-  plumbing: number;
-  scenario: number;
-}
-
-function ledger(file: ComparisonFile): Ledger {
-  const lines = file.code.trim().split('\n');
-  const meaningful = lines.filter((line) => line.trim().length > 0).length;
-  const plumbing = file.infrastructureLines.length;
-  return {total: lines.length, meaningful, plumbing, scenario: meaningful - plumbing};
+/** Non-blank lines: blank lines never count, on either side or in either total. */
+function meaningful(code: string): number {
+  return code.trim().split('\n').filter((line) => line.trim().length > 0).length;
 }
 
 function suiteLines(files: ComparisonFile[]): number {
-  return files
-    .filter((file) => file.scope === 'suite')
-    .reduce((sum, file) => sum + file.code.trim().split('\n').length, 0);
+  return files.filter((file) => file.scope === 'suite').reduce((sum, file) => sum + meaningful(file.code), 0);
 }
 
-/** Both sides share one scale, so the with-bar's empty tail is the plumbing you stop writing. */
-function Bar({value, max}: {value: Ledger; max: number}): ReactNode {
-  return (
-    <div className={styles.track} aria-hidden="true">
-      <span className={styles.plumbing} style={{width: `${(value.plumbing / max) * 100}%`}} />
-      <span className={styles.scenario} style={{width: `${(value.scenario / max) * 100}%`}} />
-    </div>
-  );
-}
-
+/**
+ * The same test written twice, as two tabs over one code surface with the plumbing lines marked, a table of where
+ * each task went, and the totals in one sentence. The helper files stay one fold away.
+ */
 export default function Comparison({
   without,
   with: withProto,
   concerns,
   withoutLabel = 'Without ProtoTest',
   withLabel = 'With ProtoTest',
-  verdict,
 }: ComparisonProps): ReactNode {
-  const [showFiles, setShowFiles] = useState(false);
-  const [openFolds, setOpenFolds] = useState<Set<string>>(new Set());
-  const [openPanes, setOpenPanes] = useState<Set<string>>(new Set());
-
-  const withoutTest = without.find((file) => file.scope === 'test')!;
-  const withTest = withProto.find((file) => file.scope === 'test')!;
-  const withoutLedger = ledger(withoutTest);
-  const withLedger = ledger(withTest);
-  const max = Math.max(withoutLedger.meaningful, withLedger.meaningful);
-
-  const groups = [
-    {id: 'without', label: withoutLabel, files: without, ledger: withoutLedger},
-    {id: 'with', label: withLabel, files: withProto, ledger: withLedger},
+  const id = useId();
+  const sides = [
+    {id: 'without', label: withoutLabel, files: without},
+    {id: 'with', label: withLabel, files: withProto},
   ];
+  const [active, setActive] = useState(sides[1].id);
+  const [openFolds, setOpenFolds] = useState<Set<string>>(new Set());
+  const side = sides.find((candidate) => candidate.id === active)!;
+  const test = side.files.find((file) => file.scope === 'test')!;
+  const plumbing = (files: ComparisonFile[]) => files.find((file) => file.scope === 'test')!.infrastructureLines.length;
 
-  function toggleFold(side: string, key: string) {
+  function toggleFold(key: string) {
     setOpenFolds((current) => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-    // Opening a capability should reveal it, even when the pane is capped.
-    setOpenPanes((current) => new Set(current).add(side));
-  }
-
-  function togglePane(side: string) {
-    setOpenPanes((current) => {
-      const next = new Set(current);
-      if (next.has(side)) next.delete(side);
-      else next.add(side);
-      return next;
-    });
   }
 
   return (
-    <Frame kind="figure"
-      head={
-        <>
-          <strong className={styles.title}>The same scenario, written twice.</strong>
-          <span className={styles.delta}>{withoutTest.filename}, both ways</span>
-        </>
-      }
-      foot={
-        <span className={styles.once}>
-          <strong>Written once.</strong> Without, {suiteLines(without)} lines of helpers and DTOs. With,{' '}
-          {suiteLines(withProto)} lines: the host, the collectors and the sinks that produce the trace, the
-          contract coverage and the report.
-        </span>
-      }>
-      {/* The point of the comparison, stated once and large: the plumbing each new fixture pays for. */}
-      {verdict && <p className={styles.verdict}>{verdict}</p>}
-      <div className={styles.score}>
-        {groups.map((group) => (
-          <div key={group.id} className={`${styles.side} ${group.id === 'with' ? styles.sideWith : ''}`}>
-            <span className={styles.sideLabel}>{group.label}</span>
-            <span className={styles.figure}>
-              <strong>{group.ledger.plumbing}</strong>
-              <span>lines of plumbing</span>
-            </span>
-            <span className={styles.context}>
-              in a {group.ledger.meaningful}-line fixture, {group.ledger.scenario} lines describe the scenario
-            </span>
-            <Bar value={group.ledger} max={max} />
+    <div className={styles.comparison}>
+      <Frame
+        kind="code"
+        head={
+          <div className={tabStyles.tabs} role="tablist" aria-label="The same test, both ways">
+            {sides.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                role="tab"
+                id={`${id}-tab-${candidate.id}`}
+                aria-controls={`${id}-panel`}
+                aria-selected={candidate.id === active}
+                tabIndex={candidate.id === active ? 0 : -1}
+                className={`${tabStyles.tab} ${candidate.id === active ? tabStyles.tabActive : ''}`}
+                onClick={() => setActive(candidate.id)}>
+                {candidate.label}
+              </button>
+            ))}
           </div>
-        ))}
+        }
+        foot={
+          <>
+            <span className={styles.mark} aria-hidden="true" /> {plumbing(side.files)} of {meaningful(test.code)} lines
+            are plumbing: they stand the test up instead of describing the scenario.
+          </>
+        }>
+        <div
+          className={tabStyles.body}
+          id={`${id}-panel`}
+          role="tabpanel"
+          aria-labelledby={`${id}-tab-${active}`}>
+          <div className={tabStyles.filename}>{test.filename}</div>
+          <div data-surface="blueprint" className={styles.code}>
+            <CodePane
+              code={test.code}
+              plumbingLines={test.infrastructureLines}
+              folds={test.folds ?? []}
+              resolve={(fold) => {
+                const source = side.files.find((file) => file.filename === fold.source);
+                return source ? source.code.trim().split('\n').slice(fold.from - 1, fold.to).join('\n') : null;
+              }}
+              openKeys={openFolds}
+              onToggle={toggleFold}
+              keyOf={(fold) => `${side.id}:${test.filename}:${fold.line}`}
+            />
+          </div>
+        </div>
+      </Frame>
+
+      <p>
+        Per fixture, {plumbing(without)} lines of plumbing without ProtoTest and {plumbing(withProto)} with it. The
+        scenario lines stay the same. Both sides also have files written once for the suite:{' '}
+        {suiteLines(without)} lines of helpers and DTOs without, {suiteLines(withProto)} with, which also produce the
+        trace, the contract coverage and the report.
+      </p>
+
+      <div className={styles.tableWrap}>
+        <table>
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>{withoutLabel}</th>
+              <th>{withLabel}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {concerns.map((concern) => (
+              <tr key={concern.id}>
+                <td>{concern.task}</td>
+                <td>{concern.without.summary}</td>
+                <td>{concern.with.summary}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <Concerns concerns={concerns} without={without} with={withProto} />
-
-      <button
-        type="button"
-        className={styles.filesToggle}
-        aria-expanded={showFiles}
-        onClick={() => setShowFiles((current) => !current)}>
-        {showFiles ? 'Hide the full files' : 'Show the full files'}
-      </button>
-
-      {showFiles && (
-        <div className={styles.preview}>
-          {groups.map((group) => {
-            const test = group.files.find((file) => file.scope === 'test')!;
-            return (
-              <div key={group.id} className={styles.doc}>
-                <div className={styles.docHead}>
-                  <span className={styles.docSide}>{group.label}</span>
-                  <span className={styles.docName}>{test.filename}</span>
-                  <span className={styles.docScope}>per fixture</span>
-                </div>
-                <div data-surface="blueprint" className={`${styles.docBody} ${openPanes.has(group.id) ? styles.docBodyOpen : ''}`}>
-                  <CodePane
-                    code={test.code}
-                    plumbingLines={test.infrastructureLines}
-                    folds={test.folds ?? []}
-                    resolve={(fold) => {
-                      const source = group.files.find((file) => file.filename === fold.source);
-                      if (!source) return null;
-                      return source.code.trim().split('\n').slice(fold.from - 1, fold.to).join('\n');
-                    }}
-                    openKeys={openFolds}
-                    onToggle={(key) => toggleFold(group.id, key)}
-                    keyOf={(fold) => `${group.id}:${test.filename}:${fold.line}`}
-                  />
-                  {!openPanes.has(group.id) && <div className={styles.fade} />}
-                </div>
-                <button
-                  type="button"
-                  className={styles.docExpand}
-                  aria-expanded={openPanes.has(group.id)}
-                  onClick={() => togglePane(group.id)}>
-                  {openPanes.has(group.id)
-                    ? 'Hide'
-                    : `Show all ${test.code.trim().split('\n').length} lines`}
-                </button>
+      <details className={styles.files}>
+        <summary>The files written once</summary>
+        {sides.map((candidate) =>
+          candidate.files
+            .filter((file) => file.scope === 'suite')
+            .map((file) => (
+              <div key={`${candidate.id}:${file.filename}`} className={styles.file}>
+                <p className={styles.fileName}>
+                  {candidate.label}: <code>{file.filename}</code>, {meaningful(file.code)} lines
+                </p>
+                <CodeSnippet code={file.code.trim()} language="csharp" regionLabel={file.filename} scroll />
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      <div className={styles.notes}>
-        <p className={styles.contrast}>
-          A base class can share the left-hand lines too. Inherited setup reruns for every fixture against
-          shared state. A capability attaches to one test, on a context ProtoTest manages.
-        </p>
-
-        <div className={styles.owned}>
-          <span className={styles.ownedLabel}>Coordinated lifecycle</span>
-          <span className={styles.ownedItem}>Each test gets its own context and data</span>
-          <span className={styles.ownedItem}>Cleanup runs deterministically</span>
-          <span className={styles.ownedItem}>Tests can run in parallel</span>
-        </div>
-      </div>
-    </Frame>
+            )),
+        )}
+      </details>
+    </div>
   );
 }

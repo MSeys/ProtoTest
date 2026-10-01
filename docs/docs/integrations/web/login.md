@@ -23,7 +23,7 @@ public async Task Billing_admin_sees_open_invoices()
 setup order:  [SampleUser] (-100) → [WebSession] (-10) → [LoginAs] (0) → test body
 ```
 
-Declare the session first with `[WebSession]`. It creates the session during setup and can open a start URL; `Application` selects the application, `Open` the address, and the attribute's fixed `Order = -10` runs it before `[LoginAs]`:
+Declare the session first with `[WebSession]`. It creates the session during setup and can open a start URL. `Application` selects the application and `Open` the address. The attribute's fixed `Order = -10` runs it before `[LoginAs]`:
 
 ```csharp
 [WebSession("Admin", Application = "ControlPlane", Open = "/back-office")]   // address from ProtoTest:Applications:ControlPlane:BaseUrl
@@ -33,7 +33,7 @@ Declare the session first with `[WebSession]`. It creates the session during set
 public async Task ...
 ```
 
-A relative `Open` resolves against the session's application address, `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint. `Session` picks which named session to log in, so one test can have two different people signed in (it defaults to `"Default"`).
+A relative `Open` resolves against the session's application address, `ProtoTest:Applications:{application}:BaseUrl`, optionally joined with the named endpoint. `Session` on `[LoginAs]` picks the session to log in, as [the attribute](#the-attribute) describes.
 
 ## Writing a strategy
 
@@ -96,7 +96,7 @@ public sealed class ProvisionedUserLogin : IWebLoginStrategy
 public async Task ...
 ```
 
-`LoginAs` has the default `Order` of `0`; see [Attributes](../../foundation/attributes.md) for how ordering works.
+`LoginAs` has the default `Order` of `0`. [Attributes](../../foundation/attributes.md) explains how ordering works.
 
 ## The attribute
 
@@ -111,7 +111,7 @@ public sealed class LoginAsAttribute<TStrategy>(string persona, params object[] 
 ```
 
 - **`persona`** is a name, not a credential. Keep secrets in your strategy or a service it depends on: attribute arguments are compiled into your assembly metadata.
-- **Constructor arguments** after the persona are passed to the strategy's constructor, and any remaining parameters are resolved from dependency injection through `ProtoAuthenticatorFactory.Create<TStrategy>(context, constructorArgs)`, which also injects the `ProtoExecutionContext` itself:
+- **Constructor arguments** after the persona go to the strategy's constructor. `ProtoAuthenticatorFactory.Create<TStrategy>(context, constructorArgs)` resolves the remaining parameters from dependency injection, and also injects the `ProtoExecutionContext` itself:
 
   ```csharp
   [LoginAs<TenantLogin>("admin", "tenant-a")]

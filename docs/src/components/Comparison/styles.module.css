@@ -1,148 +1,24 @@
-.title { font-size: var(--text-title); font-weight: var(--weight-semibold); }
+/* The comparison: one code frame with two tabs, then the prose, the table and the fold that the page already uses. */
+.comparison { margin-bottom: var(--space-6); }
+.comparison > p { margin-top: var(--space-5); }
 
-.verdict { padding: var(--space-3) var(--space-5) 0; color: var(--text); font-size: var(--text-title); }
+/* The test file, capped so a long file scrolls inside the frame instead of pushing the page. */
+.code { max-height: 66rem; overflow: auto; }
 
-.delta { color: var(--muted); font-size: var(--text-strong); }
-
-.once { color: var(--muted); }
-.once strong { color: var(--text); }
-
-/* The scoreboard: the plumbing each fixture carries, as a figure, the two sides on one scale. */
-.score {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-  border-bottom: 1px solid var(--border);
+/* The legend swatch matches the plumbing line marker in the code. */
+.mark {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-right: var(--space-1);
+  vertical-align: -0.1em;
+  background: repeating-linear-gradient(to bottom, var(--muted) 0 4px, transparent 4px 8px);
 }
 
-.side { min-width: 0; padding: var(--space-5); display: grid; gap: var(--space-1); align-content: start; }
-.side + .side { border-left: 1px solid var(--border); }
+.files > summary { cursor: pointer; }
+.file { margin-top: var(--space-4); }
+.fileName { margin-bottom: var(--space-2); color: var(--muted); }
 
-/* Stacked sides divide horizontally, not vertically. The frame is the query container. */
-@container (max-width: 36rem) {
-  .side + .side { border-left: 0; border-top: 1px solid var(--border); }
-}
-.sideLabel { color: var(--muted); font-size: var(--text-title); font-weight: var(--weight-semibold); }
-
-.figure { display: flex; align-items: baseline; gap: var(--space-2); }
-.figure strong {
-  color: var(--text);
-  font: var(--weight-bold) var(--text-display) / var(--leading-tight) var(--font-display);
-  letter-spacing: var(--tracking-display);
-  font-variant-numeric: tabular-nums;
-}
-.figure span { color: var(--muted); font-size: var(--text-title); }
-.sideWith .figure strong { color: var(--blueprint); }
-.context { margin-bottom: var(--space-3); color: var(--dim); font-size: var(--text-title); }
-
-/* Hatched plumbing, solid scenario, one scale for both: the empty tail on the ProtoTest side is what stops
-   being written. */
-.track { display: flex; height: 6px; overflow: clip; border-radius: var(--radius-pill); background: var(--surface-2); }
-.plumbing { background: repeating-linear-gradient(135deg, var(--dim) 0 2px, transparent 2px 5px); }
-.scenario { background: var(--blueprint); }
-
-/* The two test files side by side: the same scenario, with every capability hanging off the line that uses it. */
-.preview {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border-top: 1px solid var(--border);
-  align-items: start;
-}
-
-.doc {
-  overflow: clip;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface-2);
-}
-
-.docHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border);
-}
-
-.docSide { color: var(--text); font-size: var(--text-title); font-weight: var(--weight-semibold); }
-.docName { min-width: 0; color: var(--muted); font: var(--text-strong) var(--font-mono); overflow-wrap: anywhere; }
-
-.docScope {
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-chip);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: var(--text-strong);
-  font-weight: var(--weight-semibold);
-  line-height: 1.8;
-}
-
-/* A file is the proof, not the argument: the pane shows its top and opens on request. Opening a capability
-   opens the pane with it, so the implementation is never revealed behind a cap. */
-.docBody {
-  position: relative;
-  /* About sixteen lines: the test method and its first steps, enough to compare the two sides at a glance. */
-  max-height: 340px;
-  overflow: clip;
-  background: var(--surface-sunken);
-}
-
-.docBodyOpen { max-height: none; }
-
-.fade {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 96px;
-  background: linear-gradient(to bottom, transparent, var(--surface-sunken));
-  pointer-events: none;
-}
-
-.docExpand {
-  display: block;
-  width: 100%;
-  padding: var(--space-3);
-  border: 0;
-  border-top: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: var(--text-title);
-  cursor: pointer;
-  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
-}
-
-.docExpand:hover { background: var(--hover); color: var(--text); }
-
-/* The files the rows are cut from, for a reader who wants to check the cut. */
-.filesToggle {
-  display: block;
-  width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  border-top: 1px solid var(--border);
-  background: transparent;
-  color: var(--blueprint);
-  font-size: var(--text-title);
-  font-weight: var(--weight-semibold);
-  text-align: left;
-  cursor: pointer;
-}
-
-.filesToggle:hover { background: var(--hover); }
-
-.notes {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-top: 1px solid var(--border);
-}
-
-.contrast { color: var(--muted); font-size: var(--text-title); line-height: var(--leading); }
-
-.owned { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
-
-.ownedLabel { color: var(--muted); font-size: var(--text-title); font-weight: var(--weight-semibold); }
-
-.ownedItem { color: var(--text); font-size: var(--text-title); }
-.ownedItem + .ownedItem { padding-left: var(--space-4); border-left: 1px solid var(--border); }
+/* A table this wide scrolls inside its own box on a phone instead of widening the page. */
+.tableWrap { overflow-x: auto; }
+.tableWrap table { margin-bottom: var(--space-4); }

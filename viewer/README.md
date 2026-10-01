@@ -54,7 +54,68 @@ The start screen lists the bundled demos with their test counts, read from the t
 
 To refresh a product demo, run its suite and replace the file in `public/demos/`. Do not bundle a trace that misrepresents the product: a synthetic benchmark trace is not a product demo.
 
-Supported spreadsheet artifacts can also be previewed without leaving the viewer. `npm run scale:trace` builds a 1,000+ test trace into the gitignored `.perf` directory, and `npm run scale:measure` times the built viewer against it in Edge. Numbers and method live on the [benchmarks page](https://prototest.dev/docs/project/benchmarks#the-viewer-at-1000-tests).
+Supported spreadsheet artifacts can also be previewed without leaving the viewer. `npm run scale:trace` builds a 1,000+ test trace into the gitignored `.perf` directory, and `npm run scale:measure` times the built viewer against it in Edge. Numbers and method are under [Performance at 1,000+ tests](#performance-at-1000-tests).
+
+## Performance at 1,000+ tests
+
+The viewer was measured on a generated 1,200-test trace derived from the committed demo trace.
+`viewer/scripts/generate-scale-trace.mjs` clones each demo test until the requested count, rewriting ids,
+names and timestamps, and writes small placeholder payloads for the artifacts. Every test keeps the demo's
+real operations, checks, observations, sections, events and state, so the viewer exercises its real paths.
+The generated file is 8.6 MB zipped (57.8 MB of spans JSON, 35.6 MB of state JSON). It is a heavier suite
+per test than the trace-size table on the [benchmarks page](https://prototest.dev/docs/project/benchmarks#how-big-a-trace-gets), which counts one operation per test.
+
+Method: a production build (`npm run build`), Microsoft Edge 154.0.4258.37 headless at 1440x900, no CPU or
+network throttling, on the AMD Ryzen 7 9800X3D machine the benchmarks page uses. Each number is the median of five cold runs: a fresh
+page, the trace loaded through the viewer's own file input, then one interaction. The harness is
+`viewer/scripts/measure-viewer.mjs`. It serves the built `dist` over loopback, so no dev server is involved.
+Before and after the pass:
+
+| Step | Before | After |
+| --- | --- | --- |
+| Open the trace and render the run list | 1,356 ms | 1,316 ms |
+| Filter to "Needs attention" | 77 ms | 53 ms |
+| Clear the filter (1,200 rows return) | 182 ms | 162 ms |
+| Type "GraphQL" in the run search | 365 ms | 231 ms |
+| Open a test with 169 operations | 167 ms | 151 ms |
+| Return to the run list | 650 ms | 566 ms |
+
+Read plainly: a cold open of a suite this size takes about **1.3 seconds**, and the remaining run list
+steps land between **50 ms and 570 ms**. The test views stay fast at this size: Timeline, State and the
+inspector all answer in 33 to 50 ms for a test with 169 operations.
+
+What the pass changed, all inside the existing views:
+
+- Each test computes its display name, title, group and search text once and caches it, instead of
+  re-deriving them for every row on every render.
+- The run view is kept alive when a test opens, so returning moves the cached DOM instead of rebuilding
+  a thousand rows.
+- Each run and rail row contains its own layout and paint (`contain: layout paint`), so one row's change
+  never re-lays-out the list.
+
+What remains, with the measurement that shows it:
+
+- The cold open is dominated by reading and parsing the two JSON documents and the first full layout
+  (five long tasks, the longest about 550 ms). Removing that needs a streaming reader.
+- The run list and the outcome strip render one element per test, so returning to the run and changing
+  the filter move about a thousand DOM rows. Removing that needs a windowed list.
+- `content-visibility: auto` on the rows was measured and rejected. It skipped off-screen layout on the
+  first render but made typed filtering about twice as slow, because every row added or removed during
+  filtering pays its bookkeeping.
+
+
+The viewer numbers re-run from the `viewer` directory:
+
+```
+npm run scale:trace
+npm run build
+npm run scale:measure -- --trace .perf/scale-1200.prototrace --tests 1200 --runs 5
+```
+
+The generator prints the trace's size. The harness prints every run and its median, and `--profile` also
+writes CPU profiles and renderer time (script, layout, style) per measured step. Neither script is part of
+the build or CI. The harness needs an installed Chromium-family browser (Edge by default) and
+`puppeteer-core`, which is a viewer dev dependency.
 
 ## Learn more
 

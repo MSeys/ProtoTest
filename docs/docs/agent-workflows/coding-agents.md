@@ -19,7 +19,7 @@ Ask for the newest failure:
 > `TheAddressWasHardcodedForOneMachine` failed with a `ConnectionError reaching
 > http://127.0.0.1:5099: connection refused` at `Program.cs:65`, in `test.execution`.
 
-The run id above stands in for any run; ids and times are new on every run.
+The run id above stands in for any run, because ids and times are new on every run.
 
 ## The workflow an agent follows
 
@@ -57,16 +57,16 @@ The tools here are for your agent. How the project itself uses AI is on the [AI 
 
 - The MCP tool descriptions are the contract. An agent that lists tools sees four names, what each reads and that each is read-only.
 - Summaries first. Every tool caps its payload, so the agent asks for one failure, one test or one page of coverage. It never pulls a whole trace into context.
-- The trace itself is for depth. A `.prototrace` archive holds `spans.json`, `state.json`, embedded sources and artifacts ([ProtoTrace](../observability/prototrace.md)); the MCP tools read it, the viewer shows it.
+- The trace itself is for depth. A `.prototrace` archive holds `spans.json`, `state.json`, embedded sources and artifacts ([ProtoTrace](../observability/prototrace.md)). The MCP tools read it, and the viewer shows it.
 - `prototest summary` and the pull request comment render the same diagnosis document. The agent log and the reviewer comment match.
 
 ## The skills bundle
 
 The repository carries one skill: [`skills/prototest-evidence-loop/SKILL.md`](https://github.com/MSeys/ProtoTest/blob/main/skills/prototest-evidence-loop/SKILL.md). It covers the loop, the four MCP tools, `prototest verify`, `prototest feedback`, and the docs.
 
-It is copy-in, not a package. No NuGet package carries it and no installer writes it: copy the folder into your client's skills directory, or paste the file into the instructions file your client reads. [Setup](./setup.md#give-the-agent-the-skill) shows both.
+It is copy-in, not a package. No NuGet package carries it and no installer writes it. Copy the folder into your client's skills directory, or paste the file into the instructions file your client reads. [Setup](./setup.md#give-the-agent-the-skill) shows both.
 
-The skill is optional. The MCP tool descriptions and the CLI output are the contract; the skill only points at them, and this page is written so an agent pointed at it can follow the same commands.
+The skill is optional. The MCP tool descriptions and the CLI output are the contract, and the skill only points at them. This page is written so an agent pointed at it can follow the same commands.
 
 ## What is local and what is not
 
@@ -74,8 +74,8 @@ The skill is optional. The MCP tool descriptions and the CLI output are the cont
 | --- | --- | --- |
 | `prototest-mcp` (stdio) | your machine | nothing |
 | `prototest` CLI | your machine | only what you point it at: a pull request comment or a webhook |
-| Trace viewer | your browser | nothing; the archive is read in the browser |
-| Demo MCP endpoint | your machine, loopback only | nothing; it serves one bundled trace |
+| Trace viewer | your browser | nothing, because the archive is read in the browser |
+| Demo MCP endpoint | your machine, loopback only | nothing, because it serves one bundled trace |
 
 Nothing is uploaded by default. There is no telemetry, no account and no ProtoTest service to sign in to.
 
@@ -87,8 +87,8 @@ Nothing is uploaded by default. There is no telemetry, no account and no ProtoTe
 dotnet run --project samples/ProtoTest.Mcp.DemoEndpoint
 ```
 
-The endpoint is then at `http://127.0.0.1:5199/`: the root path, with no `/mcp` prefix. Point a client that speaks MCP Streamable HTTP at it (for example MCP Inspector) and call `list_runs`: one bundled trace, four tools, no account. A plain JSON-RPC POST without the Streamable HTTP headers is answered `406`. The local stdio server is the surface that reads your repository; this one reads the bundled trace.
+The endpoint is then at `http://127.0.0.1:5199/`: the root path, with no `/mcp` prefix. Point a client that speaks MCP Streamable HTTP at it (for example MCP Inspector) and call `list_runs`: one bundled trace, four tools, no account. A plain JSON-RPC POST without the Streamable HTTP headers is answered `406`. The local stdio server is the surface that reads your repository, and this one reads the bundled trace.
 
 ## Check it
 
-Run your suite once so a `.prototrace` exists, then ask the question at the top of this page. If the agent sees no runs, the server is pointed at a folder that does not hold the archive; [Setup](./setup.md#where-it-reads) explains where discovery looks.
+Run your suite once so a `.prototrace` exists, then ask the question at the top of this page. If the agent sees no runs, the server is pointed at a folder that does not hold the archive. [Setup](./setup.md#where-it-reads) explains where discovery looks.

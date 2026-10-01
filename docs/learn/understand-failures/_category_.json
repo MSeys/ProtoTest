@@ -3,7 +3,7 @@
   "position": 6,
   "customProps": {
     "outcome": "Find why a test failed, tell findings from failures, gate a run, read contract coverage and keep the evidence from CI.",
-    "time": "About 50 minutes",
+    "time": "About 1 hour",
     "needs": "Start"
   }
 }

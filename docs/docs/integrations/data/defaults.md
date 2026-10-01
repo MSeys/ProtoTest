@@ -44,7 +44,7 @@ You can configure inline in `AddData(data => ...)`. The trace then reports the s
 | `For<T>().Redact(member)` | hides one member's value in ProtoTrace while keeping its provenance |
 | `Values.Use<T>(provider)` | supplies a value for every member of `T` |
 
-`AddDefaultsFromAssembly` loads public, concrete, non-generic modules with a public parameterless constructor. It runs them ordered by type full name. Registering the same member, type or factory twice throws `ProtoDataException` naming both sources; there is no last-one-wins, so two modules cannot silently fight over a value. Resolvers are the exception: they may repeat and all run in order.
+`AddDefaultsFromAssembly` loads public, concrete, non-generic modules with a public parameterless constructor. It runs them ordered by type full name. Registering the same member, type or factory twice throws `ProtoDataException` naming both sources. There is no last-one-wins, so two modules cannot silently fight over a value. Resolvers are the exception: they may repeat and all run in order.
 
 ## Where a value comes from
 
@@ -70,13 +70,16 @@ flowchart TD
 1. **`With(...)`** in the test.
 2. A **member default**: `data.For<T>().Default(x => x.Member, …)`, resolved by walking the target type and its base types.
 3. A **type provider**: `data.Values.Use<TValue>(…)`, matched on the exact type only.
-4. A **custom resolver**: `IProtoDataValueResolver`, in registration order; a throwing resolver is wrapped in `ProtoDataException`.
+4. A **custom resolver**: `IProtoDataValueResolver`, in registration order. A throwing resolver is wrapped in `ProtoDataException`.
 5. The constructor parameter's **default value**, on the constructor route only. The declaration's default is the value the author asked for, so a generation never replaces it, including `null` for a nullable parameter.
-6. A **safe built-in**, for a member with no constructor default: `null` for a nullable member or a nullable-annotated reference, a generated string for `string`, a generated `Guid`, and an empty array or list for array, `IEnumerable<T>`, `IReadOnlyCollection<T>`, `IReadOnlyList<T>`, `ICollection<T>`, `IList<T>` and `List<T>`.
+6. A **safe built-in**, for a member with no constructor default:
+   - `null` for a nullable member or a nullable-annotated reference
+   - a generated string for `string`, and a generated `Guid`
+   - an empty array or list for array, `IEnumerable<T>`, `IReadOnlyCollection<T>`, `IReadOnlyList<T>`, `ICollection<T>`, `IList<T>` and `List<T>`.
 
-If none apply, `ProtoDataException` names the member. Numbers, enums, booleans, dates and your own value objects are deliberately *not* on the built-in list: provide them explicitly or through a default.
+If none apply, `ProtoDataException` names the member. Numbers, enums, booleans, dates and your own value objects are deliberately *not* on the built-in list. Provide them explicitly or through a default.
 
-A member resolving shows its source in `Explain()` and the trace. The shape of the output, with illustrative values:
+Each member shows its source in `Explain()` and the trace. This is the shape of the output, with illustrative values:
 
 ```csharp
 var plan = Proto.Context.Data().For<Invoice>()
@@ -88,7 +91,12 @@ var plan = Proto.Context.Data().For<Invoice>()
 // Each entry also names its source: the module type for defaults, "Host configuration" for inline setup.
 ```
 
-Constant or provider, member or type? Use the provider overload when the value must be unique per test, a member default when it belongs to one object type, a type provider when every member of a type shares it, and a resolver when the convention spans many types.
+Which one to use:
+
+- the provider overload when the value must be unique per test
+- a member default when the value belongs to one object type
+- a type provider when every member of a type shares it
+- a resolver when the convention covers many types.
 
 ## Member defaults
 
@@ -98,7 +106,7 @@ data.For<InviteMemberRequest>()
         context => $"member-{context.TestId}-{context.ObjectSequence:D4}@example.test");
 ```
 
-Use the provider overload whenever the value must be unique: a constant email address breaks the moment two tests run in parallel.
+Use the provider overload whenever the value must be unique. A constant email address breaks the moment two tests run in parallel.
 
 ## Type providers
 
@@ -123,7 +131,7 @@ Both kinds of provider, and every member default, receive a `ProtoDataValueConte
 | `NextString()` | a deterministic string like `Invoice.Reference-0001-00` |
 | `Ref<T>(identity)` | a value provisioned earlier in this test, from the [identity map](./provisioners.md#refs-and-the-identity-map) |
 
-`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`, and `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member. The same test produces the same values on each run. Different tests get different values. For a name outside a member default, such as a tenant or an operator, use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
+`NextGuid()` is the first 16 bytes of a SHA-256 over `"{TestId}|{ObjectSequence}|{TargetType.FullName}|{MemberName}|{counter}"`. `NextString()` is `"{TargetType.Name}.{MemberName}-{ObjectSequence:D4}-{counter:D2}"`. Each member resolution gets a fresh context, so the counter starts at 0 per member. The same test produces the same values on each run. Different tests get different values. For a name outside a member default, such as a tenant or an operator, use `Proto.Context.UniqueName("tenant")`, which derives `tenant-{TestId}` from the same test id.
 
 ## Domain factories
 
@@ -142,12 +150,12 @@ The factory rules:
 
 - One factory per type. A second `ConstructUsing` for the same type throws.
 - The factory should consume every input it needs through `Value<TValue>(...)`. A factory that does not consume an explicit `With` value throws, as does resolving the same member name as two different types.
-- A factory returning `null` or an incompatible value throws; exceptions from inside the factory are wrapped with context.
+- A factory returning `null` or an incompatible value throws. Exceptions from inside the factory are wrapped with context.
 - `Explain()` for a factory type lists only the explicit `With(...)` values and the construction source (`ConstructionSource`), because the factory resolves the rest when `Build()` runs.
 
 ## Custom resolvers
 
-For conventions that span many types, such as fixing every property called `CreatedAt` to one clock value:
+For conventions that cover many types, such as fixing every property called `CreatedAt` to one clock value:
 
 ```csharp
 public sealed class FixedClockResolver : IProtoDataValueResolver
@@ -172,7 +180,7 @@ public sealed class FixedClockResolver : IProtoDataValueResolver
 builder.AddData(data => data.AddValueResolver(new FixedClockResolver()));
 ```
 
-Resolvers run after member and type providers, in registration order, and the second argument of `ProtoDataResolvedValue` is the source shown in `Explain()` and the trace.
+Resolvers run after member and type providers, in registration order. The second argument of `ProtoDataResolvedValue` is the source shown in `Explain()` and the trace.
 
 ## Keeping values out of the trace
 
@@ -184,15 +192,15 @@ data.RedactValueType<Password>();              // every value of a type
 ```
 
 - A member is redacted when its declaring type, or any base type, matches the redacted type.
-- A value is redacted when its declared or runtime type matches, including base types and interfaces; `Nullable<T>` is unwrapped, and a collection is redacted when its element type is.
-- Non-redacted values are still walked as a graph: nested redacted members or types become `"[REDACTED]"`, and reference cycles become `"[circular]"`. The graph is copied only when something was redacted.
+- A value is redacted when its declared or runtime type matches, including base types and interfaces. `Nullable<T>` is unwrapped, and a collection is redacted when its element type is.
+- Non-redacted values are still walked as a graph. Nested redacted members or types become `"[REDACTED]"`, and reference cycles become `"[circular]"`. The graph is copied only when something was redacted.
 
 ## Limits
 
 - **Redaction protects ProtoTrace only.** It is best effort and says nothing about application logs, HTTP bodies or reports.
-- **Factory inputs come from the same pipeline.** A factory cannot invent a value the pipeline would reject; unresolved members still fail.
-- **Module discovery is shape-based.** A module needs a public parameterless constructor and a public concrete type; nested or generic modules are skipped.
-- **Member defaults apply to the member's declaring type and its base types**, but a type provider matches the exact member type only; use a resolver for a family of types.
+- **Factory inputs come from the same pipeline.** A factory cannot invent a value the pipeline would reject, and unresolved members still fail.
+- **Module discovery is shape-based.** A module needs a public parameterless constructor and a public concrete type. Nested or generic modules are skipped.
+- **Member defaults apply to the member's declaring type and its base types**, but a type provider matches the exact member type only. Use a resolver for a family of types.
 
 ## Links
 

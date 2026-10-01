@@ -14,7 +14,7 @@ TUnit is wired differently from the other four. There is no ProtoTest test attri
 dotnet add package ProtoTest.TUnit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **TUnit 1.66.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **TUnit 1.66.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`. Pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 ## Register
 
@@ -53,7 +53,7 @@ The `TUnit` namespace carries TUnit's own `[Test]`, `[Before]` and `[After]`.
 }
 ```
 
-With that file in the project or solution directory, run `dotnet test` from that directory. `dotnet test --project Starter.Tests/Starter.Tests.csproj` works when the working directory is at or under the `global.json` folder; from outside it, `cd` there first. Running from elsewhere without it fails before any test runs: the old VSTest path reports that testing with the VSTest target is no longer supported.
+With that file in the project or solution directory, run `dotnet test` from that directory. `dotnet test --project Starter.Tests/Starter.Tests.csproj` works when the working directory is at or under the `global.json` folder. From outside it, `cd` there first. Running from elsewhere fails before any test runs, because the old VSTest path reports that testing with the VSTest target is no longer supported.
 
 ```bash
 dotnet test                                               # right: run from the global.json directory
@@ -117,7 +117,7 @@ public class OrderTests
 - There is no ProtoTest attribute. Test discovery and `[Test]` are entirely TUnit's.
 - Register the executor for the assembly. `[TestExecutor<T>]` on a class or a method is not part of the supported surface.
 - **Runs unwrapped.** A source-generated test without a reflection `MethodInfo` runs unwrapped. The executor has no method data to build a context.
-- The per-test token comes from `TestContext.CancellationToken`: the executor has no token of its own, so a test with no live context (see the `MethodInfo` limit) starts from `CancellationToken.None`.
+- The per-test token comes from `TestContext.CancellationToken`. The executor has no token of its own, so a test with no live context (see the `MethodInfo` limit) starts from `CancellationToken.None`.
 - A teardown failure is recorded but can never change the body's outcome.
 
 ## Learn more

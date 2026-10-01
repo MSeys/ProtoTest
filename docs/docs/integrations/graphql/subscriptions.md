@@ -6,7 +6,7 @@ description: "Test GraphQL subscriptions over WebSocket (graphql-transport-ws) o
 
 # Subscriptions
 
-Subscriptions stream results over **WebSocket** (the `graphql-transport-ws` protocol, the default) or **Server-Sent Events**.
+Subscriptions stream results over **WebSocket** (the `graphql-transport-ws` protocol, the default) or **Server-Sent Events**. This page shows how to subscribe, wait for the next event with a shape and a timeout, and choose or supply the transport.
 
 ## A complete example
 
@@ -58,7 +58,7 @@ private static async Task TriggerAsync(CancellationToken cancellationToken)
 The same `expected` object builds the subscription's selection set and asserts the event that arrives.
 
 :::caution[Subscription registration has no acknowledgement]
-`SubscribeAsync` returns after the server acknowledges the connection, not the subscription. Triggering at once can lose the event. Trigger in a loop until `ExpectNextAsync` returns. A fixed `Task.Delay` only narrows the window. The example above triggers until the event lands: the trigger loop runs on the test's own flow, the bounded `ExpectNextAsync` is the wait, and cancelling the token ends the loop. Every trigger produces an event and the test consumes the first, so a duplicate landing after that is harmless.
+`SubscribeAsync` returns after the server acknowledges the connection, not the subscription. Triggering at once can lose the event. Trigger in a loop until `ExpectNextAsync` returns. A fixed `Task.Delay` only narrows the window. In the example above the trigger loop runs on the test's own flow, the bounded `ExpectNextAsync` is the wait, and cancelling the token ends the loop. Every trigger produces an event and the test consumes the first, so a later duplicate is harmless.
 :::
 
 ## `GraphQLSubscription`
@@ -74,9 +74,9 @@ public sealed class GraphQLSubscription : IAsyncEnumerable<GraphQLResponse>, IAs
 }
 ```
 
-Every `GraphQLResponse` you receive is yours to dispose. Only one `NextAsync` may be pending at a time; a concurrent call throws `InvalidOperationException`.
+Every `GraphQLResponse` you receive is yours to dispose. Only one `NextAsync` may be pending at a time, and a concurrent call throws `InvalidOperationException`.
 
-Because it's `IAsyncEnumerable`, you can also iterate. The enumerator disposes the previous event as it advances, so `await foreach` without a per-element `using` does not leak; the event currently in the loop body, and the last event after the loop, stay yours:
+Because it is `IAsyncEnumerable`, you can also iterate. The enumerator disposes the previous event as it advances, so `await foreach` without a per-element `using` does not leak. The event currently in the loop body, and the last event after the loop, stay yours:
 
 ```csharp
 await foreach (var message in subscription.WithCancellation(timeout.Token))
@@ -107,7 +107,7 @@ Without `ConnectionPayload`, `connection_init` is sent with a `null` payload.
 
 ## Protocol behaviour
 
-Trigger in a loop until the event lands. Time is the bug, so here it is as a picture:
+Trigger in a loop until the event lands. The timing is where these tests go wrong:
 
 ```mermaid
 sequenceDiagram
@@ -130,13 +130,9 @@ sequenceDiagram
 | Size cap | `ProtoTest:GraphQL:Responses:MaxResponseBodyBytes` (10 MiB default) | same cap, same key |
 | Failure | `connection_error`, an unexpected message before the ack, or a non-text or oversized message throws `GraphQLProtocolException` | a response that is not `text/event-stream` is read to the end within the message limit and delivered as one response |
 
-Each event is recorded: a `graphql.response` observation and a `graphql.subscription.next` event (event number, transport, error count), with response attachments named `graphql-{n:00}-event-{nn}-response`. The end of the stream records `graphql.subscription.complete` with the event count, transport and duration.
+Each event records a `graphql.response` observation and a `graphql.subscription.next` event (event number, transport, error count). Its response attachments are named `graphql-{n:00}-event-{nn}-response`. The end of the stream records `graphql.subscription.complete` with the event count, transport and duration.
 
 **Disposal** sends `complete`, then closes the socket. Socket errors during close are swallowed so they never mask a test failure.
-
-The endpoint scheme is rewritten automatically: `http` → `ws`, `https` → `wss`.
-
-Message size is capped by `ProtoTest:GraphQL:Responses:MaxResponseBodyBytes` (10 MiB default) on both transports.
 
 ## Choosing the transport
 
@@ -145,11 +141,11 @@ graphQL.AddClient("Api", "https://api.example.test/graphql")
     .WithSubscriptionTransport(GraphQLSubscriptionTransport.Sse);
 ```
 
-or `ProtoTest:Applications:Api:GraphQL:SubscriptionTransport = "Sse"` in configuration. The per-target registration wins; otherwise the configured value is read the first time the test calls `GraphQL()`. An invalid value throws `InvalidOperationException` naming `WebSocket` and `Sse`.
+or `ProtoTest:Applications:Api:GraphQL:SubscriptionTransport = "Sse"` in configuration. The per-target registration wins. Otherwise the configured value is read the first time the test calls `GraphQL()`. An invalid value throws `InvalidOperationException` naming `WebSocket` and `Sse`.
 
 ## Supplying your own WebSocket
 
-By default ProtoTest opens a real `ClientWebSocket`. An in-process test server can't be reached that way, so you register a factory:
+By default ProtoTest opens a real `ClientWebSocket`. An in-process test server cannot be reached that way, so you register a factory:
 
 ```csharp
 public interface IGraphQLWebSocketFactory

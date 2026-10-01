@@ -77,7 +77,7 @@ in (-1000 ... First ... Auth) -> ATTRIBUTES -> out (Auth ... First ... -1000)
 
 Lower orders run earlier on the way in and later on the way out, so a hook with `Order = -1_000` wraps everything with a higher order.
 
-ProtoTest's built-in hooks sit at the extremes on purpose, and `ProtoHookOrder` names their positions so a hook can sit relative to them without spelling out raw values:
+ProtoTest's built-in hooks sit at the extremes on purpose. `ProtoHookOrder` names their positions, so a hook can sit relative to them without spelling out raw values:
 
 | Hook | `Order` | Why |
 | --- | --- | --- |
@@ -152,14 +152,13 @@ Attachments added in `AfterTestAsync` are still published, because publishing ha
 ## What the trace shows
 
 - One `hook.before` operation per test hook and one `hook.after` per hook that completed, each carrying the hook type and its `Order`. The test's `test.setup` operation also records the hook count.
-- A hook that fails during setup stops the sequence and appears in the rollback: the hooks that completed run their `AfterTestAsync` in reverse, and the failing hook does not.
+- A hook that fails during setup stops the sequence and appears in the rollback. The hooks that completed run their `AfterTestAsync` in reverse, and the failing hook does not.
 - A hook that fails during teardown is recorded as an `Error` finding and does not replace the test's outcome.
 - Run hooks are not tied to a test record. Their effects show up in the run entities around the tests, such as a capability or infrastructure state they registered.
 
 ## Limits
 
 - Test hooks are registered as singletons and resolved from the root container. Per-test state must come from `context.Services` or the context itself.
-- Test hooks receive no token parameter: they read `context.CancellationToken`, which carries the caller's token or the runner's own where its adapter has one (NUnit's test context, the xUnit v2 runner, xUnit v3's `TestContext.Current.CancellationToken`, TUnit's `TestContext.CancellationToken`). MSTest's 4.0.2 floor exposes no token, so those hooks see `CancellationToken.None`.
+- Test hooks receive no token parameter. They read `context.CancellationToken`, which carries the caller's token or the runner's own where its adapter has one: NUnit's test context, the xUnit v2 runner, xUnit v3's `TestContext.Current.CancellationToken`, TUnit's `TestContext.CancellationToken`. MSTest's 4.0.2 floor exposes no token, so those hooks see `CancellationToken.None`.
 - `AddTestHook` and `AddRunHook` do **not** dedupe: every call adds another registration. Register each hook once.
 - Run hooks get no context, since there is no test yet. See [Lifecycle](./lifecycle.md#the-run) for the run sequence and the rollback rule a `BeforeRunAsync` failure follows.
-- A teardown failure in a test hook is recorded as an `Error` finding and does not replace the test's outcome.

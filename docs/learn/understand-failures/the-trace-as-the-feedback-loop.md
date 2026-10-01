@@ -75,7 +75,7 @@ Open [l0-visibility-fix.prototrace](pathname:///lessons/l0-visibility-fix.protot
 
 ### 4. When the trace is silent, the missing answer is the fix
 
-The environment failure has no HTTP request operation in its trace. The execution entry ran about two seconds and failed with a connection error.
+The environment failure has no HTTP request operation in its trace. Its execution phase, the test body, ran about two seconds and failed with a connection error.
 
 Check the source to explain the missing request. This test creates a raw `HttpClient` inside its body and calls a hardcoded address. That client bypasses ProtoTest's REST instrumentation. The paired test uses `Proto.Context.Rest()`, which takes its address from the composition and records the request.
 

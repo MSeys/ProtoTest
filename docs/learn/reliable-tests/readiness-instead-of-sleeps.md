@@ -64,14 +64,14 @@ The code is in `samples/Northstar.ProtoTest/Setup.cs`. Three things to notice:
 The default probe accepts any HTTP response, including a 404 or 500. It proves the endpoint responds, without requiring a successful health status.
 To require a 2xx response, pass `ready: response => response.IsSuccessStatusCode` to `AddHttpReadiness`.
 
-The host starts infrastructure in registration order. Register the probe after the piece that publishes its address, such as the loopback application or an AppHost.
+The host starts what the setup class registered in that order. So register the probe after whatever gives the application its address, here the loopback application.
 If no address is available at the probe's turn, it skips and records `readiness.skipped`.
 An address supplied through configuration is already available, so it does not depend on a publisher starting first.
 
 ### 2. Write tests that do not wait
 
 The host runs this probe once during startup, before the first test. The browser journey then uses the loopback address without adding its own startup delay.
-The API journeys use an in-process test server instead, so this probe does not check their transport.
+The tests that call the API directly use the in-process server instead, the application running inside the test process, so this probe does not check them.
 
 If the probe cannot satisfy its condition before the wait times out, host startup fails with the probe name and attempt count.
 Cancelling startup also cancels the wait. The configured timeout is checked between attempts, so an in-flight HTTP request can extend the elapsed time.
@@ -90,7 +90,7 @@ readiness entity for the loopback instance:
 | `readiness.attempts` | `1` |
 | `readiness.waitedMs` | `85` |
 
-The operating system chooses an available port, so your run may use a different one. The readiness entity is released with the run.
+The operating system chooses an available port, so your run may use a different one. The probe's entry in the trace is released when the run ends, like the other pieces the host owns.
 Its `resource.release` entry appears in the same layer.
 
 ## What happened

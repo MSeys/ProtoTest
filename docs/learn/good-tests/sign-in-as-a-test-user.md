@@ -32,7 +32,7 @@ import Link from '@docusaurus/Link';
 
 Most applications decide what a caller may do by who the caller is. A test that calls the API has to act as someone: an owner who can create projects, or a viewer who is refused.
 
-You already used `[SignedInAs]` in your first test. This lesson follows that identity into an authenticated request and reads the identity metadata in the trace.
+You already used `[SignedInAs]` in your first test. This lesson follows that identity into a request and into the trace.
 
 ## Do it
 
@@ -58,14 +58,13 @@ public sealed class ProjectsJourney
     }
 }`}
   callouts={[
-    {line: 5, title: 'One context per test', note: '[ProtoTest] wraps this test in its own context. The identity belongs to that context alone.'},
-    {line: 6, title: 'Name, then roles', note: 'With no arguments the built-in name test-user is used, with no roles. Here the viewer role is what the application refuses.'},
-    {line: 13, title: 'The application decides', note: 'The 403 comes from the application, which resolved the viewer and applied its own authorization.'},
+    {line: 6, title: 'Name, then roles', note: 'Without arguments it is the built-in test-user, with no roles.'},
+    {line: 13, title: 'The application decides', note: 'The 403 comes from the application\'s own authorization.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/ProjectsJourney.cs</code>. Claims use the same attribute: <code>Claims = new[] &#123; "tenant=northstar" &#125;</code>.</>}
 />
 
-The declaration contains a name, roles and claims. It does not obtain credentials from the application. The context stores one current identity, which a later `SignIn` call replaces.
+The declaration only describes the identity. It does not get credentials from the application.
 
 ### 2. See what the attribute does
 
@@ -82,13 +81,13 @@ Before the test body runs, the attribute publishes the identity to the context:
     return Task.CompletedTask;
 }`}
   callouts={[
-    {line: 3, title: 'One call publishes the identity', note: 'SignIn sets the user the context resolves and records an auth:user entity. The next test starts with none.'},
-    {line: 6, title: 'The auth entity omits claim values', note: 'The identity includes claim values, but auth:user records only their types. This does not control custom attachments or embedded source.'},
+    {line: 3, title: 'One call publishes the identity', note: 'SignIn sets this test\'s user and records an auth:user entity.'},
+    {line: 6, title: 'Claim values stay out of auth:user', note: 'It records only the claim types. Embedded source can still show the values.'},
   ]}
   foot={<>From <code>src/ProtoTest.Http/Authentication/SignedInAsAttribute.cs</code>. REST, GraphQL and gRPC requests carry the identity through the same auth lifecycle.</>}
 />
 
-`[NorthstarMember]` adds tenant setup and the sample's authenticator. When a request needs credentials, that authenticator calls `NorthstarMember.EnsureAsync` to choose or provision a member:
+`[NorthstarMember]` also adds the sample's authenticator. When a request needs credentials, the authenticator turns the declared identity into a member of the test's tenant:
 
 <AnnotatedCode
   filename="NorthstarMember.cs"
@@ -99,10 +98,10 @@ var member = role == MemberRoles.Owner
     ? new NorthstarMemberContext("owner", organization.OwnerEmail, role, organization.OwnerToken)
     : await InviteAsync(context, role);`}
   callouts={[
-    {line: 3, title: 'The first role picks the member', note: 'No role, or owner as the first role, selects the tenant owner. Another first role invites a member with that role.'},
-    {line: 4, title: 'The member is the credential', note: 'The sample sends the member token. Its application resolves that, not the shipped test-user header.'},
+    {line: 3, title: 'The first role picks the member', note: 'No role, or owner: the tenant owner. Any other role: an invited member.'},
+    {line: 4, title: 'The member is the credential', note: 'The application resolves the member token.'},
   ]}
-  foot={<>From <code>samples/Northstar.ProtoTest/NorthstarMember.cs</code>. The invited member's email includes the role and test id. The member is cached in that test's context.</>}
+  foot={<>From <code>samples/Northstar.ProtoTest/NorthstarMember.cs</code>.</>}
 />
 
 ### 3. Read the identity in the trace
@@ -111,19 +110,18 @@ Open [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototra
 
 | Entry | Reading |
 | --- | --- |
-| `Before · NorthstarTenantAttribute`, 139.9 ms | the tenant is provisioned first |
-| `Before · SignedInAsAttribute`, 1.7 ms | the declaration runs next, and its event reads `Signed in as test-user` |
-| `Apply · TestUserAuthenticator`, 1.2 ms | the shipped transport applies, because the server runs in-process |
-| `Apply · NorthstarAuthenticator`, 1.0 ms | the sample's own authenticator rides along on the same request |
-| auth entity `auth:user`: name `test-user`, roles empty, claim types empty, transport `in-process` | the identity the trace keeps |
+| `Before · NorthstarTenantAttribute`, 139.9 ms | the tenant comes first |
+| `Before · SignedInAsAttribute`, 1.7 ms | its event reads `Signed in as test-user` |
+| `Apply · TestUserAuthenticator`, 1.2 ms | the shipped transport: ProtoTest's built-in way to pass the identity, as a request header. It applies because the server runs in-process |
+| `Apply · NorthstarAuthenticator`, 1.0 ms | the sample's own authenticator on the same request |
+| auth entity `auth:user`: `test-user`, no roles, no claim types, transport `in-process` | the identity the trace keeps |
 
-The auth entity records `auth.claim_types`, without their values. The default gRPC metadata capture also redacts `prototest-user`.
-These rules do not remove values you write into custom attachments, response bodies or embedded source files.
+
 
 ### 4. Try the limit: a published application
 
 The shipped transport needs an application the run hosts in-process. To try the limit, create `PublishedAliceProbe.cs` in `samples/Northstar.ProtoTest/` with this content.
-Leave `[NorthstarMember]` off: its tenant setup would need a live application before the identity declaration runs.
+It leaves `[NorthstarMember]` off, because tenant setup needs a live application.
 
 <AnnotatedCode
   filename="PublishedAliceProbe.cs"
@@ -155,8 +153,7 @@ public sealed class PublishedAliceProbe
   ]}
 />
 
-From the repository root, run it against an unused local port. The example uses 5099. Choose another port if something already listens there.
-The script restores any previous target setting after the run:
+Run it against an unused local port, such as 5099. The script restores your previous target setting:
 
 ```powershell
 $previousTargetUrl = $env:ProtoTest__TargetUrl
@@ -177,11 +174,10 @@ finally {
 With no listener on that port, the request fails. The test's trace still records the identity:
 
 - `auth.user: alice`, `auth.roles: admin`, `auth.claim_types: tenant`.
-- `auth.transport: inert`, with the reason: the application is not hosted in-process, so register it with `AddAspNetCoreServer` and add the app-side authentication with `webHost.AddTestUserAuthentication()`.
+- `auth.transport: inert`, meaning the header is switched off, with a reason that names `AddAspNetCoreServer` and `webHost.AddTestUserAuthentication()`.
 - An `auth.user.inert` event with outcome `skipped`.
 
-The auth entity omits the claim value `northstar`. The trace may still contain it in the embedded test source.
-Delete `PublishedAliceProbe.cs` after inspecting the result so this deliberate failure does not remain in your suite.
+Delete `PublishedAliceProbe.cs` afterwards.
 
 ## What happened
 
@@ -195,7 +191,7 @@ Delete `PublishedAliceProbe.cs` after inspecting the result so this deliberate f
       .AddRest(rest => rest.AddClient("Api")));
   ```
 
-  The handler decodes the header into a `ClaimsPrincipal`, so the application's own `[Authorize]` and role checks decide as in production. The sample leaves it out on purpose, because the handler replaces the default authentication scheme and the sample's subject is its own authentication.
+  The handler turns the header into a `ClaimsPrincipal`, so the application's own `[Authorize]` checks decide. The sample leaves it out, because it tests its own authentication.
 - Published, the shipped transport is inert and says why. A custom `[Auth<T>]` authenticator can map `context.SignedInUser()` to credentials the application accepts, as the sample does.
 
 ## Check yourself
@@ -205,14 +201,14 @@ Delete `PublishedAliceProbe.cs` after inspecting the result so this deliberate f
   verify={<>Run the published case above and read its <code>auth:user</code> entity. The saved <a href="pathname:///lessons/l1-first-journey.prototrace">first journey</a> shows the same fields for <code>test-user</code>, without roles or claims.</>}>
 
 The entity records `auth.user: alice`, `auth.roles: admin` and `auth.claim_types: tenant`. It does not record the claim value `northstar`.
-Embedded source or custom captured content can still contain that value. The auth entity's omission is not a trace-wide redaction guarantee.
+Embedded source or captured content can still contain it.
 
 </Checkpoint>
 
 ## Remember
 
-- A bare `[SignedInAs]` is the built-in `test-user`. A name, roles and claims describe the identity further.
-- The identity is per-test state. Its auth entity records name, roles and claim types, without claim values.
+- `[SignedInAs]` declares a per-test identity: a name, roles and claims.
+- Its auth entity records the name, roles and claim types, without claim values.
 - The shipped transport needs an in-process application. Against a published one it is inert and records why.
 
 ## Go deeper

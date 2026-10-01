@@ -22,17 +22,17 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
   ]}
   needs={[
     <>The previous lesson, <a href="/learn/extend/attributes">Write your own attribute</a></>,
-    'The sample cloned. The browser journey also needs the Chromium browser that Playwright installs. Without it the journey skips with a reason.',
+    'The sample cloned. Part 2 also needs Playwright\'s Chromium. Without it the journey skips.',
   ]}
 />
 
-This lesson teaches two separate skills. Part 1 creates test data through the real door. Part 2 describes a browser screen so a test reads like a user. You can read them in either order.
+This lesson has two parts: test data first, then a browser screen. Read them in either order.
 
 ## The problem
 
-Setup data has to come from somewhere. A test that inserts rows directly skips the product's rules. A fixture copied into each test drifts away from the endpoint it once matched. And a browser test full of CSS selectors says nothing about which screen broke.
+A test that inserts rows directly skips the product's rules, and a copied fixture drifts from its endpoint. A browser test full of CSS selectors says nothing about which screen broke.
 
-A provisioner creates an object once, through the door you choose, and returns what the system gave back. A page object describes a screen, so a test names elements instead of selectors.
+A provisioner creates an object through the door you choose and returns what the system gave back. A page object describes a screen, so a test names elements instead of selectors.
 
 ## Do it
 
@@ -52,7 +52,7 @@ public interface IProtoDataProvisioner<TInput, TResult>
 }
 ```
 
-The sample gives its API provisioners one shared base class, so a concrete provisioner only names the URL, the body and the id (see `NorthstarMemberProvisioner`):
+The sample's API provisioners share one base class, so each names only the URL, the body and the id:
 
 <AnnotatedCode
   filename="NorthstarApiProvisioner.cs"
@@ -82,10 +82,9 @@ The sample gives its API provisioners one shared base class, so a concrete provi
     }
 }`}
   callouts={[
-    {line: 1, title: 'One seam, many fixtures', note: 'The input and the result are separate types, so a request can differ from what the system returns.'},
-    {line: 9, title: 'Name the identity', note: 'A later call finds the same value again by this id, through Ref<T>.'},
-    {line: 16, title: 'Use the running test context', note: 'context.Execution carries the clients, configuration and trace of the test that asked for the fixture.'},
-    {line: 19, title: 'Require the contract', note: 'A creation that did not answer 201 fails the test here. It is a failed fixture, not a finding.'},
+    {line: 9, title: 'Name the identity', note: 'A later call finds the same value by this id.'},
+    {line: 16, title: 'Use the test\'s clients', note: 'context.Execution is the test that asked for the fixture.'},
+    {line: 19, title: 'Require the contract', note: 'A creation without 201 fails the test here.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Provisioners/</code>.</>}
 />
@@ -127,12 +126,12 @@ One call writes a chain of entries. This one is from the first journey's trace, 
 
 | Entry | Reading |
 | --- | --- |
-| `Create · ProvisionTenantRequest`, 137.0 ms | The data surface received the request and found the registered provisioner. |
-| `Build · ProvisionTenantRequest`, 3.5 ms | The defaults and the `With` calls produced the value that was sent. |
-| `Provision · ProvisionTenantRequest → TenantResponse`, 132.0 ms | The provisioner made the call and returned the created value. |
-| `Release · data:TenantResponse:1`, 10.3 ms, then `Cleanup · TenantResponse` | Teardown released the tracked value and ran the cleanup. |
+| `Create · ProvisionTenantRequest`, 137.0 ms | the request arrived and found its provisioner |
+| `Build · ProvisionTenantRequest`, 3.5 ms | the defaults built the value to send |
+| `Provision · ProvisionTenantRequest → TenantResponse`, 132.0 ms | the provisioner made the call |
+| `Release · data:TenantResponse:1`, 10.3 ms, then `Cleanup · TenantResponse` | teardown released the value and cleaned it up |
 
-Nothing in the test knew a port or a route. The registration chose the implementation, and the trace names it.
+The test knew no port or route. The registration chose the implementation, and the trace names it.
 
 ### Part 2: model a screen as a page object
 
@@ -162,9 +161,9 @@ public sealed class ProjectsPage : WebPage
     public ProjectRow Project(string name) => Rows.Matching(By.HasText(name), $"Project[{name}]");
 }`}
   callouts={[
-    {line: 3, title: 'One property, one element', note: 'A property finds its element on the live page each time it is read, so a re-rendered screen leaves no stale handle.'},
-    {line: 16, title: 'A collection of components', note: 'Each row is its own component class, so a row can hold the name, the status and the environment count.'},
-    {line: 18, title: 'Matching is strict', note: 'No match and more than one match are both errors. A filtered list finds exactly one row or fails.'},
+    {line: 3, title: 'One property, one element', note: 'Found on the live page each time it is read.'},
+    {line: 16, title: 'Rows are components', note: 'Each row has its own class with its own elements.'},
+    {line: 18, title: 'Matching is strict', note: 'It finds exactly one row, or fails.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Pages.cs</code>. The wait the journeys use lives beside it in <code>NorthstarPages.Wait</code>.</>}
 />
@@ -190,15 +189,13 @@ await row.Status.Should.HaveTextAsync(ProjectStatuses.Active, NorthstarPages.Wai
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~WebJourney"
 ```
 
-In the execution phase you find `web.navigate` for the open, `web.flow` for each flow, `web.fill` and `web.click` for the steps, and `assert.web` for the status check. Each entry carries the component path, from `ProjectsPage` down to the element the step touched.
+The execution phase shows `web.navigate`, `web.flow`, `web.fill`, `web.click` and `assert.web`. Each entry carries the component path, from `ProjectsPage` down to the element the step touched.
 
-If the journey skips, the reason names Playwright and the browser it could not find. The [web integration page](/docs/integrations/web/) covers the install and the probe.
+If the journey skips, the reason names the missing browser. The [web integration page](/docs/integrations/web/) covers the install.
 
 ## What happened
 
-Both parts follow one idea: put the knowledge in one named place and let the trace show it was used. A provisioner holds how to create a fixture, so registration decides which implementation runs. A page object holds how to find an element, so a failure names the screen and the component instead of a CSS selector.
-
-Both are ordinary classes. Nothing about them needs the framework except the one registration or the one base class.
+Both parts follow one idea: put the knowledge in one named place and let the trace show it was used. A provisioner holds how to create a fixture. A page object holds how to find an element, so a failure names the screen instead of a CSS selector.
 
 ## Check yourself
 
@@ -206,7 +203,7 @@ Both are ordinary classes. Nothing about them needs the framework except the one
   question="A provisioner returns a result with an identity and a cleanup. What does the identity let another call do, and what happens to the cleanup when the test ends?"
   verify={<>Read the provisioner reference, then the release rows of the first journey's trace.</>}>
 
-The identity is how a later call finds the same value again. The data surface keeps one map per test, and <code>Ref&lt;T&gt;</code> resolves a value by its type and identity. The cleanup, when the provisioner supplies one, is disposed at teardown in reverse creation order and recorded as a <code>data.cleanup</code> operation.
+The identity lets a later call find the same value again, through <code>Ref&lt;T&gt;</code>. The cleanup runs at teardown, in reverse creation order, as a <code>data.cleanup</code> operation.
 
 </Checkpoint>
 
@@ -214,14 +211,13 @@ The identity is how a later call finds the same value again. The data surface ke
   question="A step in the browser journey fails on the projects screen. What three things does the trace name, and what would a raw selector name instead?"
   verify={<>Run the WebJourney filter above and read the <code>web.*</code> entries.</>}>
 
-The screen, the component and the element: each entry carries the component path from <code>ProjectsPage</code> down to the element the step touched. A raw selector would name only the CSS that found it, not the screen it belongs to.
+The screen, the component and the element, as one path from <code>ProjectsPage</code> down. A raw selector names only the CSS.
 
 </Checkpoint>
 
 ## Remember
 
 - A provisioner turns a built request into a created value and reports its identity.
-- Registering a provisioner is one line on the host builder.
 - A page object names elements as properties, and the trace carries the component path of what a step touched.
 
 Next: [write an integration](/learn/extend/write-an-integration).

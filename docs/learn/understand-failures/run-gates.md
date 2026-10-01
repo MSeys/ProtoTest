@@ -50,7 +50,7 @@ The sample registers one gate over its findings:
   callouts={[
     {line: 1, title: 'A name and a delegate', note: 'The name becomes the row in the report and the message in the failure; a class implementing IProtoRunGate works the same way.'},
     {line: 2, title: 'It reads items, not tests', note: 'ItemsOfKind selects the findings the run collected, wherever they came from. A teardown finding counts like any other.'},
-    {line: 4, title: 'Failed fails the run', note: 'A Failed verdict throws ProtoRunGateException out of the run teardown. Warning and Skipped are recorded without failing.'},
+    {line: 4, title: 'Failed fails the run', note: 'A Failed verdict makes the run teardown throw a ProtoRunGateException, so the process exits 1. Warning and Skipped are recorded without failing.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. Gates run once after the last test and before the reports are written, so a failed gate still produces its report.</>}
 />

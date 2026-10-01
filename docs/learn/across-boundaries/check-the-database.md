@@ -110,14 +110,11 @@ The test writes through the API and reads through a separate connection to the s
 
 The raw ADO.NET command does not produce a separate query operation here. Plain NUnit checks also do not each become ProtoTest check operations. A failure still appears in the test's outcome and error.
 
-The setup class chooses `SqlIsolation.None`: ProtoTest opens no per-test transaction and performs no automatic rollback. The application uses its own connection, so a transaction on the test's connection would not isolate its writes.
+ProtoTest can keep each test's database writes apart in two ways. With `Transaction`, the SQL integration's default, it wraps the test's work on the test's connection in a transaction and rolls it back afterwards. With `None`, it does neither, and the test cleans up itself.
 
-In the default local run, domain provisioners use the application's store. With domain composition against a configured external application, they use the test's connection. `None` lets those writes become visible to the application.
+This sample chooses `None`, because the application writes through its own connection. A rollback on the test's connection could not undo those writes. Instead, the tenant provisioner deletes the tenant and all its data after the test.
 
-Cleanup is explicit. The tenant provisioner supplies a disposer that deletes the tenant and its dependent data after the test.
-
-The SQL integration defaults to `Transaction`, which rolls back work enlisted in the test's transaction. That transaction does not cover another connection automatically.
-With active SQL support, startup rejects transaction isolation with registered applications unless each is declared through `ShareConnectionWith`. Such a declaration must match actual connection sharing.
+ProtoTest also refuses `Transaction` at startup when an application is registered, unless `ShareConnectionWith` declares that the application really uses the test's connection.
 
 ## Check yourself
 

@@ -105,7 +105,7 @@ An integration is a ProtoTest package for one kind of system. Its registration c
 
 Match the table to the code. `AddRest` and `AddGraphQL` declare REST and GraphQL. `AddAspNetCoreServer` declares ASP.NET Core. In this sample, `AddWeb` selects Playwright.
 
-For the remaining rows, find `AddSql` in `ConfigureDomain` and `AddSheets` in `Configure`. The Data row comes from `AddNorthstarData`, which calls `AddData` in `NorthstarTestHost.cs`.
+The remaining rows come from three more calls in `samples/Northstar.ProtoTest/Setup.cs`: `AddSql` inside the `ConfigureDomain` method, `AddSheets` inside `Configure`, and `AddNorthstarData`, which calls `AddData` in `NorthstarTestHost.cs`.
 
 ## What happened
 

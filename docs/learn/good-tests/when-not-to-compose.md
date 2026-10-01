@@ -31,7 +31,7 @@ import Link from '@docusaurus/Link';
 
 Adding infrastructure to host setup is convenient. But unnecessary startup can slow a suite, and shared mutable data can make tests interfere. Choose the resource's lifetime before registering it.
 
-The host configures both run-wide services and resources created separately for each test. Registration alone does not determine lifetime. This lesson helps you choose an owner and a lifetime.
+Registration alone does not decide a lifetime. This lesson helps you choose an owner and a lifetime.
 
 ## Do it
 
@@ -55,7 +55,7 @@ For an external system, choose whether the test needs the real service or a fake
 
 **Leaving ownership and evidence implicit.** A raw client or manually started container needs explicit cleanup and instrumentation. Test code can dispose it directly or register it as a test-owned resource.
 
-The environment drill in the [failure tour](/learn/understand-failures/a-failure-tour) shows the tracing limit: its raw HTTP request has no request operation. The trace still records the test's duration and failure. Prefer the configured client when it provides the behavior you need.
+The environment drill in the [failure tour](/learn/understand-failures/a-failure-tour) shows the tracing limit. It calls the API with a plain `HttpClient`, which ProtoTest does not record, so the trace has no `http.request` operation for it. The trace still records the test's duration and failure. Prefer the configured client when it provides the behavior you need.
 
 **Choosing a longer lifetime without a reason.** WireMock uses a separate server per test by default. `PerRun()` shares a server, its stubs and its request log until the run ends. The server starts when a test resolves it, not merely when the host registers it.
 
@@ -67,11 +67,13 @@ A run-lived fake can be useful even if only one journey uses it. Choose that lif
 
 Open [l0-state-drill.prototrace](pathname:///lessons/l0-state-drill.prototrace) and [l0-state-fix.prototrace](pathname:///lessons/l0-state-fix.prototrace) in the [viewer](https://trace.prototest.dev). The drill assumes a project exists and receives 404. The fix creates a project in its test-owned tenant before reading it.
 
-These recordings show an unmet data assumption and an explicit setup. They do not show a seeding hook or prove that all shared seed data is unsafe.
+The drill shows an unmet data assumption. The fix shows explicit setup.
 
 ## What happened
 
-Lifetime and sharing guide placement. Register owned cleanup with the host or test context, or dispose a local object directly. Trace visibility depends on instrumentation.
+Two answers decided where each piece went: who shares it, and how long it must live. A tenant used by one test belongs to that test, and its teardown removes it. A broker used by every test belongs to the host, which releases it after the last test. A response held for one call is a local variable you dispose yourself.
+
+The trace sees only what goes through ProtoTest's clients. A raw `HttpClient` works, but it leaves no operation behind.
 
 When several tests need the same setup behavior, a hook, attribute, client or integration can reuse it through the existing lifecycle.
 

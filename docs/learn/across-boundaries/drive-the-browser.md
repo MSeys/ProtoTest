@@ -80,7 +80,7 @@ public sealed class ProjectRow : WebComponent
 }
 ```
 
-Each element property locates an element by its test id. `Rows` describes a collection of project rows, and `Project(name)` selects a row by its text.
+`WebPage` and `WebComponent` are ProtoTest's base classes for a page object, and a `WebElement` is one element on the page. Each element property locates an element by its test id. `Rows` describes a collection of project rows, and `Project(name)` selects a row by its text.
 A `WebComponent` groups elements within part of a page, such as one project row. The tests use these named properties instead of repeating their selectors.
 
 ### 3. Prepare the data through the API
@@ -114,7 +114,7 @@ await row.Status.Should.HaveTextAsync(ProjectStatuses.Active, NorthstarPages.Wai
 
 `Page<SignInPage>()` gives a page object but does not navigate. `OpenAsync("/login")` does.
 The sample's login form exchanges the tenant token for a cookie and redirects to `/projects`.
-The flow groups the fill and click under one named trace operation, with child operations for the steps.
+A flow is a named group of browser steps. In the trace it becomes one operation, with the fill and the click as its children.
 
 `HaveTextAsync` polls for text equal to `ProjectStatuses.Active`. `NorthstarPages.Wait` supplies a 15-second assertion timeout.
 If the check times out, its failure includes the last observation. Backend operations have their own timing, so elapsed time can exceed the assertion timeout.

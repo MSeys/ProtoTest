@@ -31,7 +31,7 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 Your system has something ProtoTest does not know: a company client library, a fixture loader, a file format. You want tests to use it as naturally as `Proto.Context.Rest()`. That means the test gets it from the context, the run records what it did, and a failure message names it.
 
-An integration is a package that adds this kind of capability. The sample's scenario layer is a small real one of about fifty lines. It has a custom client, an initializer, a hook that runs around each test, an attachment and two trace events.
+An integration is a package that adds this kind of capability. The sample's scenario layer is a real one of about fifty lines: a custom client, a hook around each test, an attachment and two trace events.
 
 ## Do it
 
@@ -66,9 +66,8 @@ The probe is a plain class that keeps a list of milestones. The initializer regi
     }
 }`}
   callouts={[
-    {line: 1, title: 'One initializer per client type', note: 'The interface is generic over the client, so the host knows what it creates.'},
-    {line: 3, title: 'The name is the handle', note: 'A test resolves the client by this name. Returning false means "not me": the next initializer is tried, and a group with no winner fails setup with a named message.'},
-    {line: 7, title: 'Register a live instance', note: 'Registering it here is what makes the client resolve from the context instead of throwing.'},
+    {line: 3, title: 'The name is the handle', note: 'A test resolves the client by this name. Returning false lets the next initializer try.'},
+    {line: 7, title: 'Register a live instance', note: 'This is what makes the client resolve from the context.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/NorthstarScenario.cs</code>.</>}
 />
@@ -99,9 +98,9 @@ The hook opens and closes each scenario with a trace event. This is the opening 
         ["northstar.correlation_id"] = scenario.CorrelationId
     });`}
   callouts={[
-    {line: 2, title: 'Kind: dotted, lowercase', note: 'The viewer groups by the prefix before the first dot, so northstar events get their own category without a viewer release.'},
-    {line: 3, title: 'Name: for humans', note: 'The built-ins use an area, a verb and a subject. Keep that shape so a reader can scan the execution phase.'},
-    {line: 4, title: 'Source: your package', note: 'The source tells a reader which entries are the framework\'s and which are yours.'},
+    {line: 2, title: 'Kind: dotted, lowercase', note: 'The viewer labels a kind it does not know by its first segment: Northstar.'},
+    {line: 3, title: 'Name: for humans', note: 'A verb and a subject, like the built-in entries.'},
+    {line: 4, title: 'Source: your package', note: 'It separates your entries from the framework\'s.'},
   ]}
   foot={<>The same two calls bracket the scenario: <code>northstar.scenario.begin</code> and <code>northstar.scenario.end</code>, with a duration attribute on the closing one.</>}
 />
@@ -114,13 +113,13 @@ Three rules keep your entries tidy:
 
 ### 4. Use the client in a test
 
-The probe is public, so a test can mark its own step. Add this line to the first journey from [Write your own attribute](/learn/extend/attributes), under the `[RunNote]` you added there:
+Add this line to the first journey from [Write your own attribute](/learn/extend/attributes), under the `[RunNote]` you added there:
 
 ```csharp
 Proto.Context.Client<ScenarioProbe>("ScenarioProbe").Mark("first-milestone");
 ```
 
-Run the filtered test and open its trace. At teardown the hook publishes the scenario summary as an attachment. Open it and read the milestones. This is a real summary from the sample:
+Run the filtered test. At teardown the hook attaches the scenario summary. A real one from the sample:
 
 ```json
 {"CorrelationId":"scenario-416387000001-6406e159a16243e0beb564c28105893f","TestName":"Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt","DurationMs":349.127,"Milestones":["scenario-started","scenario-completed"]}
@@ -136,9 +135,9 @@ The committed trace of the first journey, <a href="pathname:///lessons/l1-first-
 
 | Entry | Reading |
 | --- | --- |
-| `Initialize · ScenarioProbe (ScenarioProbe)`, 0.1 ms | The initializer registered the custom client during setup. |
-| `Before · NorthstarScenarioHook`, 5.9 ms | The hook ran before the test and wrote the opening event. |
-| `Publish · <test id>-scenario-summary.json`, 0.5 ms | The hook attached the milestone trail at teardown. |
+| `Initialize · ScenarioProbe (ScenarioProbe)`, 0.1 ms | the initializer registered the client in setup |
+| `Before · NorthstarScenarioHook`, 5.9 ms | the hook wrote the opening event |
+| `Publish · <test id>-scenario-summary.json`, 0.5 ms | the hook attached the milestones at teardown |
 
 A feature you write behaves like a feature that shipped.
 
@@ -148,7 +147,7 @@ A feature you write behaves like a feature that shipped.
   question="The first journey runs with the scenario hook registered. Which entry in its trace proves the custom client was registered, and where does your own milestone land?"
   verify={<>Open <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a> in the <a href="https://trace.prototest.dev">viewer</a> and read the setup and teardown phases, or read the table above.</>}>
 
-The setup phase holds <code>Initialize · ScenarioProbe (ScenarioProbe)</code>. The initializer registered the custom client, which is what makes the client resolve instead of throwing. Your milestone lands where the sample's two milestones do: the scenario summary attachment the hook publishes at teardown.
+<code>Initialize · ScenarioProbe (ScenarioProbe)</code> in the setup phase. Your milestone lands beside the sample's two, in the scenario summary the hook attaches at teardown.
 
 </Checkpoint>
 

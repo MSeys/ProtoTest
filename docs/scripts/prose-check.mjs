@@ -23,7 +23,20 @@ const TERMS = [
   [/(?<!Aspire )\bdashboard\b/gi, 'viewer'],
   [/\bbootstrap(per)?\b/gi, 'setup class'],
 ];
-const PASSIVE = /\b(is|are|was|were|be|been|being)\s+(\w+ed|built|written|run|kept|made|shown|given|held|set|sent|read|done|seen)\b/gi;
+// Abstract nouns (-tion, -ment, -ity...) stacked in a paragraph read as theory, not as something the reader saw.
+// Words that name concrete things in these docs are not counted.
+const NOMINAL = /\b[a-z]{3,}(?:tions?|ments?|ity|ities|ances?|ences?|ness)\b/gi;
+const CONCRETE = new Set(['application', 'applications', 'operation', 'operations', 'configuration', 'assertion',
+  'assertions', 'connection', 'connections', 'version', 'section', 'sections', 'function', 'notification',
+  'notifications', 'integration', 'integrations', 'instance', 'instances', 'reference', 'references', 'sequence',
+  'environment', 'environments', 'attachment', 'attachments', 'document', 'documents', 'action', 'question',
+  'questions', 'exception', 'exceptions', 'collection', 'registration', 'registrations', 'element', 'elements',
+  'argument', 'arguments', 'statement', 'experience', 'audience', 'evidence', 'reason', 'payment', 'deployment',
+  'capability', 'capabilities', 'expectation', 'expectations', 'visibility', 'identity', 'identities', 'completion',
+  'validation', 'isolation', 'substitution', 'substitutions', 'credentials', 'requirement', 'requirements']);
+// More abstract nouns than this per sentence, over two or more sentences, flags the paragraph.
+const ABSTRACT_PER_SENTENCE = 0.8;
+const PASSIVE =/\b(is|are|was|were|be|been|being)\s+(\w+ed|built|written|run|kept|made|shown|given|held|set|sent|read|done|seen)\b/gi;
 
 function files(target) {
   if (statSync(target).isFile()) return /\.mdx?$/.test(target) ? [target] : [];
@@ -106,10 +119,14 @@ export function sentences(block) {
 const words = (sentence) => sentence.split(/\s+/).filter(Boolean).length;
 
 export function check(text, path = '') {
-  const result = {terms: [], sentences: 0, long: 0, tooLong: [], emDash: 0, semicolons: 0, asides: 0, filler: [], passive: 0, longParagraphs: 0};
+  const result = {terms: [], sentences: 0, long: 0, tooLong: [], emDash: 0, semicolons: 0, asides: 0, filler: [], passive: 0, longParagraphs: 0, abstract: []};
   for (const block of prose(text)) {
     const list = sentences(block);
     if (list.length > 5) result.longParagraphs += 1;
+    const nominals = (block.match(NOMINAL) ?? []).filter((word) => !CONCRETE.has(word.toLowerCase()));
+    if (list.length >= 2 && nominals.length / list.length > ABSTRACT_PER_SENTENCE) {
+      result.abstract.push(block.length > 90 ? `${block.slice(0, 87)}...` : block);
+    }
     for (const sentence of list) {
       result.sentences += 1;
       const count = words(sentence);
@@ -132,7 +149,7 @@ export function check(text, path = '') {
 /** One number to sort pages by: how much a reader has to work through, per hundred sentences. */
 export function score(result) {
   if (!result.sentences) return 0;
-  const weight = result.terms.length + result.long + result.tooLong.length * 2 + result.emDash * 2 + result.semicolons + result.asides + result.filler.length + result.longParagraphs * 2;
+  const weight = result.terms.length + result.long + result.tooLong.length * 2 + result.emDash * 2 + result.semicolons + result.asides + result.filler.length + result.longParagraphs * 2 + result.abstract.length * 2;
   return Math.round((weight / result.sentences) * 100);
 }
 
@@ -167,7 +184,7 @@ if (isMain) {
     total += result.sentences;
     const parts = [
       old === null ? `${words} words` : `${old} -> ${words} words`,
-      isLesson(path) && words > LESSON_WORDS && `over the ${LESSON_WORDS}-word lesson budget`,
+      isLesson(path) && words > LESSON_WORDS && `over the ${LESSON_WORDS}-word lesson line (say why in the report)`,
       `${result.sentences} sentences`,
       `${result.long} over ${LONG} words`,
       result.tooLong.length && `${result.tooLong.length} over ${TOO_LONG}`,
@@ -176,11 +193,13 @@ if (isMain) {
       result.asides && `${result.asides} stacked asides`,
       result.filler.length && `filler: ${[...new Set(result.filler)].join(', ')}`,
       result.longParagraphs && `${result.longParagraphs} long paragraphs`,
+      result.abstract.length && `${result.abstract.length} abstract paragraphs`,
       result.passive && `${result.passive} likely passives`,
       result.terms.length && `terms: ${[...new Set(result.terms)].join(', ')}`,
     ].filter(Boolean);
     console.log(`${String(score(result)).padStart(3)}  ${path}  ${parts.join(', ')}`);
     if (detail) for (const sentence of result.tooLong) console.log(`       > ${sentence}`);
+    if (detail) for (const block of result.abstract) console.log(`       ~ ${block}`);
   }
   console.log(`\n${rows.length} pages, ${total} sentences. Score: weighted issues per hundred sentences, highest first.`);
 }

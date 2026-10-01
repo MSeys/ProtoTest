@@ -27,3 +27,11 @@ test('only Learn lessons have a lesson budget', () => {
   assert.equal(isLesson('docs/learn/why-it-gets-hard.md'), false);
   assert.equal(isLesson('docs/docs/foundation/execution-context.md'), false);
 });
+
+test('a paragraph of stacked abstract nouns is flagged, a concrete one is not', async () => {
+  const {check} = await import('./prose-check.mjs');
+  const abstract = 'Lifetime and ownership guide placement and isolation. Trace visibility depends on instrumentation and composition.';
+  const concrete = 'Open the trace in the viewer. The application answered 404 because the project did not exist.';
+  assert.equal(check(abstract).abstract.length, 1);
+  assert.equal(check(concrete).abstract.length, 0);
+});

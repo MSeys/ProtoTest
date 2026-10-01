@@ -32,9 +32,9 @@ import ModesComparison from '@site/src/components/ModesComparison';
 
 A suite that needs a database and a broker usually asks you to install both first. You would rather start the suite and let it bring what it needs.
 
-These lessons use recorded runs from OpenCSMS, a separate suite. You can follow the explanation and quoted evidence without its checkout. Running the commands requires the checkout and its development tools.
+These lessons use recorded runs from OpenCSMS, a separate suite. You can follow them without its checkout. Running the commands needs it.
 
-OpenCSMS manages EV charging. It has a REST API with a dashboard, PostgreSQL for storage, RabbitMQ for events, and billing and notification workers. The dashboard is the operator's interface. Its suite has one setup class and four modes. This track reads three modes, then examines failures the suite creates deliberately.
+OpenCSMS manages EV charging. It has a REST API with a dashboard, PostgreSQL for storage, RabbitMQ for events, and billing and notification workers. Its suite has one setup class and four modes. This track reads three modes, then examines failures the suite creates deliberately.
 
 ## Do it
 
@@ -48,7 +48,7 @@ pwsh eng/run-suite.ps1 -Mode container
 
 The script first builds the dashboard with npm. It then runs `dotnet test tests/OpenCsms.Suite -c Release` and saves the test output to `artifacts/gates/opencsms-container-<timestamp>.log`.
 
-A plain `dotnet test tests/OpenCsms.Suite` does not build that dashboard. Its browser journeys skip when the built `dist/index.html` is absent. An existing build can let them run.
+A plain `dotnet test tests/OpenCsms.Suite` does not build the dashboard, so its browser journeys skip unless an earlier build exists.
 
 ### 2. Read the run's own counts
 
@@ -58,12 +58,11 @@ The recorded log ends with this summary:
 Passed!  - Failed:     0, Passed:    75, Skipped:     0, Total:    75, Duration: 6 s - OpenCsms.Suite.dll (net8.0)
 ```
 
-This run was recorded on 2026-09-28 in `opencsms-container-20260928-194709.log`. All 75 tests ran, including the seven Chromium journeys, OCPP device journeys and the regression journey for idle fees.
-These counts describe that recording. Your checkout and configuration can produce different counts.
+This run was recorded on 2026-09-28 in `opencsms-container-20260928-194709.log`. All 75 tests ran, including the seven Chromium journeys. Your checkout can produce different counts.
 
 ### 3. Read the chain that decided
 
-The setup class declares the database and the broker the same way. Each is a chain of providers, and the first provider whose condition holds serves it:
+The setup class declares each target, a thing the suite needs such as the database or the broker, the same way. Each target has a chain of providers: an ordered list of ways to get it, where the first one whose condition holds serves it:
 
 <AnnotatedCode
   filename="Setup.cs"
@@ -92,11 +91,11 @@ The setup class declares the database and the broker the same way. Each is a cha
 />
 
 With no configured connection strings and Aspire unselected, both chains reach `UseContainer`. The host starts the containers and disposes them at the end.
-The script clears Aspire selection for container mode, but keeps exported connection strings and application addresses. Check those values before interpreting the mode name as proof of what started.
+The script keeps exported connection strings in container mode, so check them before trusting the mode name.
 
 ![The OpenCSMS stations screen: three stations with their charge points, connector counts and last-seen stamps.](/images/opencsms/dashboard.png)
 
-The dashboard on a local run. The Chromium journeys drive this screen, served by the API the run hosts.
+The dashboard on a local run, the screen the Chromium journeys drive.
 
 ## What happened
 
@@ -114,10 +113,10 @@ Messaging__RabbitMq__ConnectionString
 ProtoTest__Messaging__RabbitMq__ConnectionString
 ```
 
-The first is the product's database. The second is the product's broker. The third is the address the suite's own messaging tap uses. Point both broker settings at the same broker.
+The first is the product's database. The other two are the product's broker and the suite's own messaging tap, so point both at the same broker.
 
 Run the script with `-Mode configured` to require all three exported values before testing. Both configured providers then win, so these chains start no containers.
-Using `-Mode container` keeps the same exported values, but does not require them. Missing values can therefore cause a chain to select a container.
+
 
 The table compares the recorded runs used in these lessons. The next two lessons explain the other two rows.
 

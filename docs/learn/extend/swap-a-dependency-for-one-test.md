@@ -31,7 +31,7 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 You want to test what happens when one dependency misbehaves, or returns a fixed value, and keep everything else real. The outbox tests of the OpenCSMS product do this: they replace the event publisher for one test with one that fails a few times, then delegates to the real publisher. Nothing else on that path is faked.
 
-The seam for this is `Override`. It works only when the run hosts the application in-process, because the replacement is registered in the application's own service container. When there is no container the framework says so: the attribute form skips, and the body form throws.
+The seam for this is `Override`. It needs the application hosted in-process, because the replacement goes into the application's own service container.
 
 ## Do it
 
@@ -87,9 +87,9 @@ public sealed class FrozenClockJourney
     }
 }`}
   callouts={[
-    {line: 10, title: 'Apply it before the first request', note: 'The override builds a dedicated server, and application services are resolved after it. This form takes a factory, so the instance is built lazily.'},
-    {line: 13, title: 'The request did not change', note: 'The test still sends one request through the composed client. Only the application\'s own provider changed.'},
-    {line: 21, title: 'The assertion proves it', note: 'The stamp comes from the application, so it equals the frozen value only if the replacement reached it.'},
+    {line: 10, title: 'Apply it before the first request', note: 'The override builds a dedicated server for this test.'},
+    {line: 13, title: 'The request did not change', note: 'Only the application\'s own provider changed.'},
+    {line: 21, title: 'The assertion proves it', note: 'The stamp equals the frozen value only if the replacement reached the application.'},
   ]}
   foot={<>Run it with <code>dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~FrozenClockJourney"</code>.</>}
 />
@@ -102,11 +102,10 @@ From a run of the sample with the test above:
 
 | Record | Reading |
 | --- | --- |
-| `service.substitute · TimeProvider`, 53.3 ms, with `service.type`, `service.server` and `service.replacement` | One operation per replacement, linked to the server entity. |
-| Server entity change `substituted`: `aspnetcore.server.substituted: true`, `aspnetcore.server.substitutions: System.TimeProvider` | The dedicated server records what it carries. |
-| The response artifact: `createdAtUtc: 2030-01-15T12:00:00+00:00` | The application resolved the frozen provider. |
-| `Initialize · ASP.NET Core server · Northstar` under the substitution, `reused: false` | A new server started for this test, not the shared one. |
-| Shared server initialization in setup: 291.2 ms. Dedicated start inside the substitution: 53.3 ms | The substituting test pays for a second server start. |
+| `service.substitute · TimeProvider`, 53.3 ms | one operation per replacement |
+| Server change `substituted`, `aspnetcore.server.substitutions: System.TimeProvider` | the dedicated server records what it carries |
+| The response artifact: `createdAtUtc: 2030-01-15T12:00:00+00:00` | the application used the frozen provider |
+| `Initialize · ASP.NET Core server · Northstar`, `reused: false` | a new server started for this test |
 
 Durations vary with the machine. The names and the states do not.
 
@@ -132,30 +131,21 @@ dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~TheSubstitu
 Remove-Item Env:ProtoTest__TargetUrl
 ```
 
-The runner reports one skipped test. The reason says this test substitutes `TimeProvider` on the `Default` application, which this run does not host in-process, so register it with `AddAspNetCoreServer` or name the in-process server in a mixed run. The test has no `[Application]`, so the gate falls back to `Default`. Nothing ran and nothing failed, which is the honest outcome for a substitution that cannot be served.
+The runner reports one skipped test. The reason names `TimeProvider`, the `Default` application, and the `AddAspNetCoreServer` registration it would need. A substitution that cannot be served skips instead of running against the wrong service.
 
 ## What happened
 
-An override does not touch the run's shared server. ProtoTest builds a dedicated server for that test with its substitutions, and releases it when the test ends. One test's replacement cannot leak into the next, and parallel tests that substitute differently each get their own server.
+An override does not touch the run's shared server. ProtoTest builds a dedicated server for that test with its substitutions, and releases it when the test ends. One test's replacement cannot leak into the next, and parallel tests that substitute differently each get their own server. The cost is a second server start.
 
-That is also the cost: a substituting test pays a second server start.
-
-Substitutions from the class, the method and the body combine into one set, and the later registration wins. When the application is not in-process, the two forms refuse differently:
-
-| Case | What happens |
-| --- | --- |
-| Attribute, application published (`BaseUrl` set) | The test skips with a reason naming the application. |
-| Attribute, container or loopback application | The test skips: there is no service container to reach. |
-| Body `Override`, application published | Throws `Application 'Api' runs at '<address>', so its services cannot be substituted`, naming the `ProtoTest:Applications:Api:BaseUrl` key. |
-| Body `Override`, container or loopback application | Throws, naming the missing `AddAspNetCoreServer` registration. |
+When the application does not run inside the test process, the attribute form skips and the body form, `Override`, throws with the configuration key or registration it needs.
 
 ## Check yourself
 
 <Checkpoint
-  question="A suite hosts Api in-process and points Web at a published address. A test carries [ReplaceService<T>(...)] with no Server set and selects Web. What does the runner report, and why does the live Api server not change it?"
-  verify={<>Run the attribute form with <code>ProtoTest__TargetUrl=http://127.0.0.1:5099</code> as in step 4 and read the skip reason.</>}>
+  question="Two tests run in parallel. One overrides TimeProvider with a frozen clock. Which time does the other test's application use, and why?"
+  verify={<>Compare the <code>reused: false</code> server under the substitution with the shared server in the run's setup.</>}>
 
-It skips with a reason naming Web. With no <code>Server</code> set, the gate follows the test's selected application, and a configured <code>BaseUrl</code> drops the in-process capability the substitution needs. The live Api server is irrelevant, because the gate resolves the selected application and not any server that happens to be running. Naming <code>Server = "Api"</code> would run the substitution there. The body form, <code>Override</code>, has no gate and throws instead.
+The real time. The override runs on a dedicated server built for that one test. The shared server, which the other test uses, never sees the replacement.
 
 </Checkpoint>
 

@@ -59,16 +59,11 @@ FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (1.79
   mismatch: $.status: expected past_due, actual active
 ```
 
-Read it top to bottom:
-
-- The failing test, with its duration from the recording.
-- The recorded error and the source location.
-- The selected failing operation, `assert.json.shape`: the deepest check that failed.
-- The cause: an assertion, with the JSON path and both values.
+It names the failing test, the error with its source line, the deepest failing check (`assert.json.shape`) and the cause: one JSON path with both values.
 
 ### 2. Connect an agent to the same file
 
-The MCP server is a .NET tool. Install it:
+MCP, the Model Context Protocol, is how a coding agent calls tools. ProtoTest's MCP server is a .NET tool that lets the agent read traces. Install it:
 
 ```bash
 dotnet tool install --global ProtoTest.Mcp
@@ -95,10 +90,10 @@ The server offers four read-only tools:
 
 | Tool | Returns |
 | --- | --- |
-| `list_runs` | Newest runs first, with outcome counts and the failing test ids. |
-| `get_failure` | One failure: outcome, error, source location, selected operation, mismatches and artifacts. |
-| `get_diagnosis` | The run's diagnosis, or one failure's context package with `detail: context`. |
-| `get_coverage` | Coverage totals and uncovered units from the report the run embedded. |
+| `list_runs` | the newest runs, with counts and failing test ids |
+| `get_failure` | one failure: error, source line, failing check, mismatches, artifacts |
+| `get_diagnosis` | the run's diagnosis, or one failure's context with `detail: context` |
+| `get_coverage` | coverage totals and uncovered units |
 
 Ask the agent to list the runs, then for the failure in the time drill. The names, the line and the mismatch come out identical to the summary, because the viewer, the summary and the tools select the failure the same way.
 
@@ -112,7 +107,7 @@ source: samples/Northstar.ProtoTest/FailureDrills.cs:36
 artifacts: rest-01-response, rest-01-expected-shape, scenario-summary.json
 ```
 
-The five lines are the test, the ancestor chain, the mismatch attributes, the source location and the artifacts the agent can reach.
+
 
 ### 4. Close the loop
 
@@ -129,18 +124,13 @@ Then post the digest, locally or from CI:
 prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
 ```
 
-The annotations go to stdout and the per-channel outcomes to stderr. With no target configured, the network channels skip with their reason, so a local run is safe. In CI, the feedback action uploads the trace, posts the comment and runs the verdict with the two reports. The [loop page](/docs/agent-workflows/loop) carries the workflow.
+The command prints one annotation per failure, for the pull request, on stdout. On stderr it says how each channel went, such as the comment or a webhook. With no target configured, those channels skip with their reason, so a local run is safe. In CI, the feedback action uploads the trace, posts the comment and runs the verdict with the two reports. The [loop page](/docs/agent-workflows/loop) carries the workflow.
 
 ## What happened
 
 The suite wrote one archive. The command and the agent both read that archive, so they could not tell different stories. The agent did not read the test output at all. It named the file, the line, the mismatch and the artifacts from recorded evidence.
 
-Its limits are part of the design:
-
-- It reads evidence that already exists. A run with no `.prototrace` is invisible, so write the trace first.
-- It is read-only: no suite runs, no file changes, and nothing leaves the machine by default.
-- Every payload is capped. An archive opened from a stream has no file to read, so its sources and artifact contents are absent, with that reason.
-- It never guesses. A failure whose evidence was not recorded is reported as unexplained, with a pointer to the viewer.
+The agent is read-only: it runs no suite and changes no file. It never guesses either. A failure whose evidence was not recorded is reported as unexplained.
 
 ## Check yourself
 
@@ -148,7 +138,7 @@ Its limits are part of the design:
   question="The agent asks for get_diagnosis with detail=context. Name two things it adds over the one-line summary, and one thing it can never do."
   verify={<>Read the diagnosis page's context package list, then ask your agent for the same drill and compare its answer with the summary output above.</>}>
 
-The context package adds the failing operation's ancestor chain, its attributes, the source snippet when the archive embedded it, the artifacts it can reach and the state it changed. It never guesses: the rules read recorded evidence only, and a failure whose evidence was not recorded stays unexplained.
+It adds the failing check's ancestor chain and the artifacts the agent can reach (also its attributes and source). It can never guess: a failure without recorded evidence stays unexplained.
 
 </Checkpoint>
 

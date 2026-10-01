@@ -177,7 +177,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Viewer
 
-- the docs walkthrough draws Steps and the failing check as the redesigned viewer does: the verdict in the rule's words, the phase band, the Framework switch, one-line rows with quiet kinds, folded setup and teardown summaries, and the inspector's text index, cards and folds. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- one ViewerMock component draws every viewer picture in the docs (the walkthrough's six views, the home's failing check and the coverage page's run header) from one file of the demo run's values, taken from the viewer itself; Timeline, State and Evidence now show the viewer's own rows, counts and positions. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - the walkthrough, ProtoTrace guide and viewer README describe Steps, Timeline, State and Evidence, diagnosis rules, untraced gaps and run selections, with updated demo excerpts. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - State uses the same test clock and phase marks as Timeline, shades the selected operation's time across the lifelines, and highlights the items and changes it touched. The ruler stays visible on phones. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - the run names attention with the diagnosis rules, marks untraced gaps on its timeline, lists every environment value and the run id, and opens run operations and tracked items in the inspector. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)

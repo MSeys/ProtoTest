@@ -16,8 +16,8 @@ try {
   const screens = {
     Run: ['Assertion', 'Runner failure', 'What this run could see'],
     Steps: ['Assertion', '1.01 s with no recorded operation', 'Teardown'],
-    Timeline: ['Operation excerpt', 'Assert response shape', '1.01 s with no recorded operation'],
-    State: ['invoice.issue', 'Invoice INV-202610-0001', 'Messaging consumer Default'],
+    Timeline: ['12 of 53 operations', 'Assert response shape', '1.01 s with no recorded operation'],
+    State: ['invoice.issue', 'Invoice INV-202610-0001', 'messaging:consumer:Default'],
     Evidence: ['scenario.started', '597539000012-rest-01-response', 'Assert response shape'],
     Check: ['Parts of this operation', 'FailureDrills.cs:36', 'Validated document'],
   };

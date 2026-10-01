@@ -3,8 +3,16 @@ import type {CSSProperties, ReactNode} from 'react';
 import styles from './styles.module.css';
 
 /*
- * Steps for test 12: the verdict, folded lifecycle and the gap before its failing call.
+ * Test 12's Steps as the viewer draws them: the verdict in the rule's words, the phase band with its
+ * untraced second, the framework switch, then the phases. Setup and teardown fold to one line that says what
+ * they did; the body is open. Names, durations and summaries are the viewer's for the demo archive.
  */
+
+const total = 1162.6093;
+const place = (start: number, length: number): CSSProperties => ({
+  left: `${(start / total) * 100}%`,
+  width: `max(2px, ${(length / total) * 100}%)`,
+});
 
 interface Check {
   label: string;
@@ -12,100 +20,150 @@ interface Check {
 }
 
 interface Row {
-  chip: string;
-  /** The execution-vocabulary token the chip is tinted with. */
+  kind: string;
+  /** The execution-vocabulary token the kind is tinted with. */
   tone: string;
   title: string;
   facts?: string;
+  app?: boolean;
   duration: string;
+  depth: number;
+  open?: boolean;
+  leaf?: boolean;
+  failed?: boolean;
   checks?: Check[];
-  /** A folded run of framework steps: drawn with the expand box and a quiet title. */
-  folded?: boolean;
-  depth?: number;
-  failed?: boolean;
-  start?: number;
-  length?: number;
+  start: number;
+  length: number;
 }
 
-interface Phase {
-  name: string;
-  marker: string;
-  duration: string;
-  failed?: boolean;
-  rows: Row[];
-}
-
-const mismatches = [
-  {property: 'status', expected: '"past_due"', actual: '"active"'},
-];
-
-const phases: Phase[] = [
+const body: Row[] = [
   {
-    name: 'Setup',
-    marker: '--phase-setup',
-    duration: '46 ms',
-    rows: [
-      {chip: 'Setup', tone: '--phase-setup', title: 'Setup', facts: 'Clients, tenant provisioning and authentication', duration: '46 ms', folded: true, start: 0, length: 46.325},
-    ],
+    kind: 'Data',
+    tone: '--type-data',
+    title: 'Create · IssueInvoiceRequest',
+    duration: '91 ms',
+    depth: 0,
+    open: true,
+    start: 47.245,
+    length: 90.971,
   },
   {
-    name: 'Execution',
-    marker: '--phase-execution',
-    duration: '1.11 s',
-    failed: true,
-    rows: [
-      {chip: 'Data', tone: '--type-data', title: 'Create · IssueInvoiceRequest', duration: '91 ms', start: 47.245, length: 90.971},
-      {chip: 'Gap', tone: '--muted', title: '1.01 s with no recorded operation', facts: 'Execution', duration: '1.01 s', start: 138.216, length: 1006.522},
-      {
-        chip: 'Call',
-        tone: '--type-call',
-        title: 'REST · GET /api/v1/organization',
-        duration: '7.6 ms',
-        failed: true,
-        start: 1144.738,
-        length: 7.552,
-        checks: [
-          {label: 'status · 200 OK', passed: true},
-          {label: 'response shape', passed: false},
-        ],
-      },
-    ],
+    kind: 'Data',
+    tone: '--type-data',
+    title: 'Build · IssueInvoiceRequest',
+    duration: '667 µs',
+    depth: 1,
+    leaf: true,
+    start: 47.3,
+    length: 0.667,
   },
   {
-    name: 'Teardown',
-    marker: '--phase-teardown',
-    duration: '7.4 ms',
-    rows: [
-      {chip: 'Teardown', tone: '--phase-teardown', title: 'Teardown', facts: 'Release owned resources and dispose the context', duration: '7.4 ms', folded: true, start: 1155.097, length: 7.396},
-    ],
+    kind: 'Data',
+    tone: '--type-data',
+    title: 'Provision · IssueInvoiceRequest → InvoiceResponse',
+    facts: 'Context set, and 1 more',
+    duration: '90 ms',
+    depth: 1,
+    open: true,
+    start: 48.1,
+    length: 90,
+  },
+  {
+    kind: 'Northstar',
+    tone: '--type-custom',
+    title: 'invoice.issue',
+    facts: 'Invoice created',
+    app: true,
+    duration: '6 µs',
+    depth: 2,
+    leaf: true,
+    start: 134.7,
+    length: 0.006,
   },
 ];
+
+const call: Row = {
+  kind: 'Call',
+  tone: '--type-call',
+  title: 'REST · GET /api/v1/organization',
+  duration: '7.6 ms',
+  depth: 0,
+  failed: true,
+  start: 1144.738,
+  length: 7.552,
+  checks: [
+    {label: 'status · 200 OK', passed: true},
+    {label: 'response shape', passed: false},
+  ],
+};
 
 function tone(token: string): CSSProperties {
   return {'--node-color': `var(${token})`} as CSSProperties;
 }
 
+function Chevron({open}: {open?: boolean}): ReactNode {
+  return <i className={`${styles.vChevron} ${open ? styles.vChevronOpen : ''}`} aria-hidden="true" />;
+}
+
 function StepRow({row}: {row: Row}): ReactNode {
   return (
-    <div className={`${styles.row} ${row.failed ? styles.failed : ''}`} style={{'--depth': row.depth ?? 0} as CSSProperties}>
-      {row.folded ? <i className={styles.fold} aria-label="folded" /> : <i className={styles.node} style={tone(row.tone)} />}
-      <span className={styles.kind} style={tone(row.tone)}>
-        {row.chip}
-      </span>
-      <span className={`${styles.label} ${row.folded ? styles.quiet : ''} ${row.facts ? '' : styles.wide}`}>{row.title}</span>
-      {row.facts && <span className={styles.facts}>{row.facts}</span>}
-      <span className={styles.duration}>{row.duration}</span>
-      <span className={styles.stepTrack}><i className={row.chip === 'Gap' ? styles.gapBar : undefined} style={{left: `${(row.start ?? 0) / 1162.6093 * 100}%`, width: `${(row.length ?? 0) / 1162.6093 * 100}%`, ...(row.chip === 'Gap' ? {} : {background: `var(${row.tone})`})}} /></span>
-      {row.checks && (
-        <span className={styles.checks}>
-          {row.checks.map((check) => (
-            <span key={check.label} className={`${styles.check} ${check.passed ? '' : styles.checkFailed}`}>
+    <div className={styles.vNest} style={{'--depth': row.depth} as CSSProperties}>
+      <div className={`${styles.vLine} ${row.failed ? styles.vLineFailed : ''}`}>
+        {row.leaf ? <span /> : <Chevron open={row.open} />}
+        <span className={styles.vPick}>
+          <span className={styles.vKind} style={tone(row.tone)}>
+            {row.kind}
+          </span>
+          <span className={styles.vTitle}>{row.title}</span>
+          {(row.facts || row.app) && (
+            <span className={styles.vFacts}>
+              {row.app && <b className={styles.vApp}>app</b>}
+              {row.facts}
+            </span>
+          )}
+        </span>
+        <span className={styles.vChecks}>
+          {row.checks?.map((check) => (
+            <span key={check.label} className={check.passed ? styles.vCheck : styles.vCheckFailed}>
               <b aria-hidden="true">{check.passed ? '✓' : '×'}</b>
               {check.label}
             </span>
           ))}
         </span>
-      )}
+        <span className={styles.vBar}>
+          <i
+            style={{...place(row.start, row.length), background: row.failed ? 'var(--danger)' : undefined}}
+          />
+        </span>
+        <span className={styles.vDuration}>{row.duration}</span>
+      </div>
+    </div>
+  );
+}
+
+function PhaseHead({
+  name,
+  marker,
+  summary,
+  duration,
+  open,
+  failed,
+}: {
+  name: string;
+  marker: string;
+  summary: string;
+  duration: string;
+  open?: boolean;
+  failed?: boolean;
+}): ReactNode {
+  return (
+    <div className={styles.vPhaseHead} style={{'--marker': `var(${marker})`} as CSSProperties}>
+      <Chevron open={open} />
+      <i className={styles.marker} aria-hidden="true" />
+      <strong>{name}</strong>
+      <span className={styles.vSummary}>{summary}</span>
+      {failed && <b className={styles.phaseFailed}>Failed</b>}
+      <small>{duration}</small>
     </div>
   );
 }
@@ -126,38 +184,91 @@ export default function StepsView(): ReactNode {
         </span>
       </header>
 
-      <div className={styles.card}>
-        <div className={styles.cardHead}>
-          <span className={styles.kind} style={tone('--type-assertion')}>
-            Assertion
-          </span>
-          <strong>Assert response shape</strong>
-          <span className={styles.verdict}>Execution, +1.15 s</span>
-          <span className={styles.on}>on REST · GET /api/v1/organization</span>
-        </div>
-        <div className={styles.verdictDetail}>
-          {mismatches.map((mismatch) => (
-            <div key={mismatch.property} className={styles.mismatch}>
-              <span>$.{mismatch.property}: expected {mismatch.expected}, got <strong>{mismatch.actual}</strong></span>
-            </div>
-          ))}
-        </div>
+      <section className={styles.vVerdict} aria-label="Why this test did not pass">
+        <span className={styles.vRule}>Assertion</span>
+        <strong>Assert response shape</strong>
+        <span className={styles.on}>on REST · GET /api/v1/organization</span>
+        <p>
+          $.status: expected &quot;past_due&quot;, got <b>&quot;active&quot;</b>
+        </p>
+      </section>
+
+      <div className={styles.vBand} aria-hidden="true">
+        <i style={{...place(0, 46.325), background: 'var(--phase-setup)'}} />
+        <i style={{...place(46.349, 1108.669), background: 'var(--phase-execution)'}} />
+        <i className={styles.gapBar} style={place(138.216, 1006.522)} />
+        <i style={{...place(1155.097, 7.396), background: 'var(--phase-teardown)'}} />
+      </div>
+      <p className={styles.vLegend}>
+        <span style={{'--marker': 'var(--phase-setup)'} as CSSProperties}>
+          Setup <b>46 ms</b>
+        </span>
+        <span style={{'--marker': 'var(--phase-execution)'} as CSSProperties}>
+          Execution <b>1.11 s</b>, 1.01 s without an operation
+        </span>
+        <span style={{'--marker': 'var(--phase-teardown)'} as CSSProperties}>
+          Teardown <b>7.4 ms</b>
+        </span>
+      </p>
+
+      <div className={styles.vToolbar}>
+        <span>Framework</span>
+        <span className={styles.vSegment}>Show</span>
+        <span className={`${styles.vSegment} ${styles.vSegmentOn}`}>Dim</span>
+        <span className={styles.vSegment}>Hide</span>
       </div>
 
-      <div className={styles.rows}>
-        {phases.map((phase) => (
-          <section key={phase.name} className={styles.phase}>
-            <header className={styles.phaseHead} style={{'--marker': `var(${phase.marker})`} as CSSProperties}>
-              <i className={styles.marker} />
-              <span>{phase.name}</span>
-              {phase.failed && <b className={styles.phaseFailed}>Failed</b>}
-              <small>{phase.duration}</small>
-            </header>
-            {phase.rows.map((row) => (
-              <StepRow key={`${phase.name}-${row.title}`} row={row} />
+      <div className={styles.vPhases}>
+        <section className={styles.vPhase}>
+          <PhaseHead
+            name="Setup"
+            marker="--phase-setup"
+            summary="20 operations, 6 clients initialized, Create · ProvisionTenantRequest (45 ms)"
+            duration="46 ms"
+          />
+        </section>
+        <section className={styles.vPhase}>
+          <PhaseHead
+            name="Execution"
+            marker="--phase-execution"
+            summary="9 operations, Create · IssueInvoiceRequest (91 ms), REST · GET /api/v1/organization (7.6 ms)"
+            duration="1.11 s"
+            open
+            failed
+          />
+          <div className={styles.vRows}>
+            {body.map((row) => (
+              <StepRow key={row.title} row={row} />
             ))}
-          </section>
-        ))}
+            <div className={`${styles.vLine} ${styles.vGap}`}>
+              <i className={styles.vGapMark} aria-hidden="true" />
+              <span className={styles.vGapText}>
+                <strong>1.01 s with no recorded operation</strong>
+                <small>
+                  Until REST · GET /api/v1/organization started, +1.15 s into the test. A wait, or work the
+                  trace could not see.
+                </small>
+              </span>
+              <span className={styles.vChecks} />
+              <span className={styles.vBar}>
+                <i className={styles.gapBar} style={place(138.216, 1006.522)} />
+              </span>
+              <span className={styles.vDuration}>1.01 s</span>
+            </div>
+            <StepRow row={call} />
+            <p className={styles.vObserved}>
+              Observed http.response · GET /api/v1/organization <span>on Northstar·Northstar</span>
+            </p>
+          </div>
+        </section>
+        <section className={styles.vPhase}>
+          <PhaseHead
+            name="Teardown"
+            marker="--phase-teardown"
+            summary="21 operations, 4 resources released, 3 files published, Cleanup · TenantResponse (3.1 ms)"
+            duration="7.4 ms"
+          />
+        </section>
       </div>
     </div>
   );

@@ -133,7 +133,6 @@
   border-left: 2px solid transparent;
 }
 
-
 .attRow + .attRow { border-top: 1px solid var(--border); }
 
 .attFailed { border-left-color: var(--danger); background: var(--danger-soft); }
@@ -185,38 +184,8 @@
 .outcomeDot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .outcome em { color: var(--muted); font-size: var(--text-body); font-style: normal; font-weight: var(--weight-regular); }
 
-/* The verdict names the check, its call and the first difference. */
-.card {
-  margin: var(--space-3) 0 0;
-  padding: var(--space-3);
-  display: grid;
-  gap: var(--space-3);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--danger);
-  border-radius: var(--radius-control);
-  background: var(--danger-soft);
-}
-
-.cardHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
-.cardHead strong { font-size: var(--text-title); }
-.verdict { color: var(--danger); font-size: var(--text-strong); font-weight: var(--weight-semibold); }
 .on { color: var(--muted); font-size: var(--text-strong); }
 
-.shape { overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-chip); background: var(--surface); }
-
-.shapeHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-1) var(--space-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-  font-size: var(--text-strong);
-  font-weight: var(--weight-semibold);
-}
-
-.shapeHead small { margin-left: auto; font-size: var(--text-body); font-weight: var(--weight-regular); }
 .matched { color: var(--success); }
 .differs { color: var(--danger); }
 
@@ -237,46 +206,11 @@
 .mismatch i { color: var(--danger); font-style: normal; }
 .mismatch strong { color: var(--danger); }
 
-.rows { padding: var(--space-3) 0 0; }
-
-.phase + .phase { margin-top: var(--space-2); }
-
-.phaseHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-1);
-  border-bottom: 1px solid var(--border);
-}
-
 .marker { width: 8px; height: 8px; border-radius: var(--radius-hairline); background: var(--marker); }
-.phaseHead span { flex: 1 1 auto; font-size: var(--text-strong); font-weight: var(--weight-bold); }
-.phaseHead small { color: var(--muted); font-size: var(--text-body); }
+
 .phaseFailed { color: var(--danger); font-size: var(--text-body); font-weight: var(--weight-semibold); }
 
-/* The viewer's story row: node, kind chip, title, facts, duration - and the checks on their call. */
-.row {
-  margin-left: calc(var(--depth) * var(--space-5));
-  padding: var(--space-1) var(--space-1) var(--space-1) 0;
-  display: grid;
-  grid-template-columns: 10px auto minmax(0, 1.6fr) minmax(0, 1fr) 52px;
-  align-items: center;
-  gap: var(--space-1) var(--space-3);
-}
-
 .failed { background: var(--danger-soft); box-shadow: inset 2px 0 0 var(--danger); }
-
-.fold {
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-hairline);
-  background:
-    linear-gradient(var(--muted), var(--muted)) center / 6px 1px no-repeat,
-    linear-gradient(var(--muted), var(--muted)) center / 1px 6px no-repeat;
-}
-
-.node { justify-self: center; width: 7px; height: 7px; transform: rotate(45deg); background: var(--node-color, var(--dim)); }
 
 .kind {
   justify-self: start;
@@ -290,54 +224,24 @@
   white-space: nowrap;
 }
 
-.label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-strong); }
-.quiet { color: var(--muted); }
-/* Without facts, the title takes their column too. */
-.wide { grid-column: span 2; }
-.facts { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
-.duration { color: var(--muted); font-size: var(--text-body); text-align: right; white-space: nowrap; }
-.stepTrack { grid-column: 3 / -1; position: relative; height: 5px; background: var(--surface-2); }
-.stepTrack i { position: absolute; height: 5px; min-width: 2px; }
-.verdictDetail { font: var(--text-body) var(--font-mono); }
-
 /* Narrow frames stack the row: marker and chip on the first line with the duration, the title
    and facts wrap underneath, the checks keep the full width. */
 @container (max-width: 34rem) {
-  .row { grid-template-columns: 10px minmax(0, 1fr) auto; row-gap: var(--space-1); }
-  .fold, .node { grid-column: 1; grid-row: 1; margin-top: var(--space-1); }
+  
+  
   .kind { grid-column: 2; grid-row: 1; }
-  .duration { grid-column: 3; grid-row: 1; }
-  .label, .wide { grid-column: 2 / -1; grid-row: 2; overflow: visible; white-space: normal; }
-  .facts { grid-column: 2 / -1; grid-row: 3; overflow: visible; white-space: normal; overflow-wrap: break-word; }
-  .checks { grid-column: 2 / -1; }
-  .stepTrack { grid-column: 2 / -1; }
+  
+  
+  
+  
+  
 }
-
-.checks { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: var(--space-1); }
-
-.check {
-  padding: 0 var(--space-2);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: var(--text-body);
-  line-height: 1.8;
-}
-
-.check b { color: var(--success); }
-.checkFailed { border-color: var(--danger); color: var(--danger); font-weight: var(--weight-semibold); }
-.checkFailed b { color: var(--danger); }
 
 /* Check view ---------------------------------------------------------------- */
 
 .checkView { padding: 0 var(--space-4) var(--space-1); display: grid; gap: var(--space-2); }
 
 .crumb { margin: 0; color: var(--muted); font-size: var(--text-strong); overflow-wrap: anywhere; }
-.crumbOp { color: var(--blueprint); font: var(--text-body) var(--font-mono); }
 
 .checkHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .checkHead strong { font-size: var(--text-title); }
@@ -347,26 +251,9 @@
 
 .checkStatusOutcome { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); }
 
-.checkOp { margin: 0; color: var(--muted); font: var(--text-body) var(--font-mono); overflow-wrap: anywhere; }
-
-.exception {
-  padding: var(--space-3);
-  display: grid;
-  gap: var(--space-1);
-  border-left: 2px solid var(--danger);
-  border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
-  background: var(--danger-soft);
-  overflow-wrap: break-word;
-}
-
-.exception b { color: var(--danger); font: var(--weight-semibold) var(--text-strong) var(--font-mono); }
-.exceptionNote { color: var(--muted); font-size: var(--text-strong); }
-
 /* The recorded line, as the viewer's inspector shows it. */
 .source { min-width: 0; display: grid; gap: var(--space-1); }
-.sourceHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); }
-.sourceHead b { font: var(--weight-semibold) var(--text-strong) var(--font-mono); }
-.sourceHead small { min-width: 0; color: var(--muted); font-size: var(--text-body); overflow-wrap: anywhere; }
+
 .source pre {
   margin: 0;
   padding: var(--space-2) 0;
@@ -397,8 +284,7 @@
 .evidenceRow { display: grid; grid-template-columns: 64px auto minmax(0, 1fr); align-items: start; gap: var(--space-2); padding-block: var(--space-3); border-bottom: 1px solid var(--border); font-size: var(--text-body); }
 .evidenceRow strong { min-width: 0; overflow-wrap: anywhere; }
 .evidenceRow small { grid-column: 3; color: var(--muted); font-size: var(--text-meta); overflow-wrap: anywhere; }
-.detailsIndex { display: flex; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-meta); }
-.detailsIndex a { border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 0 var(--space-2); color: var(--muted); }
+
 .runDetails { margin: var(--space-3); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--space-2); font: var(--text-meta) var(--font-mono); }
 .runDetails dt, .runDetails dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 
@@ -410,3 +296,115 @@
   .runDetails { grid-template-columns: minmax(0, 1fr); }
   .runDetails dd { margin-bottom: var(--space-2); }
 }
+
+/* The redesigned viewer, drawn the way it draws itself --------------------- */
+
+/* Verdict: the rule as a word, the check, its call, the first difference. */
+.vVerdict {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-control);
+  background: var(--danger-soft);
+}
+.vVerdict strong { font-size: var(--text-title); }
+.vVerdict p { flex: 1 1 100%; margin: 0; font: var(--text-body)/var(--leading) var(--font-mono); overflow-wrap: anywhere; }
+.vVerdict p b { color: var(--danger); }
+.vRule { color: var(--danger); font-size: var(--text-body); font-weight: var(--weight-bold); }
+
+/* Phase band and its legend, with the untraced second hatched. */
+.vBand { position: relative; height: 8px; margin: var(--space-3) 0 var(--space-1); border-radius: var(--radius-hairline); background: var(--surface-2); overflow: hidden; }
+.vBand i { position: absolute; top: 0; bottom: 0; }
+.vBand .gapBar, .vBar .gapBar { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 55%, transparent) 0 2px, transparent 2px 5px); }
+.vLegend { margin: 0; display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); color: var(--muted); font-size: var(--text-body); }
+.vLegend span::before { content: ""; display: inline-block; width: 10px; height: 4px; margin-right: var(--space-1); border-radius: var(--radius-hairline); background: var(--marker); vertical-align: middle; }
+.vLegend b { color: var(--text); font-weight: var(--weight-semibold); }
+
+/* The framework switch beside the view tabs. */
+.vToolbar { margin: var(--space-3) 0 var(--space-2); display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); color: var(--dim); font-size: var(--text-body); }
+.vToolbar > span:first-child { margin-right: var(--space-1); }
+.vSegment { padding: 0 var(--space-2); border-radius: var(--radius-chip); color: var(--muted); line-height: 1.8; }
+.vSegmentOn { background: var(--surface-2); color: var(--text); font-weight: var(--weight-semibold); }
+
+/* Phases: a head that says what the phase did, and its rows when it is open. */
+.vPhases { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.vPhase { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); overflow: clip; }
+.vPhaseHead { padding: var(--space-2) var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+.vPhaseHead strong { font-size: var(--text-strong); }
+.vPhaseHead small { margin-left: auto; color: var(--muted); font-size: var(--text-body); white-space: nowrap; }
+.vSummary { min-width: 0; flex: 1 1 0; overflow: hidden; color: var(--muted); font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
+.vRows { padding: 0 var(--space-2) var(--space-2); border-top: 1px solid var(--border); }
+.vChevron { width: 6px; height: 6px; flex: none; margin: 0 var(--space-1); border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); }
+.vChevronOpen { transform: rotate(45deg); }
+
+/* A step: one line, the kind as quiet text, only a failing check outlined, a thin bar with no track. */
+.vNest { margin-left: calc(var(--depth) * var(--space-4)); }
+.vLine {
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto 90px 52px;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-chip);
+}
+.vLineFailed { background: var(--danger-soft); box-shadow: inset 2px 0 0 var(--danger); }
+.vPick { min-width: 0; display: flex; align-items: baseline; gap: var(--space-2); }
+.vKind { flex: none; color: color-mix(in srgb, var(--node-color) 70%, var(--muted)); font-size: var(--text-body); font-weight: var(--weight-medium); }
+.vTitle { flex: 0 1 auto; min-width: 0; overflow: hidden; font-size: var(--text-strong); text-overflow: ellipsis; white-space: nowrap; }
+.vFacts { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
+.vApp { margin-right: var(--space-1); padding: 0 var(--space-1); border-radius: var(--radius-hairline); background: var(--blueprint-soft); color: var(--blueprint); font-weight: var(--weight-semibold); }
+.vChecks { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); }
+.vCheck, .vCheckFailed { padding: 0 var(--space-2); display: inline-flex; align-items: center; gap: var(--space-1); border: 1px solid transparent; border-radius: var(--radius-pill); color: var(--muted); font-size: var(--text-body); line-height: 1.8; white-space: nowrap; }
+.vCheck b { color: var(--success); }
+.vCheckFailed { border-color: var(--danger); color: var(--danger); font-weight: var(--weight-semibold); }
+.vBar { position: relative; height: 4px; }
+.vBar i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-hairline); background: color-mix(in srgb, var(--muted) 70%, transparent); }
+.vDuration { color: var(--muted); font-size: var(--text-body); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vGap { min-height: 40px; }
+.vGapMark { width: 12px; height: 9px; justify-self: center; border-radius: var(--radius-hairline); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 55%, transparent) 0 2px, transparent 2px 5px); }
+.vGapText { min-width: 0; display: grid; gap: 1px; }
+.vGapText strong { font-size: var(--text-strong); font-weight: var(--weight-semibold); }
+.vGapText small { color: var(--muted); font-size: var(--text-body); }
+.vGap .vDuration { color: var(--text); font-weight: var(--weight-semibold); }
+.vObserved { margin: 1px 0 var(--space-1) calc(14px + var(--space-2)); font-size: var(--text-strong); }
+.vObserved span { color: var(--muted); font-size: var(--text-body); }
+
+/* Narrow frames keep the name and the duration; checks move under the name, the bar steps back. */
+@container (max-width: 34rem) {
+  .vLine { grid-template-columns: 14px minmax(0, 1fr) 52px; }
+  .vChecks { grid-column: 2 / -1; justify-content: flex-start; }
+  .vChecks:empty, .vBar { display: none; }
+  .vDuration { grid-row: 1; grid-column: 3; }
+  .vFacts { display: none; }
+  .vSummary { display: none; }
+}
+
+/* The inspector: a text index, cards for documents, folded lines for what repeats. */
+.vIndex { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); color: var(--muted); font-size: var(--text-body); }
+.vIndexHot { color: var(--danger); }
+.vCard { min-width: 0; overflow: clip; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-sunken); }
+.vCard > header { padding: var(--space-1) var(--space-3); display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.vCard > header strong { font-size: var(--text-strong); }
+.vCard > header small { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--text-body); text-overflow: ellipsis; white-space: nowrap; }
+.vCard .mismatch { background: var(--surface); }
+.vMono { font-family: var(--font-mono); }
+.vIndex a { color: var(--muted); }
+.vIndex a:hover { color: var(--text); }
+.vIndex .vIndexHot { color: var(--danger); }
+.vFold > summary { display: flex; align-items: center; gap: var(--space-2); color: var(--muted); font-size: var(--text-strong); font-weight: var(--weight-semibold); list-style: none; cursor: pointer; }
+.vFold > summary::-webkit-details-marker { display: none; }
+.vFold > summary::before { content: ""; width: 5px; height: 5px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform var(--motion-fast) var(--motion-ease); }
+.vFold[open] > summary::before { transform: rotate(45deg); }
+.vFold summary small { color: var(--dim); font-weight: var(--weight-regular); }
+.vFoldBody { margin: var(--space-1) 0 0; color: var(--muted); font: var(--text-body)/var(--leading) var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.vBlock { display: grid; gap: var(--space-1); }
+.vBlock h4 { margin: 0; color: var(--muted); font-size: var(--text-strong); font-weight: var(--weight-semibold); }
+.vFileRow { padding: var(--space-1) var(--space-2); display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--text-body); }
+.vFileRow span { color: var(--muted); font-weight: var(--weight-semibold); }
+.vFileRow strong { min-width: 0; overflow: hidden; font-weight: var(--weight-regular); text-overflow: ellipsis; white-space: nowrap; }
+.vFileRow small { margin-left: auto; color: var(--muted); white-space: nowrap; }

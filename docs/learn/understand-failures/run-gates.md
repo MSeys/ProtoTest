@@ -2,7 +2,7 @@
 id: run-gates
 title: Why the run is red when every test is green
 sidebar_label: Run gates
-sidebar_position: 5
+sidebar_position: 6
 description: "Read the run gate that turns an Error finding into a failed run while the test list stays green."
 ---
 
@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 5 of 8"
+  step="Lesson 6 of 9"
   minutes={7}
   outcomes={[
     'Read the gate row that a finding feeds',

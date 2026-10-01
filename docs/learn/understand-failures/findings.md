@@ -2,7 +2,7 @@
 id: findings
 title: Why a passing test can still leave an error
 sidebar_label: Findings
-sidebar_position: 4
+sidebar_position: 5
 description: "Break a teardown on purpose and follow it into the report as a finding, which explains an outcome without replacing the test result."
 ---
 
@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 4 of 8"
+  step="Lesson 5 of 9"
   minutes={7}
   outcomes={[
     'Tell an observation, a finding and an attachment apart',
@@ -23,7 +23,7 @@ import Link from '@docusaurus/Link';
     'Say why a finding never replaces the test result',
   ]}
   needs={[
-    <>The previous lesson, <Link to="/learn/understand-failures/the-trace-as-the-feedback-loop">the trace as a feedback loop</Link></>,
+    <>The previous lesson, <Link to="/learn/understand-failures/diagnose-a-flaky-test">diagnose a flaky test</Link></>,
     'The sample cloned, to break a teardown. Reading the report alone also works.',
   ]}
 />

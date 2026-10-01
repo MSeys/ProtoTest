@@ -31,7 +31,8 @@ import Link from '@docusaurus/Link';
 
 A test can pass and still leave unwanted data behind. In a shared store, that data can affect later tests or accumulate across runs. Decide who owns its cleanup.
 
-This lesson follows the sample's tenant cleanup through the trace. It shows what the cleanup callback reported and what still needs checking outside the trace.
+This lesson follows the cleanup of the tenant that [Give each test its own state](/learn/good-tests/per-test-state-and-cleanup) created.
+It reads the trace to see what the cleanup callback reported and what still needs checking outside the trace.
 
 ## Do it
 

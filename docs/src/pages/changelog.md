@@ -236,6 +236,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `ReplaceClient` with the already-registered instance keeps its owner instead of double-disposing. [Clients](https://prototest.dev/docs/foundation/clients)
 - trace snapshots can be read while other tests record observations, attachments and findings. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - the test-clock lookup is scoped to its host, so two hosts sharing a prefix keep separate clocks. [Time](https://prototest.dev/docs/foundation/time)
+- diagnostic request URLs keep a root-relative path on Linux and macOS instead of turning it into a `file://` address. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - `ProtoClock.Advance` is atomic, so concurrent advances add up and each records its event. [Time](https://prototest.dev/docs/foundation/time)
 - capability conditions are evaluated per declaration; one server no longer skips another. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
 - a conditional declaration's key set compares by content, so a repeat leaves one declaration. [Skip conditions](https://prototest.dev/docs/foundation/skip-conditions)
@@ -332,6 +333,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - framework routes (`/_`, `/.well-known`) are never page-inventoried. [Web](https://prototest.dev/docs/integrations/web/)
 - `WebDownload` implements `IProtoBinaryContent`, so a download feeds `ProtoSheets.Open` in one line. [Web](https://prototest.dev/docs/integrations/web/)
 - sessions key by name and application, so the same name under two applications stays distinct. [Web](https://prototest.dev/docs/integrations/web)
+- assertion, wait and actionability messages end their last observation with one full stop. [Interactions](https://prototest.dev/docs/integrations/web/interactions)
 
 #### Sheets
 

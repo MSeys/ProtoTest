@@ -37,7 +37,7 @@ shows. Suite startup, through the first completed request, is 22 ms with tracing
 
 ## Where the time goes in a real suite \{#opencsms-at-1000-tests}
 
-The OpenCSMS suite runs the product itself: the API, the billing worker,
+The [OpenCSMS](https://github.com/MSeys/OpenCsms) suite runs the product itself: the API, the billing worker,
 and real PostgreSQL and RabbitMQ. Its `eng/run-benchmark.ps1` times a health-check test, 1,000 iterations after
 100 warmups, on the same machine. The run's own trace shows where each test's 36 ms goes:
 

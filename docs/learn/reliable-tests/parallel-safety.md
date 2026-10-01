@@ -13,7 +13,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
 
 <Lesson
   track="Reliable tests"
-  step="Lesson 3 of 3"
+  step="Lesson 3 of 4"
   minutes={7}
   outcomes={[
     'Spot the shared name that breaks tests in parallel',
@@ -124,4 +124,4 @@ The test context associates state and evidence with the test's async flow. It do
 ## Go deeper
 
 - [Concurrency](/docs/foundation/concurrency): what flows with the context, what loses it, and how a suite opts in.
-- Next track: [Read a failing trace](/learn/understand-failures/read-a-failing-trace).
+- Next lesson: [Wait for a read that lags a write](/learn/reliable-tests/wait-for-a-lagging-read).

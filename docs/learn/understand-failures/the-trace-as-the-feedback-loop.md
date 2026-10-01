@@ -14,7 +14,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 3 of 8"
+  step="Lesson 3 of 9"
   minutes={8}
   outcomes={[
     'Turn a failed check into one change to the test',
@@ -115,4 +115,4 @@ The visibility test sent invalid input but expected successful creation. Check t
 ## Go deeper
 
 - [The trace reference](/docs/observability/prototrace): every operation a trace records, and the viewer that draws it.
-- [Findings](/learn/understand-failures/findings): the next lesson, for runs that fail while every test passes.
+- [Diagnose a flaky test](/learn/understand-failures/diagnose-a-flaky-test): the next lesson, for a test that passes in one run and fails in the next.

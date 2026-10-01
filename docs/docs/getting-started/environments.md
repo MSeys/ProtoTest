@@ -198,7 +198,7 @@ Each key also works as an environment variable, with `__` in place of the colon 
 The [recipes](../recipes/overview.md) work in all three modes unchanged: [REST, then GraphQL](../recipes/rest-then-graphql.md), [a write that lands in the database](../recipes/write-lands-in-the-database.md) and [API, then browser](../recipes/api-then-browser.md).
 
 :::note[The same shapes in a product suite]
-OpenCSMS, an independent EV charging platform in its own repository, runs one suite in every shape on this page. It adds one more: an Aspire AppHost that starts the product's own processes. Each target declares its providers in priority order with `UseConfigured()` first, so the environment decides which link serves the store, the broker and the application.
+[OpenCSMS](https://github.com/MSeys/OpenCsms), an independent EV charging platform in its own repository, runs one suite in every shape on this page. It adds one more: an Aspire AppHost that starts the product's own processes. Each target declares its providers in priority order with `UseConfigured()` first, so the environment decides which link serves the store, the broker and the application.
 
 ![The OpenCSMS station screen showing a charge point, its sessions and the operator's remote-start panel.](/images/opencsms/station-timeline.png)
 :::

@@ -113,7 +113,7 @@ The test arranged its own tenant and project. Its authenticated request selected
 
 This holds under parallel runs too: each test keeps its own tenant credentials in its own context.
 
-Cleanup is a separate step. Northstar's tenant provisioner returns a cleanup that deletes the tenant, and ProtoTest registers it as a test-owned resource. Lesson 6 follows it.
+Cleanup is a separate step. Northstar's tenant provisioner returns a cleanup that deletes the tenant, and ProtoTest registers it as a test-owned resource. Lesson 6, [What a test leaves behind](/learn/good-tests/what-a-test-leaves-behind), follows it.
 
 ## Check yourself
 

@@ -2,7 +2,7 @@
 id: contract-coverage
 title: What did my suite never check?
 sidebar_label: Contract coverage
-sidebar_position: 6
+sidebar_position: 7
 description: "Read what a run checked about your API's contract, endpoints, statuses and fields, next to what it only saw."
 ---
 
@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 6 of 8"
+  step="Lesson 7 of 9"
   minutes={8}
   outcomes={[
     'Tell contract coverage from code coverage',

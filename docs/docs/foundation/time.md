@@ -59,13 +59,58 @@ ProtoHost.CurrentHost.Clock.Advance(TimeSpan.FromDays(1));
 
 The bridge exists only where the run hosts the process: the in-process application server and a hosted worker. A [loopback](../integrations/aspnetcore.md#choosing-how-the-application-runs), container, AppHost or published application resolves its own `TimeProvider`, so the run cannot move its time. Otherwise `[RequiresTestClock]` skips the journeys that need it.
 
+## Waiting for work on a real timer
+
+Some work runs on its own timer, such as a background dispatcher or an outbox worker. Moving the test clock does not run it sooner. Poll the read that reports the work, with a deadline, instead of sleeping:
+
+```csharp
+var delivered = await ProtoPolling.PollAsync(
+    async cancellationToken =>
+    {
+        using var page = await Proto.Context.Rest().GetAsync(
+            "/api/v1/webhook-deliveries",
+            new { status = WebhookDeliveryStatuses.Delivered },
+            cancellationToken);
+        return page.ReadRequired<CursorPage<WebhookDeliveryResponse>>().Items;
+    },
+    deliveries => deliveries.Count > 0,
+    timeout: TimeSpan.FromSeconds(5),
+    pollInterval: TimeSpan.FromMilliseconds(100),
+    Proto.Context.CancellationToken);
+
+Assert.That(delivered.Satisfied, Is.True);
+```
+
+`PollAsync` lives in `ProtoTest.Core`:
+
+```csharp
+public static ValueTask<ProtoPollResult<T>> PollAsync<T>(
+    Func<CancellationToken, ValueTask<T>> probe,
+    Func<T, bool> isSatisfied,
+    TimeSpan timeout,
+    TimeSpan pollInterval,
+    CancellationToken cancellationToken);
+
+public readonly record struct ProtoPollResult<T>(T Value, bool Satisfied, TimeSpan Elapsed);
+```
+
+- The first probe runs at once. The poll returns as soon as `isSatisfied` holds, so a fast system ends the wait early.
+- After the timeout, the poll returns the last observation with `Satisfied = false`. It does not throw. The test decides what a timeout means, usually with an assertion that names what never arrived.
+- The wait between probes is `pollInterval`, or the time left when that is shorter. `ProtoPolling.DefaultInterval` is 50 ms.
+- `timeout` and `pollInterval` must be positive, or the call throws `ArgumentOutOfRangeException`. Cancelling the token throws `OperationCanceledException`.
+- An exception from the probe ends the poll and propagates. Catch it inside the probe if a failed read means "not yet".
+- `Elapsed` and the deadline use real time, not the test clock.
+- The poll writes no trace entry of its own. A probe that calls a ProtoTest client writes that call's entry, so the trace shows one entry per probe.
+
+The lesson [Wait for a read that lags a write](/learn/reliable-tests/wait-for-a-lagging-read) walks through this test.
+
 ## What the trace records
 
 Advancing a test's clock records a `clock` entity with its new value and writes a `clock.advance` event carrying the delta and both instants. Advancing the run clock records the same event on the run. [Trace entries](../observability/prototrace.md) need tracing enabled. A suite that turned entries off keeps the entity state only.
 
 ## Limits
 
-- **Only `GetUtcNow` is virtual.** Timers created from this provider still run on real time. Code that schedules with `TimeProvider.CreateTimer` or `PeriodicTimer` is not accelerated.
+- **Only `GetUtcNow` is virtual.** Timers created from this provider still run on real time. Code that schedules with `TimeProvider.CreateTimer` or `PeriodicTimer` is not accelerated. [Poll](#waiting-for-work-on-a-real-timer) for its result instead.
 - **Direct wall-clock calls are not affected.** `DateTime.UtcNow`, `DateTimeOffset.UtcNow` and `Environment.TickCount` bypass the clock. Application code must read its `TimeProvider`.
 - **Published environments cannot be faked.** A deployed process keeps its own time, so time-dependent journeys are in-process journeys. Guard them with `[RequiresTestClock]` (the `clock` capability the winning in-process provider declares), `[RequiresInProcess]` or a capability skip.
 - **An application that caches time fails the same way it would in production.** A service that resolves the clock once and stores a value it computed earlier stays stale. The fake clock makes that visible rather than causing it.

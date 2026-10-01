@@ -2,7 +2,7 @@
 id: write-an-integration
 title: Write an integration
 sidebar_label: Write an integration
-sidebar_position: 3
+sidebar_position: 4
 description: "Add your own client, hook and trace entries so a system ProtoTest does not know behaves like a built-in one."
 ---
 
@@ -14,7 +14,7 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 <Lesson
   track="Extend ProtoTest"
-  step="Lesson 3 of 5"
+  step="Lesson 4 of 6"
   minutes={10}
   outcomes={[
     'Choose the extension point your feature needs',
@@ -22,7 +22,7 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
     'Write your own entries into the trace',
   ]}
   needs={[
-    <>The previous lesson, <a href="/learn/extend/provisioners-and-page-objects">Provisioners and page objects</a></>,
+    <>The previous lesson, <a href="/learn/extend/page-objects">Model a screen as a page object</a></>,
     'The sample cloned and open in an editor',
   ]}
 />

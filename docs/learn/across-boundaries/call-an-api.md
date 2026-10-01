@@ -28,6 +28,8 @@ Most applications you test have an HTTP API. A good test calls it the way a clie
 
 In this lesson, you run a REST test and check its response shape. The shape names fields, expected values and constraints for values the application chooses.
 
+The test is the one you wrote in [Write your first test](/learn/start/write-your-first-test). There it showed how a test runs. Here it shows how to check a response shape and a refusal.
+
 ## Do it
 
 ### 1. Run the test alone

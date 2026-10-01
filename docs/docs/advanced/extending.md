@@ -282,6 +282,25 @@ context.Trace.WriteEvent(
     attributes: new Dictionary<string, string?> { ["saas.correlation_id"] = correlationId });
 ```
 
+### Steps in sequence
+
+`ProtoFlow` runs a named list of steps, one operation per step. It is the primitive behind ProtoTest's own teardown chains, and it suits an integration that cleans up several things in order:
+
+```csharp
+var result = await new ProtoFlow("Mailbox teardown", "Acme.ProtoTest.Mail", ProtoFlowFailureMode.Collect)
+    .Step("delete messages", ct => new ValueTask(mailbox.ClearAsync(ct)))
+    .Step("delete mailbox", ct => new ValueTask(mailbox.DeleteAsync(ct)))
+    .RunAsync(context.Trace, context.CancellationToken);
+
+if (!result.Succeeded) throw new AggregateException(result.Failures);
+```
+
+- `Step(name, action)` records a `flow.step` operation named `{flow} · {step}`, with the attributes `flow.name`, `step.name` and `step.index`.
+- `Step(ProtoStepDescriptor, action)` records the kind, name, phase, attributes and entity the descriptor declares, so a release step can stay a `resource.release` entry.
+- `FailFast`, the default, stops at the first failing step. `Collect` runs every step and keeps every failure.
+- `RunAsync` returns the failures in step order and does not throw them. The caller decides.
+- Cancelling the flow's token stops the flow and throws. In `Collect` mode, a step that cancels for another reason counts as a failure and the next steps still run.
+
 ### Conventions
 
 - **Kind** is a dotted, lowercase identifier: `{area}.{action}`. The viewer groups by the prefix, so a new kind gets its own category without a viewer release.

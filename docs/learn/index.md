@@ -52,4 +52,4 @@ Run it with `dotnet test samples/Northstar.ProtoTest`. Many lessons also link to
 without running anything. Some ask you to inspect the trace from your own run.
 
 The **Real systems** track uses a second suite, OpenCSMS, which runs on containers and real processes. It lives in
-its own repository, which is not public yet. Those lessons also work as a read-through of its recorded runs.
+its own repository, [MSeys/OpenCsms](https://github.com/MSeys/OpenCsms). Those lessons also work as a read-through of its recorded runs.

@@ -80,6 +80,19 @@ export default async function createConfig(): Promise<Config> {
   // under `docs/docs`, so a doc belongs to exactly one sidebar.
   plugins: [
     [
+      // /llms.txt lists every page and lesson with its description, for coding agents and AI search.
+      require.resolve('./plugins/llms-txt.cjs'),
+      {
+        title: 'ProtoTest',
+        summary:
+          'ProtoTest is an integration testing foundation for .NET 8, 9 and 10. A suite composes its applications, data and clients once; every test gets its own context and owned cleanup, and the run writes a .prototrace archive. A read-only MCP server and the prototest CLI hand that evidence to coding agents.',
+        sources: [
+          {path: 'docs', routeBase: 'docs', label: 'Reference'},
+          {path: 'learn', routeBase: 'learn', label: 'Learn'},
+        ],
+      },
+    ],
+    [
       '@docusaurus/plugin-content-docs',
       {
         id: 'learn',

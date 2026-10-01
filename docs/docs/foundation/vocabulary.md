@@ -73,7 +73,7 @@ the word and the page with the details. The trace, the reports and the viewer us
 | **client** | The object a test uses to talk to a system, such as `Proto.Context.Rest()`. | [Write your first test](/learn/start/write-your-first-test) | [Clients](./clients.md) |
 | **attribute** | A C# attribute on a test that prepares something before it and undoes it after. | [Write your own attribute](/learn/extend/attributes) | [Attributes](./attributes.md) |
 | **hook** | Code that runs around every test, or around the whole run. | [Write an integration](/learn/extend/write-an-integration) | [Hooks](./hooks.md) |
-| **data surface** | `Proto.Context.Data()`: where a test asks for test data. A registered provisioner creates it and registers its cleanup. | [Provisioners and page objects](/learn/extend/provisioners-and-page-objects) | [Provisioners](../integrations/data/provisioners.md) |
+| **data surface** | `Proto.Context.Data()`: where a test asks for test data. A registered provisioner creates it and registers its cleanup. | [Create test data with a provisioner](/learn/extend/provisioners) | [Provisioners](../integrations/data/provisioners.md) |
 | **test-owned, run-owned** | Who releases a resource: the test's teardown, or the host after the last test. | [Check that a test cleans up](/learn/good-tests/what-a-test-leaves-behind) | [Infrastructure recipes](./infrastructure-recipes.md) |
 | **tenant** | In the Northstar sample, one customer's isolated data. Each test gets its own. | [Give each test its own state](/learn/good-tests/per-test-state-and-cleanup) | |
 

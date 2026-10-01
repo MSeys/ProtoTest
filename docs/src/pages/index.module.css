@@ -107,6 +107,12 @@
 
 .checkFrame { align-self: start; }
 .frameTitle { color: var(--muted); font: var(--text-strong) var(--font-mono); }
+.agentTurns { margin: 0; padding: var(--space-3) var(--space-5); list-style: none; counter-reset: turn; }
+.agentTurns li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1) var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); counter-increment: turn; }
+.agentTurns li:last-child { border: 0; }
+.agentTurns li::before { content: counter(turn); grid-row: span 2; color: var(--dim); font: var(--text-strong) var(--font-mono); }
+.agentTurns code { justify-self: start; color: var(--blueprint); font-weight: var(--weight-semibold); }
+.agentTurns span { color: var(--muted); font-size: var(--text-strong); overflow-wrap: anywhere; }
 
 /* ── Integrations ── */
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }

@@ -2,7 +2,7 @@
 id: evidence-in-ci
 title: Keep the evidence when CI fails
 sidebar_label: Evidence in CI
-sidebar_position: 8
+sidebar_position: 9
 description: "Put the trace and the reports in one directory, upload it even when the test step fails, and post the digest with the action."
 ---
 
@@ -15,7 +15,7 @@ import Link from '@docusaurus/Link';
 
 <Lesson
   track="Understand failures"
-  step="Lesson 8 of 8"
+  step="Lesson 9 of 9"
   minutes={8}
   outcomes={[
     'Point every output at one directory and upload it as one CI artifact',

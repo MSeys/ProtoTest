@@ -13,7 +13,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
 
 <Lesson
   track="Reliable tests"
-  step="Lesson 2 of 3"
+  step="Lesson 2 of 4"
   minutes={6}
   outcomes={[
     'Replace a sleep with a readiness probe',

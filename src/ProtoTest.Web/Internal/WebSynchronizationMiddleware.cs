@@ -64,7 +64,7 @@ internal sealed class WebSynchronizationMiddleware(
                         {
                             throw new WebWaitTimeoutException(
                                 $"Wait '{condition.Name}' timed out after {registration.Timeout}. " +
-                                $"Last observed: {result.Value.LastObserved ?? "no observation"}.");
+                                WebBackendErrors.LastObserved(result.Value.LastObserved ?? "no observation"));
                         }
                     }
                     catch

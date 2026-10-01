@@ -341,6 +341,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Web
 
+- `Proto.Context.Web()` without an application returns the session a `[WebSession(Application = ...)]` attribute opened for another application, instead of opening a second, addressless one; the shared client resolution finds it. [Web](https://prototest.dev/docs/integrations/web/)
 - a failed backend creation is no longer cached, so a session retries from a clean slate. [Web](https://prototest.dev/docs/integrations/web/)
 - only the backend that wins the first-wins registration declares the browser capability. [Web](https://prototest.dev/docs/integrations/web/)
 - Selenium `Check`/`SelectOption` verify the resulting state or fail within the action timeout. [Interactions](https://prototest.dev/docs/integrations/web/interactions)

@@ -149,6 +149,66 @@ public sealed partial class WebModelTests
     }
 
     [Test]
+    public async Task Web_WithoutAnApplication_ShouldReturnTheSessionAnAttributeOpenedForAnotherApplication()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("attribute session", TestMethods.Placeholder);
+
+        // The test selects Csms, which runs in-process, and declares its browser session on Dashboard.
+        await new ApplicationAttribute("Csms").BeforeTestAsync(context);
+        await new WebSessionAttribute("Default") { Application = "Dashboard" }.BeforeTestAsync(context);
+
+        var session = context.Web();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Application, Is.EqualTo("Dashboard"));
+            Assert.That(context.Web("Default"), Is.SameAs(session));
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task Web_WithASessionNameUnderTwoOtherApplications_ShouldThrowNamingBoth()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("ambiguous sessions", TestMethods.Placeholder);
+        context.Web("Admin", application: "Shop");
+        context.Web("Admin", application: "BackOffice");
+
+        var exception = Assert.Throws<InvalidOperationException>(() => context.Web("Admin"));
+
+        Assert.That(exception!.Message, Does.Contain("'BackOffice:Admin'").And.Contain("'Shop:Admin'"));
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
+    public async Task Web_WithAnExplicitApplication_ShouldNeverFallBackToAnotherApplication()
+    {
+        var factory = new FakeBackendFactory();
+        var host = CreateHost(factory);
+        await using var ownedHost = host;
+        await host.StartAsync();
+        var context = await host.StartTestAsync("exact session", TestMethods.Placeholder);
+        var backOffice = context.Web("Admin", application: "BackOffice");
+
+        var shop = context.Web("Admin", application: "Shop");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(shop, Is.Not.SameAs(backOffice));
+            Assert.That(shop.Application, Is.EqualTo("Shop"));
+        });
+        await host.CompleteTestAsync(ProtoTestResult.Passed);
+    }
+
+    [Test]
     public async Task WebSession_ShouldKeySessionsByNameAndApplication()
     {
         var factory = new FakeBackendFactory();

@@ -240,6 +240,8 @@ Options are bound once, the first time a session opens a browser.
 
 `Proto.Context.Web(sessionName = null, application = null, endpoint = null, discoverRoutes = false)` returns the test's `WebSession`. The browser is created **lazily** on the first operation, so a test that never touches the browser never starts one, and the session is completed and disposed at teardown. `application` defaults to the test's selected application. `sessionName` defaults to the application's `Web` client name, then `"Default"`.
 
+Without `application`, `Web(name)` returns a session the test already has under that name: the selected application's first, otherwise the one under another application, such as a session `[WebSession(Application = ...)]` opened. Two or more under other applications throw, naming them. An explicit `application` is exact.
+
 ```mermaid
 sequenceDiagram
     participant Test

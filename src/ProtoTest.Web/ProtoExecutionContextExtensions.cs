@@ -6,6 +6,9 @@ using ProtoTest.Web.Internal;
 
 public static class ProtoExecutionContextExtensions
 {
+    // The protocol scope web sessions are registered under, so the shared resolution finds them by name.
+    private const string WebProtocol = "Web";
+
     /// <summary>
     /// Returns the web session for this test, creating it on first use. Inside an <c>[Application]</c>
     /// the session targets that application unless <paramref name="application"/> overrides it; its
@@ -31,9 +34,14 @@ public static class ProtoExecutionContextExtensions
                 "No web backend is registered. Reference ProtoTest.Web.Playwright or ProtoTest.Web.Selenium and call AddWeb().");
 
         // Sessions are keyed by name and application, so the same name under two applications is two
-        // sessions. The qualification is the shared client naming, not a second registry.
+        // sessions. They resolve through the shared client resolution: the selected application's session
+        // first, then the one session with that name under another application (such as one a
+        // [WebSession] attribute opened), and two or more throw naming them. An explicit application is
+        // exact and never falls back.
         var key = ProtoClientResolution.Qualify(resolvedName, resolvedApplication);
-        if (context.TryClient<WebSession>(key) is { } existing)
+        var requested = application is null ? resolvedName : key;
+        var (existing, _, _) = ProtoClientResolution.Find<WebSession>(context, WebProtocol, requested, key);
+        if (existing is not null)
         {
             return existing;
         }
@@ -43,7 +51,7 @@ public static class ProtoExecutionContextExtensions
         // through the client registry).
         var session = new WebSession(
             context, ResolveFactory(context), resolvedName, resolvedApplication, endpoint, discoverRoutes);
-        context.RegisterClient(session, key);
+        context.RegisterClient(session, ProtoClientResolution.ScopedName(WebProtocol, key));
         return session;
     }
 

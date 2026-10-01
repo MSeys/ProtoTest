@@ -6,7 +6,7 @@ description: "Run ProtoTest on Azure Pipelines and publish the trace, reports an
 
 # Azure Pipelines
 
-The same shape as the [GitHub Actions](./#provider-configurations) setup: one results directory, tests, then a publish step that runs even when the tests failed.
+The same shape as the [GitHub Actions](./index.md#provider-configurations) setup: one results directory, tests, then a publish step that runs even when the tests failed.
 
 ```yaml title="azure-pipelines.yml"
 trigger:
@@ -37,6 +37,6 @@ steps:
 ```
 
 - `condition: succeededOrFailed()` is the Azure spelling of `if: always()`, because the trace is most useful when the test step failed.
-- `PROTOTEST_RESULTS` points at `$(Build.ArtifactStagingDirectory)/ProtoTest`, the directory the [wiring](./#put-every-artifact-in-one-place) reads.
+- `PROTOTEST_RESULTS` points at `$(Build.ArtifactStagingDirectory)/ProtoTest`, the directory the [wiring](./index.md#put-every-artifact-in-one-place) reads.
 - Microsoft-hosted Linux agents have Docker, so a container-backed suite needs no extra runner setup.
-- [Retention](./#what-to-keep) follows the same rules as everywhere: keep the trace and the HTML report, and expire them with the pipeline's own retention.
+- [Retention](./index.md#what-to-keep) follows the same rules as everywhere: keep the trace and the HTML report, and expire them with the pipeline's own retention.

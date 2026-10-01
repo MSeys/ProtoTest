@@ -46,7 +46,7 @@ export const lifecycleLayers = [
 
 # Foundation overview
 
-ProtoTest is an integration testing foundation for .NET. Its integrations build on the same concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. One host per process, one context per test; everything else hangs off these two. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
+ProtoTest is an integration testing foundation for .NET. Its integrations build on the same concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. There is one host per process and one context per test, and everything else hangs off these two. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
 
 ```mermaid
 flowchart TB
@@ -66,10 +66,10 @@ flowchart TB
 
 | Piece | Job | Page |
 | --- | --- | --- |
-| `ProtoHost` | built once per test process; owns DI, run hooks, gates, infrastructure, and each test's start and completion | [Lifecycle](./lifecycle.md) |
-| `ProtoExecutionContext` | exists for exactly one test; holds its clients, state, resources, findings, attachments and observations | [Execution context](./execution-context.md) |
-| Hooks | run around every test or the whole run; registered on the host | [Hooks](./hooks.md) |
-| Attributes | run around the tests they decorate; package a capability onto any test | [Attributes](./attributes.md) |
+| `ProtoHost` | built once per test process. Owns DI, run hooks, gates, infrastructure, and each test's start and completion. | [Lifecycle](./lifecycle.md) |
+| `ProtoExecutionContext` | exists for exactly one test. Holds its clients, state, resources, findings, attachments and observations. | [Execution context](./execution-context.md) |
+| Hooks | run around every test or the whole run, registered on the host | [Hooks](./hooks.md) |
+| Attributes | run around the tests they decorate, and package a capability onto any test | [Attributes](./attributes.md) |
 | Clients | what integrations give you: `Rest()`, `GraphQL()`, `Web()` | [Clients](./clients.md) |
 | Assertions | one `Should` / `ShouldNot` surface on every integration | [Assertions](./assertions.md) |
 | Attachments | files a test produces, handed to the runner and the trace | [Attachments](./attachments.md) |

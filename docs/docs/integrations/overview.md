@@ -10,7 +10,7 @@ import CapabilityIndex from '@site/src/components/CapabilityIndex';
 
 # Integrations map
 
-Compose the capabilities your scenario needs. Every integration joins the same [host, context and lifecycle](../foundation/overview.md).
+Every ProtoTest integration on one page, grouped by the kind of system it reaches. Compose the capabilities your scenario needs. Every integration joins the same [host, context and lifecycle](../foundation/overview.md).
 
 **Supported** packages follow the 1.x compatibility promise. **Preview** packages work today, but their surface may change before the next minor release. [Installation](../getting-started/installation.md) explains the stability tiers and framework requirements.
 

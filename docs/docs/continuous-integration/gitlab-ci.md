@@ -23,7 +23,7 @@ integration-tests:
     expire_in: 14 days
 ```
 
-- `when: always` is the GitLab spelling of `if: always()`: the trace is most useful when the test step failed.
+- `when: always` is the GitLab spelling of `if: always()`, because the trace is most useful when the test step failed.
 - `PROTOTEST_RESULTS` points at `$CI_PROJECT_DIR/TestResults/ProtoTest`, the directory the [wiring](./#put-every-artifact-in-one-place) reads.
-- `expire_in: 14 days` bounds storage; a suite with browser diagnostics grows faster, so shorten it or keep failures longer per [retention](./#what-to-keep).
+- `expire_in: 14 days` bounds storage. A suite with browser diagnostics grows faster, so shorten it or keep failures longer per [retention](./#what-to-keep).
 - A container-backed suite needs a Docker-capable runner. Your runner setup decides if Docker-in-Docker is allowed and which service config it needs. ProtoTest only needs a reachable Docker endpoint.

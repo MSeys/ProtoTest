@@ -145,7 +145,7 @@ builder
   path="POST /api/v1/projects · SELECT the row"
 />
 
-The trace reads in test order: the REST `http.request` for the write with `assert.http.status`, then the `sql.connection.open` operation from setup released at teardown. The `SELECT` itself is not traced. Individual commands are not traced; the connection lifecycle is, and the assertion proves the row. When the row is missing, the assertion fails with the message the test wrote. The long-form reading is on [ProtoTrace](../observability/prototrace.md).
+The trace reads in test order: the REST `http.request` for the write with `assert.http.status`, then the `sql.connection.open` operation from setup released at teardown. The `SELECT` itself is not traced, because individual commands are not. The connection lifecycle is traced, and the assertion proves the row. When the row is missing, the assertion fails with the message the test wrote. The long-form reading is on [ProtoTrace](../observability/prototrace.md).
 
 ## Variations
 
@@ -158,7 +158,7 @@ The trace reads in test order: the REST `http.request` for the write with `asser
 
 ## What it does not prove
 
-- **The test reads outside any transaction.** The in-process application opens its own connection and commits; a rollback on the test's connection would not undo that write. With the default `Transaction` isolation the run fails at startup unless the application declares `ShareConnectionWith(...)`. That declaration is a statement, not a check.
+- **The test reads outside any transaction.** The in-process application opens its own connection and commits. A rollback on the test's connection would not undo that write. With the default `Transaction` isolation the run fails at startup unless the application declares `ShareConnectionWith(...)`. That declaration is a statement, not a check.
 - **Unique values, not cleanup.** A container lives for one run and the SQLite file is recreated, so nothing survives to the next run. Within a run, a reference built from `TestId` keeps parallel tests out of each other's rows.
-- **No SQL tracing.** The connection and transaction lifecycle is traced; individual commands are not.
-- **In a deployed environment the suite often cannot reach the database.** Compose `AddSql` only where it can, and gate the test with `[RequiresCapability(ProtoCapabilityKinds.Store)]`: where no store is composed, it skips instead of failing.
+- **No SQL tracing.** The connection and transaction lifecycle is traced, but individual commands are not.
+- **In a deployed environment the suite often cannot reach the database.** Compose `AddSql` only where it can, and gate the test with `[RequiresCapability(ProtoCapabilityKinds.Store)]`. Where no store is composed, the test skips instead of failing.

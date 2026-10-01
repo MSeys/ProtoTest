@@ -6,9 +6,100 @@ description: "Measured trace size, run time, export time and memory growth for s
 
 # Benchmarks
 
-Same short test: raw 0.33 ms, ProtoTest without trace 0.95 ms (about 3x), with trace 2.55 ms (about 8x). The trace adds about 1.6 ms and 1 MB per test here. On suites whose tests talk to a database or a browser, that difference disappears into the setup the framework replaces.
+This page answers two questions: what ProtoTest adds to a test's run time, and how big its trace gets. The
+numbers come from harnesses in this repository, run on one machine: an AMD Ryzen 7 9800X3D, Windows 11 and .NET 8.
+They are indicative, not a contract. Expect run-to-run medians to move by around 20%, and re-run the harnesses
+on your own hardware before you quote them.
 
-These numbers come from the in-repo harnesses, and their scope is narrow: one machine (AMD Ryzen 7 9800X3D, Windows 11, .NET 8), synthetic suites where each test records one operation, `EmbedSources = false` and `EmbedArtifacts = false`, a raw baseline that creates a client per test but never opens a broker consumer, and medians taken after warmup. `TraceScaleTests.cs` covers trace size. `PerTestPhaseBenchmarkTests.cs` covers the phase profile. `OverheadBenchmarkTests.cs` covers the `WebApplicationFactory` comparison. The OpenCSMS numbers come from that repository's own `eng/run-benchmark.ps1`. They are indicative, not a contract: run the harnesses on your own hardware and CI image before quoting them, and expect run-to-run medians to move by around 20%.
+## What a test costs
+
+One short test, written twice against the same in-process application: POST an order, read it back, check both
+bodies. **Neither side starts a container or a broker.** The raw side uses `WebApplicationFactory` with
+`System.Net.Http.Json`, creates a client per test and deserializes with `JsonSerializer`. The ProtoTest side runs
+the full lifecycle and asserts with `Should.HaveHttpStatus(...).Should.MatchShape(...)`. Same requests, same
+assertions, 32 warmups and 256 measured, medians:
+
+| Mode | Per test | p95 | Start | Call | Complete | Allocated |
+| --- | --- | --- | --- | --- | --- | --- |
+| ProtoTest, tracing on | 2.55 ms | 3.79 ms | 0.66 ms | 1.23 ms | 0.55 ms | 1,354 KB |
+| ProtoTest, tracing off | 0.95 ms | 1.29 ms | 0.10 ms | 0.79 ms | 0.05 ms | 327 KB |
+| Raw stack (the same test) | 0.33 ms | 0.47 ms | 0.01 ms | 0.32 ms | - | 66 KB |
+
+ProtoTest adds about 0.6 ms per test without tracing and 2.2 ms with it. Because the test itself does almost
+nothing, that reads as about **3x and 8x the raw stack**. That ratio is the worst case. A test that seeds a
+database, waits for a message or drives a browser spends milliseconds to seconds on that work, and the same
+fixed cost shrinks into it. A 1,000-test suite of tests this small pays about 2.6 s for the framework and the
+trace, against 0.3 s raw.
+
+Almost all of the tracing cost is **source-location capture**. Setting `CaptureSourceLocations = false` takes a
+bare test's trace cost from 0.33 ms to 0.02 ms, as [the phase profile](#for-contributors-the-details-behind-the-numbers)
+shows. Suite startup, through the first completed request, is 22 ms with tracing, 13 ms without and 12 ms raw.
+
+## Where the time goes in a real suite \{#opencsms-at-1000-tests}
+
+The OpenCSMS suite runs the product itself: the API, the billing worker,
+and real PostgreSQL and RabbitMQ. Its `eng/run-benchmark.ps1` times a health-check test, 1,000 iterations after
+100 warmups, on the same machine. The run's own trace shows where each test's 36 ms goes:
+
+| Operation | Median | What it is |
+| --- | --- | --- |
+| `client.initialize` for the messaging client | 11.09 - 11.26 ms | the test's own consumer, prepared for the suite's three tap destinations |
+| `resource.release` for that consumer | 17.00 - 17.49 ms | its tap queues and channels released |
+| `http.request` (`GET /healthz`) | 5.65 - 5.69 ms | the request itself, through the REST client |
+| Everything else | under 1 ms | HTTP client init, hooks, attributes, execution and teardown scaffold, trace included |
+
+So about 30 of the 36 ms is the suite's **per-test broker isolation**: each test gets its own consumer, bound to
+three tap destinations before it acts, and released afterwards. About 6 ms is the request. Under 1 ms is
+ProtoTest. A test that never touches messaging still pays the tap cost in this suite, because `Tap` promises the
+destination is bound before the test acts. Each tap costs five broker round trips (channel, queue declare, two
+bindings, consume), and the taps are prepared concurrently.
+
+The same run also measured a raw `WebApplicationFactory` baseline. **It is not a like-for-like comparison:** the
+raw side calls the health check but opens no broker consumer, so it skips the 30 ms of isolation the ProtoTest
+suite chose to have.
+
+| Mode | Per test | Start | Call | Complete |
+| --- | --- | --- | --- | --- |
+| ProtoTest, tracing on | 35.15 - 36.17 ms | 11.95 - 12.09 ms | 5.69 - 5.72 ms | 17.36 - 17.87 ms |
+| ProtoTest, tracing off | 30.74 - 32.40 ms | 11.14 - 11.65 ms | 5.55 - 5.57 ms | 13.67 - 15.91 ms |
+| Raw `WebApplicationFactory` | 4.79 - 5.00 ms | 0.00 ms | 4.79 - 5.00 ms | - |
+
+Suite startup through the first completed request is 156 to 179 ms with tracing, 154 to 176 ms without, and 73
+to 83 ms raw, for the same reason. Turning tracing off moves the total within noise, because the trace is about
+0.33 ms of a 36 ms cycle.
+
+The showpiece trace is [opencsms-showpiece.prototrace](/traces/opencsms-showpiece.prototrace): the
+`IdleFeeAfterTariffChange` journey as it failed, when a reprice during an open session changed the session's
+billing.
+
+## How big a trace gets
+
+Each synthetic test below records one operation, one event, one entity-state change and one observation, roughly
+what a small API test produces. The harness runs with `EmbedSources = false` and `EmbedArtifacts = false`, so a
+default run, which embeds source files and attachment bytes, writes a larger file.
+
+| Tests | Trace size | Run time | Stop + export | Allocated | Peak working set growth |
+| --- | --- | --- | --- | --- | --- |
+| 100 | 0.70 MB | 78 ms | 49 ms | 38 MB | 44 MB |
+| 1,000 | 6.95 MB | 389 ms | 59 ms | 377 MB | 23 MB |
+
+That is about 7 KB of trace per test. The OpenCSMS health-check trace is 25.8 MB for 1,000 tests, about 25 KB
+each, and its 1,000-journey trace is 38.8 MB. The viewer opens a 1,200-test trace in about 1.3 seconds.
+
+## Levers
+
+| Lever | Effect |
+| --- | --- |
+| `trace.CaptureSourceLocations = false` | Drops the `code.file.path` / `code.line.number` / `code.function.name` attributes. This is almost the whole trace cost: 0.33 ms -> 0.02 ms and 375 KB -> 30 KB per bare test in the phase profile. |
+| `trace.EmbedSources = false` | Keeps source locations but stops embedding the files they point at |
+| `trace.EmbedArtifacts = false` | Declares attachments (name, media type, size) without reading or writing their bytes |
+| `trace.MaxArtifactBytes` | Caps any single artifact, 64 MB by default. An over-limit attachment becomes an error artifact. |
+| Attachment capture per integration | Request, response, screenshot and trace capture is opt-in (`CaptureAttachments(...)`). Leaving it off is the biggest lever. |
+
+## For contributors: the details behind the numbers
+
+<details>
+<summary>The harnesses, the per-request breakdown and the phase profile</summary>
 
 | Question | Harness |
 | --- | --- |
@@ -17,38 +108,8 @@ These numbers come from the in-repo harnesses, and their scope is narrow: one ma
 | What does the framework add over raw `WebApplicationFactory` | `tests/ProtoTest.AspNetCore.Tests/OverheadBenchmarkTests.cs` |
 | What does a per-test broker tap cost | `tests/ProtoTest.Messaging.RabbitMq.Tests/RabbitMqTests.cs` (`PerTestTapLifecycle_ShouldStayWithinTheSanityBound`) |
 
-| Tests | Trace size | Run time | Stop + export | Allocated | Peak working set growth |
-| --- | --- | --- | --- | --- | --- |
-| 100 | 0.70 MB | 78 ms | 49 ms | 38 MB | 44 MB |
-| 1,000 | 6.95 MB | 389 ms | 59 ms | 377 MB | 23 MB |
-
-Every synthetic test records one operation, one event, one entity-state change and one observation - roughly the evidence a small API test produces. That is about 7 KB of trace and about 0.4 MB of allocation per test at this size. The harness runs with `EmbedSources = false` and `EmbedArtifacts = false`; the defaults (embedding the suite's source files and attachment bytes) produce a larger file.
-
-## A short test, written twice
-
-The comparison an evaluator actually cares about: one short test - POST an order, read it back, check both
-bodies - written twice against the same in-process application and measured a whole test at a time. The raw
-side uses `WebApplicationFactory` with `System.Net.Http.Json`, creates a client per test and deserializes with
-`JsonSerializer`; the ProtoTest side runs the full lifecycle and asserts with
-`Should.HaveHttpStatus(...).Should.MatchShape(...)`. Same requests, same assertions, 32 warmups and 256
+A single request (`GET /ping`), a bare lifecycle with no request, and the raw equivalent, 32 warmups and 256
 measured, medians:
-
-| Mode | Per test | p95 | Start | Call | Complete | Allocated |
-| --- | --- | --- | --- | --- | --- | --- |
-| ProtoTest, tracing on | 2.55 ms | 3.79 ms | 0.66 ms | 1.23 ms | 0.55 ms | 1,354 KB |
-| ProtoTest, tracing off | 0.95 ms | 1.29 ms | 0.10 ms | 0.79 ms | 0.05 ms | 327 KB |
-| Raw stack (the same test) | 0.33 ms | 0.47 ms | 0.01 ms | 0.32 ms | - | 66 KB |
-
-Read plainly: the same test costs about **3x the raw stack without tracing and about 8x with it**. The trace
-adds roughly 1.6 ms and 1 MB per test here, because the short test produces two recorded calls, their
-observations and the shape validations. A 1,000-test suite pays about 2.6 s for the framework and the trace,
-against 0.3 s raw - on a suite whose tests talk to a database or a browser, that difference disappears into
-the setup the framework is replacing.
-
-## Where the difference comes from
-
-A micro comparison explains the number above: a single request (`GET /ping`), a bare lifecycle with no
-request at all, and the raw equivalent - 32 warmups and 256 measured, medians:
 
 | Mode | Per test | p95 | Start | Call | Complete | Allocated |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -57,41 +118,26 @@ request at all, and the raw equivalent - 32 warmups and 256 measured, medians:
 | ProtoTest, lifecycle only (no request) | 0.06 ms | 0.15 ms | 0.04 ms | - | 0.02 ms | 60 KB |
 | Raw `WebApplicationFactory` | 0.05 ms | 0.16 ms | 0.00 ms | 0.04 ms | - | 17 KB |
 
-As a waterfall, each layer adds its cost on top of the last:
-
 ```text
 raw baseline        0.05 ms
 lifecycle only      0.06 ms   framework bookkeeping is nearly free
-+ REST client       0.34 ms   +0.15 ms of capture, wrapping and body reads
-+ trace             1.54 ms   +1.0 ms of source locations and recording
++ REST client       0.34 ms   +0.28 ms: the request, capture, wrapping and body reads
++ trace             1.54 ms   +1.2 ms of source locations and recording
 ```
 
-Suite startup, measured through the first completed request so both sides pay for building the in-process
-server: ProtoTest 22 ms with tracing, 13 ms without, raw 12 ms.
+- "Tracing off" is not "framework off". `Enabled = false` skips the activity listener, the recorder and trace
+  export, but the context, hook pipeline, per-test client creation and outcome release still run. With no
+  request at all, the lifecycle costs 0.06 ms and 60 KB.
+- The REST client adds about 0.17 ms to the call itself (0.21 vs 0.04 ms in the Call column). It reads and
+  captures the response body, which the raw baseline leaves unread until asked. It also records the response
+  observation and entity state, and builds the typed wrapper.
+- Tracing adds roughly 1.2 ms and 0.8 MB per request: start +0.5 ms, complete +0.5 ms, call +0.1 ms.
+- The raw baseline creates an `HttpClient` per test, matching ProtoTest's per-test model. A raw suite that
+  reuses one client is faster.
 
-- **The lifecycle itself is cheap.** Start and complete a test with no request at all: 0.06 ms and 60 KB -
-  about the raw baseline's whole per-test work. "Tracing off" is not "framework off": `Enabled = false`
-  skips the activity listener, the recorder and trace export, but the context, hook pipeline, per-test
-  client creation and outcome release still run.
-- **The REST client adds about 0.15 ms over a raw request** (0.20 vs 0.05 ms). It reads and captures the
-  response body - the raw baseline leaves it unread until asked - records the response observation and
-  entity state, and builds the typed wrapper. A raw test that asserts a body pays part of that difference
-  itself.
-- **The trace is the rest of the cost.** Tracing adds roughly 1.0 ms and 0.7 MB per test over the same suite
-  with tracing off (start +0.5 ms of setup, complete +0.5 ms of recording and finalizing, call +0.1 ms).
-- **Startup is nearly identical** (22 vs 12 ms): booting the application dominates, not the framework.
-- **The raw baseline creates an `HttpClient` per test**, matching ProtoTest's per-test model; a raw suite
-  that reuses one client will be faster than the numbers shown.
-- A real test does much more than one request. When a test starts containers, drives a browser or seeds a
-  database, these milliseconds are noise; this table is the cost of the framework's own bookkeeping, not of
-  a typical test.
-
-## The per-test phase profile
-
-One lifecycle broken into the phases the framework owns, on a bare host with no application, 64 warmups
-and 512 measured iterations per phase, medians. The host runs with `EmbedSources = false` and
-`EmbedArtifacts = false` and source locations on (the default), the same trace settings the OpenCSMS
-benchmark uses; the harness is `tests/ProtoTest.Core.Tests/PerTestPhaseBenchmarkTests.cs`.
+One lifecycle broken into the phases the framework owns, on a bare host with no application, 64 warmups and 512
+measured iterations per phase, medians. Source locations are on (the default), with `EmbedSources = false` and
+`EmbedArtifacts = false`:
 
 | Phase | Median | p95 | Allocated |
 | --- | --- | --- | --- |
@@ -110,129 +156,19 @@ benchmark uses; the harness is `tests/ProtoTest.Core.Tests/PerTestPhaseBenchmark
 | Lifecycle, tracing on, 5 more operations | 0.4910 ms | 0.7293 ms | 519.8 KB |
 | Lifecycle, tracing on, 1 declared attachment | 0.3782 ms | 0.6423 ms | 377.8 KB |
 
-Read plainly: the framework's own work is microseconds. DI scope creation, context creation, per-test
-clock registration, attribute and skip resolution and teardown all stay under 0.04 ms. Tracing costs about
-0.33 ms and 375 KB per test, and **source-location capture is essentially all of it**: with
-`CaptureSourceLocations = false` the same lifecycle costs 0.02 ms and 30 KB.
+DI scope creation, context creation, clock registration, attribute and skip resolution and teardown all stay
+under 0.04 ms. The OpenCSMS tracing-off leg is the most order-sensitive, because it runs second, after the first
+leg has created and deleted about 3,300 tap queues on the shared broker. The controlled tap A/B,
+`PerTestTapLifecycle_ShouldStayWithinTheSanityBound` in the RabbitMQ suite, measures 0.03 ms with no tap
+destinations and about 11-12 ms for three.
 
-## OpenCSMS at 1,000 tests
-
-The OpenCSMS repository's `eng/run-benchmark.ps1` runs the product itself - API, billing worker, real
-PostgreSQL and RabbitMQ from the environment - through one health-check test cycle per iteration (1,000
-iterations, 100 warmups), against a raw `WebApplicationFactory` baseline, plus a 1,000-test seeded journey
-run. Same machine and .NET 8.
-
-The showpiece trace is [opencsms-showpiece.prototrace](/traces/opencsms-showpiece.prototrace): the
-`IdleFeeAfterTariffChange` journey as it failed, when a reprice during an open session changed the
-session's billing. The fixed journey asserts the session's original tariff and runs in the OpenCSMS suite.
-
-| Mode | Per test | Start | Call | Complete |
-| --- | --- | --- | --- | --- |
-| ProtoTest, tracing on | 35.15 - 36.17 ms | 11.95 - 12.09 ms | 5.69 - 5.72 ms | 17.36 - 17.87 ms |
-| ProtoTest, tracing off | 30.74 - 32.40 ms | 11.14 - 11.65 ms | 5.55 - 5.57 ms | 13.67 - 15.91 ms |
-| Raw `WebApplicationFactory` | 4.79 - 5.00 ms | 0.00 ms | 4.79 - 5.00 ms | - |
-
-Suite startup through the first completed request lands between 156 and 179 ms with tracing, 154 and
-176 ms without, and 73 and 83 ms raw. The 1,000-test health-check trace is 25.8 MB (about 25 KB per
-test); the 1,000-journey trace is 38.8 MB, with a 49.3 to 54.8 ms journey median.
-
-Read the table honestly: the per-test total moves inside the run-to-run band, and the tracing-off leg
-is the most order-sensitive, because it runs second in the harness after the first leg has created and
-deleted about 3,300 tap queues on the shared broker.
-
-The run's own trace explains where the milliseconds are, and they are not the framework. Medians per
-operation over the 1,100 health-check tests of the recorded traces:
-
-| Operation | Median | What it is |
-| --- | --- | --- |
-| `client.initialize` for the messaging client | 11.09 - 11.26 ms | the test's own consumer, prepared for the suite's three tap destinations |
-| `resource.release` for that consumer | 17.00 - 17.49 ms | its tap queues and channels released |
-| `http.request` (`GET /healthz`) | 5.65 - 5.69 ms | the request itself, through the REST client |
-| Everything else | under 1 ms | HTTP client init, hooks, attributes, execution and teardown scaffold, trace included |
-
-The controlled A/B is the honest number: three tapped destinations against the same host and broker
-with none, the no-destination host at 0.03 ms
-(`PerTestTapLifecycle_ShouldStayWithinTheSanityBound` in the RabbitMQ suite), and the tapped prepare
-phase at about 11-12 ms.
-
-So about 30 of the 36 ms is the suite's per-test broker isolation, about 6 ms is the request, and under
-1 ms is ProtoTest. The raw baseline never opens a broker consumer; a test that never touches messaging
-still pays the tap cost, because `Tap` promises the destination is bound before the test acts.
-
-- **"Tracing off" works; it is just not the cost.** `Enabled = false` installs no activity listener, the
-  recorder drops operations and records, and no archive is written (pinned by
-  `ProtoEvidenceBoundaryTests.DisabledTracing_ShouldNotRecordOperationsOrWriteAnArchive`). The benchmark
-  numbers move within noise because the trace is about 0.33 ms of a 36 ms cycle, and the phase profile
-  above shows where the 0.33 ms sits: source-location capture.
-- **Preparation is the floor.** Each tap costs five broker round trips (channel, queue declare, two
-  bindings, consume), and the taps are prepared concurrently, each on its own channel, so their round trips
-  overlap: three taps' prepare phase lands at about 11-12 ms. Every destination is still attempted, so one
-  that cannot be prepared fails only the await that names it.
-
-## The viewer at 1,000+ tests
-
-The viewer was measured on a generated 1,200-test trace derived from the committed demo trace:
-`viewer/scripts/generate-scale-trace.mjs` clones each demo test until the requested count, rewriting ids,
-names and timestamps, and writes small placeholder payloads for the artifacts. Every test keeps the demo's
-real operations, checks, observations, sections, events and state, so the viewer exercises its real paths.
-The generated file is 8.6 MB zipped (57.8 MB of spans JSON, 35.6 MB of state JSON); it is a heavier suite
-per test than the size table above, which counts one operation per test.
-
-Method: a production build (`npm run build`), Microsoft Edge 154.0.4258.37 headless at 1440x900, no CPU or
-network throttling, on the same Ryzen 7 9800X3D machine. Each number is the median of five cold runs: a fresh page,
-the trace loaded through the viewer's own file input, then one interaction. The harness is
-`viewer/scripts/measure-viewer.mjs`; it serves the built `dist` over loopback, so no dev server is involved.
-Before and after the pass:
-
-| Step | Before | After |
-| --- | --- | --- |
-| Open the trace and render the run list | 1,356 ms | 1,316 ms |
-| Filter to "Needs attention" | 77 ms | 53 ms |
-| Clear the filter (1,200 rows return) | 182 ms | 162 ms |
-| Type "GraphQL" in the run search | 365 ms | 231 ms |
-| Open a test with 169 spans | 167 ms | 151 ms |
-| Return to the run list | 650 ms | 566 ms |
-
-Read plainly: a cold open of a suite this size takes about **1.3 seconds**, and the remaining run list
-steps land between **50 ms and 570 ms**. The metric views stay fast at this size: the spans tab, the state
-view and the inspector all answer in 33 to 50 ms for a 169-span test.
-
-What the pass changed, all inside the existing views:
-
-- Each test computes its display name, title, group and search text once and caches it, instead of
-  re-deriving them for every row on every render.
-- The run view is kept alive when a test opens, so returning moves the cached DOM instead of rebuilding
-  a thousand rows.
-- Each run and rail row contains its own layout and paint (`contain: layout paint`), so one row's change
-  never re-lays-out the list.
-
-What remains, with the measurement that shows it:
-
-- The cold open is dominated by reading and parsing the two JSON documents and the first full layout
-  (five long tasks, the longest about 550 ms). Removing that needs a streaming reader.
-- The run list and the outcome strip render one element per test, so returning to the run and changing
-  the filter move about a thousand DOM rows. Removing that needs a windowed list.
-- `content-visibility: auto` on the rows was measured and rejected: it skipped off-screen layout on the
-  first render but made typed filtering about twice as slow, because every row added or removed during
-  filtering pays its bookkeeping.
-
-## Levers
-
-| Lever | Effect |
-| --- | --- |
-| `trace.CaptureSourceLocations = false` | Drops the `code.file.path` / `code.line.number` / `code.function.name` attributes; this is essentially the whole trace cost (0.32 ms -> 0.02 ms and 375 KB -> 30 KB per bare test in the phase profile) |
-| `trace.EmbedSources = false` | Keeps source locations but stops embedding the files they point at |
-| `trace.EmbedArtifacts = false` | Declares attachments (name, media type, size) without reading or writing their bytes |
-| `trace.MaxArtifactBytes` | Caps any single artifact; an over-limit attachment becomes an error artifact (default 64 MB) |
-| Attachment capture per integration | Request/response/screenshot/trace capture is opt-in (`CaptureAttachments(...)`); leaving it off is the biggest lever |
-
-## Re-running
+### Re-running
 
 ```
 dotnet test tests/ProtoTest.Core.Tests --filter TraceScaleTests
 ```
 
-The harness prints `[scale] tests=... trace=... run=... stop+export=... allocated=...` for each size. Its assertions are sanity bounds - a trace must stay proportional to the test count - not performance targets.
+The harness prints `[scale] tests=... trace=... run=... stop+export=... allocated=...` for each size. Its assertions are sanity bounds, so a trace must stay proportional to the test count. They are not performance targets.
 
 The overhead comparison re-runs with:
 
@@ -240,7 +176,7 @@ The overhead comparison re-runs with:
 dotnet test tests/ProtoTest.AspNetCore.Tests --filter Category=Benchmark --logger "console;verbosity=detailed"
 ```
 
-It prints `[overhead]` lines per mode - the short test written both ways, the single-request comparison, the bare lifecycle and each side's startup - and its assertions are generous sanity bounds too, not targets.
+It prints `[overhead]` lines per mode: the short test written both ways, the single-request comparison, the bare lifecycle and each side's startup. Its assertions are generous sanity bounds too, not targets.
 
 The per-test phase profile re-runs with:
 
@@ -254,23 +190,9 @@ The broker tap comparison re-runs with (a broker from `ProtoTest__Messaging__Rab
 dotnet test tests/ProtoTest.Messaging.RabbitMq.Tests --filter PerTestTapLifecycle --logger "console;verbosity=detailed"
 ```
 
-The viewer numbers re-run from the `viewer` directory:
+</details>
 
-```
-npm run scale:trace
-npm run build
-npm run scale:measure -- --trace .perf/scale-1200.prototrace --tests 1200 --runs 5
-```
+## Related
 
-The generator prints the trace's size, the harness prints every run and its median, and `--profile` also
-writes CPU profiles and renderer time (script, layout, style) per measured step. Neither script is part of
-the build or CI; the harness needs an installed Chromium-family browser (Edge by default) and
-`puppeteer-core`, which is a viewer dev dependency.
-
-## Parallel execution
-
-A suite with containers and real browsers was stable at 8 and 32 workers on a 16-core machine; at
-64 workers one run showed a single failure that never reproduced, and the passing rerun overwrote the
-failed run's single trace file before it could be read. The [concurrency page](../foundation/concurrency.md#exercised-parallelism)
-records the runs, the failure mode, and the current re-runs: Core green three times at 64 workers
-(380 passed each), Northstar.ProtoTest with containers and a real browser green twice at 64 workers.
+- [Concurrency](../foundation/concurrency.md#exercised-parallelism): the parallel runs, from 8 to 64 workers.
+- [The viewer's own measurements](https://github.com/MSeys/ProtoTest/blob/main/viewer/README.md#performance-at-1000-tests): how the viewer was measured on a 1,200-test trace.

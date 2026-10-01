@@ -6,6 +6,9 @@ description: "Capture REST requests and responses as attachments, and record whi
 
 # Attachments and coverage
 
+This page shows how to keep each REST request and response next to the test result, how secrets are redacted
+from them, and how to report which endpoints your suite called.
+
 ## Capturing requests and responses
 
 Turn capture on when registering REST:
@@ -17,7 +20,7 @@ builder.AddApplication("Api", app => app
         .AddClient("Api")));
 ```
 
-`CaptureAttachments` returns the REST builder while `AddClient` returns the client's *target* builder, so call it first, or in its own statement when you want to tune it:
+`CaptureAttachments` returns the REST builder, while `AddClient` returns the client's *target* builder. Call it first, or in its own statement when you want to tune it:
 
 ```csharp
 builder.AddApplication("Api", app => app.AddRest(rest =>
@@ -27,9 +30,9 @@ builder.AddApplication("Api", app => app.AddRest(rest =>
 }));
 ```
 
-Without `CaptureAttachments()`, nothing is attached; requests are still traced and observed.
+Without `CaptureAttachments()`, nothing is attached. Requests are still traced and observed.
 
-Each test then gets numbered attachments, which your [runner](../../runners/overview.md) shows alongside the result and which are bundled into the [ProtoTrace archive](../../observability/prototrace.md):
+Each test then gets numbered attachments. Your [runner](../../runners/overview.md) shows them alongside the result, and the [ProtoTrace archive](../../observability/prototrace.md) bundles them:
 
 | Attachment | Contains |
 | --- | --- |
@@ -77,14 +80,14 @@ See [Configuration](../../getting-started/configuration.md) for how sections bin
 
 With `RedactSensitiveData` on (the default):
 
-- Sensitive **headers** are replaced with `[REDACTED]` (matched case-insensitively; repeated values are joined with `, `).
-- Sensitive **query parameter values** in URLs are replaced with `[REDACTED]`; URI user-info (`user:password@`) is **always** removed, even when redaction is off.
+- Sensitive **headers** are replaced with `[REDACTED]`. Names match case-insensitively, and repeated values are joined with `, `.
+- Sensitive **query parameter values** in URLs are replaced with `[REDACTED]`. URI user-info (`user:password@`) is **always** removed, even when redaction is off.
 - Sensitive **JSON properties** in bodies are redacted by name, at any depth, tolerating duplicate keys.
-- Bodies that aren't JSON are scanned for the same keys: form-urlencoded, multipart (`Content-Disposition` `name=`) and XML (element text of sensitive tags and attributes) are all covered.
-- A body that starts like JSON but does not parse is redacted by a text fallback that covers quoted string values only; numbers, booleans and nulls in such a body pass through.
+- Bodies that are not JSON are scanned for the same keys. This covers form-urlencoded, multipart (`Content-Disposition` `name=`) and XML (element text of sensitive tags and attributes).
+- A body that starts like JSON but does not parse is redacted by a text fallback. It covers quoted string values only, so numbers, booleans and nulls in such a body pass through.
 - Every body is truncated at `MaxDiagnosticBodyLength` with a `… [N characters truncated]` marker.
 
-The same sanitizer is used for the response body included in `RestStatusAssertionException` messages and for captured attachment content. GraphQL additionally redacts inline literals in documents; see [Queries and mutations](../graphql/operations.md#transport-details).
+The same sanitizer is used for the response body included in `RestStatusAssertionException` messages and for captured attachment content. GraphQL also redacts inline literals in documents, as [Queries and mutations](../graphql/operations.md#transport-details) describes.
 
 ## Coverage
 
@@ -99,4 +102,4 @@ builder.AddApplication("Api", app => app
 
 `RestCoverageCollector` reports every endpoint your suite **called**, with a hit count, under the `REST` category. It can only list what it saw. To find endpoints you **never** called, and response fields you never asserted, use [`OpenApiCoverageCollector`](../openapi.md), which walks your whole specification and consumes the `http.contract.shape` observations produced by shape assertions.
 
-Both write into the same reports; see [Coverage](../../observability/coverage.md).
+Both write into the same reports, described in [Coverage](../../observability/coverage.md).

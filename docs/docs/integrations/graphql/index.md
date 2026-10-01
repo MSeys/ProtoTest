@@ -27,11 +27,11 @@ public sealed class ViewerTests
 
 Run it with `dotnet test`. A green run prints `Passed Counts_workspaces`, and the trace lands at `TestResults/prototest-{runId}.prototrace` with a `graphql.operation` entry for the call.
 
-Most GraphQL test code says the same thing twice: once as a selection set, once as the assertion. ProtoTest lets one object do both: one anonymous object is the selection set and the assertion.
-
 ## What it adds
 
-Each test gets a GraphQL client with shape assertions, the shared [authentication model](../rest/authentication.md) and capture options shared with REST. The mutation below shows the shape-driven style: one object is the selection set and the assertion.
+Each test gets a GraphQL client with shape assertions, the shared [authentication model](../rest/authentication.md) and capture options shared with REST.
+
+Most GraphQL test code says the same thing twice: once as a selection set, once as the assertion. In ProtoTest one anonymous object is both. The mutation below shows that shape-driven style:
 
 ```csharp
 using var response = await Proto.Context.GraphQL()
@@ -72,7 +72,7 @@ builder.AddApplication("Api", app => app.AddGraphQL(graphQL =>
     graphQL.AddClient("GraphQL", endpoint: "GraphQL")));       // BaseUrl + Endpoints:GraphQL
 ```
 
-Calling `AddGraphQL` twice does not throw. The shared setup runs once. Each callback still adds its clients. The name may be omitted when the application has one GraphQL client; pass one only to address several targets.
+Calling `AddGraphQL` twice does not throw. The shared setup runs once, and each callback still adds its clients. Omit the name when the application has one GraphQL client. Pass one only to address several targets.
 
 When GraphQL is served by the same [in-process ASP.NET Core server](../aspnetcore.md) as the application, a plain `AddClient` reuses its transport automatically. A configured `BaseUrl` wins and the in-process server stays stopped.
 
@@ -82,7 +82,7 @@ The `Counts_workspaces` test above is the whole pattern: pick the client, name t
 
 ### Going further
 
-- **Authentication** - the same `[Auth<T>]`, `.Auth(...)` and `.WithoutAuth()` as [REST](../rest/authentication.md); narrow to GraphQL with `Protocols = ["GraphQL"]`. The [built-in test user](../rest/authentication.md#built-in-test-user) rides the same pipeline.
+- **Authentication** - the same `[Auth<T>]`, `.Auth(...)` and `.WithoutAuth()` as [REST](../rest/authentication.md). Narrow to GraphQL with `Protocols = ["GraphQL"]`. The [built-in test user](../rest/authentication.md#built-in-test-user) rides the same pipeline.
 - **Queries, mutations and uploads** - shape-driven, fluent and raw documents: [Queries and mutations](./operations.md).
 - **Subscriptions** - WebSocket or SSE, connection payloads, custom sockets: [Subscriptions](./subscriptions.md).
 - **Schema coverage** - point a client at your SDL: [Schema coverage](./coverage.md).
@@ -104,7 +104,7 @@ graphQL.AddClient("GraphQL")
 | `AddClient(name, Func<ProtoExecutionContext, Uri> resolver, configure = null)` | resolved per request from the running test |
 | `AddClient(name, Func<ProtoExecutionContext, CancellationToken, ValueTask<Uri>> resolver, configure = null)` | async per-request resolution |
 
-There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Applications:{application}:Endpoints` to append to the application's `BaseUrl`, for host-level and application clients alike. Without it the base URL is used as-is. An invalid base URL throws `ArgumentException`. A base URL that isn't absolute HTTP(S) fails when the request is sent or the subscription starts.
+There is **no endpoint default**. `endpoint` names the key under `ProtoTest:Applications:{application}:Endpoints` to append to the application's `BaseUrl`, for host-level and application clients alike. Without it the base URL is used as-is. An invalid base URL throws `ArgumentException`. A base URL that is not absolute HTTP(S) fails when the request is sent or the subscription starts.
 
 | Extension | Effect |
 | --- | --- |
@@ -116,9 +116,18 @@ There is **no endpoint default**: `endpoint` names the key under `ProtoTest:Appl
 GraphQLRequestBuilder GraphQL(this ProtoExecutionContext context, string? clientName = null);
 ```
 
-`Proto.Context.GraphQL(name)` picks the client in this order: the requested name, the client bound by `[Application(…)]` for GraphQL, the application's first registered GraphQL client, then `"Default"`. A requested name first tries its application-qualified form, then the name as given. When exactly one client of the protocol registered that name on another application, the call reaches it. Two applications sharing the name fail, so qualify the call (`App:Client`).
+`Proto.Context.GraphQL(name)` picks the client in this order:
 
-A client with no base address and no owner for its address falls back to the application's in-process transport, rooted at the endpoint the client registered, then `"GraphQL"`, then the requested name, looking up `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress`. If nothing resolves, the call throws `InvalidOperationException` listing the registered client names. Creating the builder records a `graphql.builder.create` event with the client, application, resolved source client, whether auth is configured and which resolver supplied the endpoint.
+1. the requested name
+2. the client bound by `[Application(…)]` for GraphQL
+3. the application's first registered GraphQL client
+4. `"Default"`.
+
+ A requested name first tries its application-qualified form, then the name as given. When exactly one client of the protocol registered that name on another application, the call reaches it. Two applications sharing the name fail, so qualify the call (`App:Client`).
+
+A client with no base address and no owner for its address falls back to the application's in-process transport. That transport is rooted at the endpoint the client registered, else `"GraphQL"`, else the requested name, looked up as `ProtoTest:Applications:{application}:Endpoints:{name}`. A per-test resolver beats `HttpClient.BaseAddress`. If nothing resolves, the call throws `InvalidOperationException` listing the registered client names.
+
+Creating the builder records a `graphql.builder.create` event. It holds the client, application, resolved source client, whether auth is configured and which resolver supplied the endpoint.
 
 | Section | Key | Default |
 | --- | --- | --- |
@@ -130,17 +139,17 @@ A client with no base address and no owner for its address falls back to the app
 | `ProtoTest:Applications:{app}:GraphQL` | `SubscriptionTransport` | `WebSocket`; `Sse` is the other valid value |
 | | `Schema` | schema source for `WithSchemaCoverage()` |
 
-Tune them in code or configuration. Configuration binds last, so it wins over code. The transport can come from configuration too; an invalid value throws when the test first calls `GraphQL()`, naming `WebSocket` and `Sse`.
+Tune them in code or configuration. Configuration binds last, so it wins over code. The transport can come from configuration too. An invalid value throws when the test first calls `GraphQL()`, naming `WebSocket` and `Sse`.
 
 ## In the trace and coverage
 
-Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under the protocol-scoped client entity (`client:System.Net.Http.HttpClient:GraphQL:{target}`), with a `graphql.endpoint.resolve` child, the operation type and name, header count, response status and error count; assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children.
+Queries and mutations record a `graphql.operation` operation (`GraphQL · {type} {name}`) under the protocol-scoped client entity (`client:System.Net.Http.HttpClient:GraphQL:{target}`). It has a `graphql.endpoint.resolve` child and carries the operation type and name, header count, response status and error count. Assertions record `assert.http.status`, `assert.graphql.*` and `assert.json.shape` as children.
 
 Deserialization records `graphql.response.deserialize`.
 
-Observations: `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
+The observations are `graphql.response` for every response, `graphql.failure` when sending fails, and `graphql.contract.shape` when a shape assertion matches. Subscriptions add `graphql.subscription.start|next|complete` events.
 
-`GraphQLCoverageCollector` reports operation-level hits; `GraphQLSchemaCoverageCollector` walks the SDL. See [Schema coverage](./coverage.md) and [Coverage](../../observability/coverage.md).
+`GraphQLCoverageCollector` reports operation-level hits, and `GraphQLSchemaCoverageCollector` walks the SDL. See [Schema coverage](./coverage.md) and [Coverage](../../observability/coverage.md).
 
 ## Skip
 
@@ -151,12 +160,14 @@ Observations: `graphql.response` for every response, `graphql.failure` when send
 ## Limits
 
 - No batching, persisted operations or incremental delivery (`@defer`).
-- WebSocket subscriptions speak only `graphql-transport-ws`; the legacy `graphql-ws` protocol is not supported.
-- A fluent `.Argument("file", Gql.Upload(...))` fails when the document is built; uploads travel through shape-driven arguments or `.Variables(...)`, which send them as multipart variables.
+- WebSocket subscriptions speak only `graphql-transport-ws`. The legacy `graphql-ws` protocol is not supported.
+- A fluent `.Argument("file", Gql.Upload(...))` fails when the document is built. Uploads travel through shape-driven arguments or `.Variables(...)`, which send them as multipart variables.
 - Shape variable type strings are parsed when you create the variable, so an invalid type fails immediately.
 - Only one `NextAsync` may be pending at a time.
 - The response must be JSON containing `data` or `errors`; anything else throws `GraphQLProtocolException`.
-- Upload streams are opened per send; responses are buffered whole in memory; there is no retry/policy layer.
+- Upload streams are opened per send.
+- Responses are buffered whole in memory.
+- There is no retry or policy layer.
 
 ## Next
 

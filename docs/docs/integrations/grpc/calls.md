@@ -62,7 +62,7 @@ Task<IReadOnlyList<TResponse>> ServerStreamingAsync<TRequest, TResponse>(Method<
     CancellationToken cancellationToken = default);
 ```
 
-`ServerStreamingAsync` reads the stream to completion and returns the messages; `ClientStreamingAsync` writes every request and completes the stream before reading the response. The raw helpers return the call object untouched for callers that drive it; the blocking two live on `client.Blocking`:
+`ServerStreamingAsync` reads the stream to completion and returns the messages. `ClientStreamingAsync` writes every request and completes the stream before reading the response. The raw helpers return the call object untouched for callers that drive it. The two blocking ones live on `client.Blocking`:
 
 ```csharp
 // client.Blocking
@@ -82,11 +82,11 @@ Task<AsyncDuplexStreamingCall<TRequest, TResponse>> OpenDuplexStreamingAsync<TRe
     CancellationToken cancellationToken = default);
 ```
 
-`Blocking.ServerStreaming` and `Blocking.DuplexStreaming` block the calling thread while authenticators and the channel are prepared; prefer the `Open*Async` variants on a synchronizing runner.
+`Blocking.ServerStreaming` and `Blocking.DuplexStreaming` block the calling thread while authenticators and the channel are prepared. Prefer the `Open*Async` variants on a synchronizing runner.
 
 ## Method descriptors
 
-The call helpers take a `Method<TRequest, TResponse>`; the generated client classes do not expose one per method, so keep the suite's call descriptors in one holder and use it everywhere:
+The call helpers take a `Method<TRequest, TResponse>`. The generated client classes do not expose one per method, so keep the suite's call descriptors in one holder and use it everywhere:
 
 ```csharp
 public static class OrdersMethods
@@ -108,7 +108,7 @@ The `MethodType` is `Unary`, `ServerStreaming`, `ClientStreaming` or `DuplexStre
 
 ## Assertions
 
-A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. A message reaches its facade through the factory; `MatchShape` returns the reply:
+A reply is a protobuf message, and `Should.MatchShape` matches it with the same [shapes](../../foundation/shape-matching.md) as REST and GraphQL. A message reaches its facade through the factory, and `MatchShape` returns the reply:
 
 ```csharp
 public static ProtoGrpcMessageAssertions<TResponse> For<TResponse>(TResponse response)
@@ -122,7 +122,7 @@ The reply is compared through its JSON form: field names are camelCase, enums ar
 
 Keep one copy of the exact-mode rule on the [shape matching page](../../foundation/shape-matching.md#exact-matching): exact mode flags any unlisted field.
 
-A failed call throws `RpcException`; `ProtoGrpcAssertions.For(exception)` returns its assertion facade:
+A failed call throws `RpcException`. `ProtoGrpcAssertions.For(exception)` returns its assertion facade:
 
 ```csharp
 public static ProtoGrpcExceptionAssertions For(RpcException exception);
@@ -143,7 +143,7 @@ catch (RpcException exception)
 }
 ```
 
-The assertion records an `assert.grpc.status` operation on the ambient test context with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section; a mismatch throws `GrpcAssertionException`. The facade goes through `For(...)` because C# has no extension properties. The older `ShouldHaveStatus`/`ShouldNotHaveStatus` spellings are listed in [Migrating from 1.0](../../getting-started/migrating-from-1-0.md).
+The assertion records an `assert.grpc.status` operation on the ambient test context, with expected and actual `rpc.grpc.status_code`/`rpc.grpc.status` and a `Result` Checks section. A mismatch throws `GrpcAssertionException`. The facade goes through `For(...)` because C# has no extension properties. The older `ShouldHaveStatus`/`ShouldNotHaveStatus` spellings are listed in [Migrating from 1.0](../../getting-started/migrating-from-1-0.md).
 
 ## Links
 

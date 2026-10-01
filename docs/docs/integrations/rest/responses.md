@@ -6,7 +6,8 @@ description: "Assert on a RestResponse: status, headers, JSON shapes and typed b
 
 # Responses and assertions
 
-Every verb returns a `RestResponse`. The body is already buffered, so you can read it as many times as you like.
+Every verb returns a `RestResponse`. This page shows how to assert on its status, headers and JSON shape, and how to
+read its body. The body is already buffered, so you can read it as many times as you like.
 
 ## Asserting
 
@@ -62,7 +63,7 @@ public RestResponse MatchShape(object expectedShape, bool exact, JsonSerializerO
 
 ### Asserting in the call
 
-A pending request can assert its response shape where the call is made. `ExpectAsync` awaits the response and runs the same `Should.MatchShape` the after-the-fact spelling runs, returning the response:
+A pending request can assert its response shape where the call is made. `ExpectAsync` awaits the response, runs the same `Should.MatchShape` as the after-the-fact spelling, and returns the response:
 
 ```csharp
 using var response = await Proto.Context.Rest()
@@ -75,11 +76,11 @@ On a mismatch the response is disposed and the `RestAssertionException` is rethr
 
 ### Status assertions
 
-A status assertion records an `assert.http.status` operation (source `ProtoTest.Rest`, parented to the request) with the expected and actual status codes, the client identity and `assertion.negated` when it is the `ShouldNot` side. `RestStatusAssertionException` carries the expected and actual status, the body and whether it was negated. It appends the sanitized body up to the smaller of the two length caps.
+A status assertion records an `assert.http.status` operation with source `ProtoTest.Rest`, under the request. It holds the expected and actual status codes, the client identity, and `assertion.negated` on the `ShouldNot` side. `RestStatusAssertionException` carries the expected and actual status, the body and whether it was negated. It appends the sanitized body up to the smaller of the two length caps.
 
 ### Content type, headers, cookies and redirects
 
-Each of these records its own `assert.http.*` operation (parented to the request, with the Checks section and `assertion.negated` on the `ShouldNot` side), returns the response, and names the request in its failure:
+Each of these records its own `assert.http.*` operation under the request, with the Checks section and `assertion.negated` on the `ShouldNot` side. Each returns the response and names the request in its failure:
 
 ```csharp
 response.Should.HaveContentType("application/json");          // the media type, without parameters, case-insensitive
@@ -90,13 +91,13 @@ response.Should.HaveCookie("session", "abc123");              // the value befor
 response.Should.HaveRedirectLocation("/orders/42");           // the Location header as it arrived, relative or absolute
 ```
 
-Header and cookie values pass through the shared redaction rules before they reach a failure message or the trace, so a failing assertion on `Authorization` or `Set-Cookie` shows `[REDACTED]` instead of the secret. A failure reads, for example, `GET /orders/42 - Expected header 'X-Correlation' to have value 'abc', but it was def.`
+Header and cookie values pass through the shared redaction rules before they reach a failure message or the trace. A failing assertion on `Authorization` or `Set-Cookie` shows `[REDACTED]` instead of the secret. A failure reads, for example, `GET /orders/42 - Expected header 'X-Correlation' to have value 'abc', but it was def.`
 
 ### `MatchShape`
 
 Describe the JSON you expect as an anonymous object. The short version of the rules:
 
-- **Objects match partially.** Only the properties you list are checked; anything else in the response is ignored.
+- **Objects match partially.** Only the properties you list are checked. Anything else in the response is ignored.
 - **Arrays match exactly.** Same length, compared position by position.
 - **Property names are case-insensitive** by default.
 - **Values can be literals or constraints** such as `JsonValue.GreaterThan(0)`.
@@ -104,11 +105,11 @@ Describe the JSON you expect as an anonymous object. The short version of the ru
 
 A failure names the request it was made against, the identifier the trace already carries (shown in the example above).
 
-The failure is a `RestAssertionException` whose `InnerException` is the shared `JsonShapeMismatchException` (`Mismatches`, `MatchedProperties`), so the mismatch list stays inspectable.
+The failure is a `RestAssertionException`. Its `InnerException` is the shared `JsonShapeMismatchException` (`Mismatches`, `MatchedProperties`), so the mismatch list stays inspectable.
 
-Keep one copy of the exact-mode rule on the [shape matching page](../../foundation/shape-matching.md#exact-matching): exact mode flags any unlisted field.
+[Exact mode](../../foundation/shape-matching.md#exact-matching) also fails on any field you did not list.
 
-The assertion records an `assert.json.shape` operation. It stores the expected and actual shapes, the match result and the mismatch list. On success it records an `http.contract.shape` observation carrying the request identifier, matched property paths, target type and status code, the input [OpenAPI coverage](../openapi.md) and [traffic coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted) use. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
+The assertion records an `assert.json.shape` operation. It stores the expected and actual shapes, the match result and the mismatch list. On success it records an `http.contract.shape` observation with the request identifier, matched property paths, target type and status code. [OpenAPI coverage](../openapi.md) and [traffic coverage](../../observability/coverage.md#traffic-coverage-observed-but-unasserted) read that observation. When `CaptureExpectedShapes` is on, the expected shape is attached as `rest-{n:00}-expected-shape` (`-02`, `-03` … for repeated assertions on one response).
 
 The full rules and every available matcher are on the [Shape matching](../../foundation/shape-matching.md) page.
 
@@ -136,14 +137,14 @@ dynamic? ReadAsDynamic();
 byte[] ReadAsBytes();
 ```
 
-`ReadAsJson<T>` is case-insensitive by default and returns `default` for an empty body. A deserialization failure records an `http.response.deserialize` event with `target.type` and `content.length` (plus `json.path` for a path read), then rethrows; the required reads record the same failed event for an empty body or JSON `null`. `ReadAsAnonymous` exists purely for type inference: the argument's values are ignored:
+`ReadAsJson<T>` is case-insensitive by default and returns `default` for an empty body. A deserialization failure records an `http.response.deserialize` event with `target.type` and `content.length`, plus `json.path` for a path read, and then rethrows. The required reads record the same failed event for an empty body or JSON `null`. `ReadAsAnonymous` exists only for type inference, and the argument's values are ignored:
 
 ```csharp
 var created = response.ReadAsAnonymous(new { id = 0, status = "" })!;
 Console.WriteLine(created.id);
 ```
 
-A common pattern is assert-then-read, so the test fails with a useful message before you dereference anything. `ReadRequired<T>` does both: it throws `RestAssertionException` naming the request identifier when the body is empty or JSON `null`, instead of making you write `!`:
+Assert first, then read, so the test fails with a useful message before you dereference anything. `ReadRequired<T>` does both. It throws `RestAssertionException` naming the request identifier when the body is empty or JSON `null`, so you need no `!`:
 
 ```csharp
 var workspace = response
@@ -161,9 +162,11 @@ var total = response.ReadRequired<decimal>("$.order.total");
 var first = response.ReadAsJson<string>("items[0].sku");
 ```
 
-The path subset is `$` for the root, dot members (`$.customer.id`) and zero-based array indices (`$.items[0].sku`); a leading member without `$` is accepted as `$.member`. Members match case-sensitively. Filters, wildcards, quoted names and slices are excluded.
+The path subset is `$` for the root, dot members (`$.customer.id`) and zero-based array indices (`$.items[0].sku`). A leading member without `$` is accepted as `$.member`. Members match case-sensitively. Filters, wildcards, quoted names and slices are excluded.
 
-A path that does not resolve throws `RestAssertionException` whose message starts with the request identifier and names the path, for example `GET /orders/42 - The JSON path '$.missing' did not match: the member 'missing' was not found.`; the shared `JsonPathException` stays reachable as `InnerException`. A value of the wrong type throws `JsonException`. `ReadRequired<T>(jsonPath)` additionally throws when the body is empty or the path holds JSON `null`, for every `T`, including value types, because the null check runs before the deserializer, and the nullable `ReadAsJson<T>(jsonPath)` returns `default` for an empty body.
+A path that does not resolve throws `RestAssertionException`. Its message starts with the request identifier and names the path, for example `GET /orders/42 - The JSON path '$.missing' did not match: the member 'missing' was not found.` The shared `JsonPathException` stays reachable as `InnerException`. A value of the wrong type throws `JsonException`.
+
+`ReadRequired<T>(jsonPath)` also throws when the body is empty or the path holds JSON `null`. That holds for every `T`, value types included, because the null check runs before the deserializer. The nullable `ReadAsJson<T>(jsonPath)` returns `default` for an empty body.
 
 ## Raw access
 

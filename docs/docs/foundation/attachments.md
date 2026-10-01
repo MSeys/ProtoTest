@@ -6,7 +6,7 @@ description: "Files a test produces reach your runner, so they show up next to t
 
 # Attachments
 
-An attachment is a file a test produced, for example a response body or a screenshot. ProtoTest hands attachments to your runner, so they show up next to the test result in your IDE or CI, and bundles them into the [`.prototrace` archive](../observability/prototrace.md).
+An attachment is a file a test produced, for example a response body or a screenshot. ProtoTest hands attachments to your runner, so they show up next to the test result in your IDE or CI. It also bundles them into the [`.prototrace` archive](../observability/prototrace.md).
 
 Integrations add attachments on their own ([REST](../integrations/rest/attachments.md), [GraphQL](../integrations/graphql/index.md), [Web](../integrations/web/diagnostics.md)). You can add your own from tests, hooks and attributes.
 
@@ -43,24 +43,24 @@ ProtoTestAttachment AddAttachment(ProtoTestAttachment attachment);
 
 Publishing happens during teardown, **after** every attribute and hook has finished and **before** `context.DisposeAsync` releases resources and the DI scope. So:
 
-- an `AfterTestAsync` can still add attachments, and they are published;
+- an `AfterTestAsync` can still add attachments, and they are published.
 - browser artifacts, which are finalised as the browser closes, are ready in time.
 
 A failure publishing one attachment does not stop the others. It is recorded like the rest of the teardown failures.
 
 ## How each runner receives them
 
-| Runner | How each runner receives them |
+| Runner | Receives them through |
 | --- | --- |
 | NUnit | `TestContext.AddTestAttachment` |
 | xUnit v3 | `TestContext.Current.AddAttachment` |
 | MSTest | added to `TestResult.ResultFiles` |
 | TUnit | `context.Output.AttachArtifact` |
-| xUnit v2 | written to disk; the path is printed to the console |
+| xUnit v2 | written to disk, with the path printed to the console |
 
 ## What the trace shows
 
-An attachment is recorded on the **record axis**, not as an operation: `Trace.Attachment` adds an `attachment-{n}` item to the record of the operation that produced it, or to the test's orphans when there is no active operation. After the test, the content is copied into the archive under `resources/{testId}/{artifact-N}/{name}`, and the item is updated with its archive path and size, so the [viewer](../observability/prototrace.md) can open it right from the step that produced it. If capturing fails, the item carries the capture error instead of a path.
+An attachment is recorded on the **record axis**, not as an operation. `Trace.Attachment` adds an `attachment-{n}` item to the record of the operation that produced it, or to the test's orphans when there is no active operation. After the test, the content is copied into the archive under `resources/{testId}/{artifact-N}/{name}`. The item is then updated with its archive path and size, so the [viewer](../observability/prototrace.md) can open it from the step that produced it. If capturing fails, the item carries the capture error instead of a path.
 
 One journey's archive, the sample suite's project journey:
 
@@ -96,6 +96,6 @@ public interface IProtoTestAttachmentPublisher
 
 - Attachment names are unique per test after prefixing. There is no overwrite.
 - Attachments are in-memory or file-backed references until publishing. The archive copy is made after the test.
-- Publishing is best-effort per attachment: one failure is reported, the rest still publish.
+- Publishing is best-effort per attachment. One failure is reported, and the rest still publish.
 - **A file-backed runner (NUnit, TUnit) makes an in-memory attachment durable** by writing a copy under `%TEMP%/ProtoTest/attachments`. ProtoTest does not delete those copies, so they accumulate until the OS temp cleaner runs. They are safe to delete between runs.
 - The archive embeds attachment bytes by default. `trace.EmbedArtifacts = false` declares them (name, media type, size) without reading or writing the content, and `MaxArtifactBytes` caps any single artifact.

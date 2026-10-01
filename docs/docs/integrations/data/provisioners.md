@@ -25,7 +25,7 @@ sequenceDiagram
     Note over Map: teardown: Cleanup in reverse creation order
 ```
 
-ProtoTest does not decide *how* data gets created: through your public API, a test-support endpoint, a repository or raw SQL. That is the provisioner's job, and you write it once.
+ProtoTest does not decide *how* data gets created: through your public API, a test-support endpoint, a repository or raw SQL. That is the provisioner's job, and you write it once. This page shows the contract, how to register and use a provisioner, how `Ref<T>` finds what it created, and how cleanup runs.
 
 ## The contract
 
@@ -46,7 +46,7 @@ public sealed record ProtoDataProvisioningResult<T>(
     IAsyncDisposable? Cleanup = null);
 ```
 
-Input and result are often different: you build a *request*, and get back the *created resource*. From the sample app:
+Input and result are often different. You build a *request*, and get back the *created resource*. From the sample app:
 
 ```csharp
 public sealed class NorthstarMemberProvisioner
@@ -94,7 +94,7 @@ AddDataProvisioner<T, TProvisioner>()                   // input and result are 
 AddDataProvisioner<TInput, TResult, TProvisioner>()     // different types
 ```
 
-Provisioners are resolved from dependency injection and are scoped, so their constructors can take services. A repeat with the same implementation type is a no-op; two *different* provisioners for one input/result pair both register and fail later, when the pair is used. At provisioning time exactly one provisioner must resolve for the pair. Zero provisioners, more than one, or a null return value throws `ProtoDataException`.
+Provisioners are resolved from dependency injection and are scoped, so their constructors can take services. A repeat with the same implementation type is a no-op. Two *different* provisioners for one input/result pair both register and fail later, when the pair is used. At provisioning time exactly one provisioner must resolve for the pair. Zero provisioners, more than one, or a null return value throws `ProtoDataException`.
 
 ## Using it
 
@@ -129,7 +129,10 @@ var chosen = Proto.Context.Data().Ref<ProjectResponse>(projects[1].Id);
 ```
 
 - Matching is `entry.Value is T` and, when an identity is given, `StringComparison.Ordinal` equality. Identities are case-sensitive.
-- Zero matches and more than one match throw `ProtoDataException` with guidance; when several values of a type exist, an identity is required.
+- Zero matches and more than one match throw `ProtoDataException` with guidance. When several values of a type exist, an identity is required.
+
+- Only `CreateAsync` and `CreateManyAsync` results are tracked. `Build()` and `BuildMany()` values are never in the map.
+- `IProtoData` is scoped to one test, so the map cannot reach data provisioned by another test. Defaults get the same lookup through `ProtoDataValueContext.Ref<T>(identity)`.
 
 ```mermaid
 stateDiagram-v2
@@ -139,8 +142,6 @@ stateDiagram-v2
     tracked --> failed: two or more matches → throw
     resolved --> [*]: test ends
 ```
-- Only `CreateAsync` and `CreateManyAsync` results are tracked. `Build()` and `BuildMany()` values are never in the map.
-- `IProtoData` is scoped to one test, so the map cannot reach data provisioned by another test. Defaults get the same lookup through `ProtoDataValueContext.Ref<T>(identity)`.
 
 A sample where two same-typed values are provisioned and then referenced again is [`tests/ProtoTest.Data.Tests/ProtoDataTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Data.Tests/ProtoDataTests.cs).
 
@@ -165,6 +166,9 @@ sealed class DeleteOnDispose(Func<Task> delete) : IAsyncDisposable
 - Cleanups run in reverse creation order, so dependent records are deleted before their parents.
 - Each cleanup is a test resource (`data:{TypeName}:{sequence}`, kind `data`) released in teardown before the test's clients are disposed.
 
+- Each release is a `data.cleanup` operation carrying `data.type`, `data.identity` and `data.provisioner`.
+- If several cleanups fail, they are all attempted and the failures are aggregated as an `AggregateException`.
+
 ```mermaid
 gantt
     title Cleanup at teardown (reverse creation order)
@@ -172,8 +176,6 @@ gantt
     member cleanup (created 1st, released 2nd) :done, c1, 2026-01-01, 1s
     project cleanup (created 2nd, released 1st) :done, c2, after c1, 1s
 ```
-- Each release is a `data.cleanup` operation carrying `data.type`, `data.identity` and `data.provisioner`.
-- If several cleanups fail, they are all attempted and the failures are aggregated as an `AggregateException`.
 
 When cleanup happens at a coarser level, for example when an [attribute](../../foundation/attributes.md) deletes the whole tenant, leave `Cleanup` null, as the sample provisioner does.
 
@@ -187,13 +189,13 @@ data.create · InviteMemberRequest → MembershipResponse
    └─ data.cleanup · release phase (reverse creation order, teardown)
 ```
 
-`data.provision` runs as a child of the `data.create` / `data.create_many` operation and carries `data.input_type`, `data.result_type`, `data.provisioner`, `data.identity`, `data.owned` and `data.value_id`. Each tracked value is also recorded as a `value` item with id `{type}:{identity}`; the user-facing form of `data.value_id` is `value:{type}:{id}`, for example `value:membership:42`. The type segment is snake-cased and has generic arity dropped (`Envelope<InvoiceLine>` becomes `envelope`); without an identity it ends in `#{n}`.
+`data.provision` runs as a child of the `data.create` or `data.create_many` operation. It carries `data.input_type`, `data.result_type`, `data.provisioner`, `data.identity`, `data.owned` and `data.value_id`. Each tracked value is also recorded as a `value` item with id `{type}:{identity}`. The [Data overview](./index.md#in-the-trace-and-coverage) explains the `value:{type}:{id}` form, for example `value:membership:42`.
 
 ## Limits
 
-- **No retry or transaction semantics.** A provisioner is called once per object; if it fails, the failure is the test's failure.
+- **No retry or transaction semantics.** A provisioner is called once per object. If it fails, the failure is the test's failure.
 - **`Identity` is what you say it is.** ProtoTest records the string but cannot check that it names the created record.
-- **Cleanup is optional and coarse.** Nothing tracks what a provisioner created unless it returns a `Cleanup`; a cleanup that fails is aggregated, not retried.
+- **Cleanup is optional and coarse.** Nothing tracks what a provisioner created unless it returns a `Cleanup`. A cleanup that fails is aggregated, not retried.
 - **One provisioner per input/result pair.** Different routes for the same pair are an error at provisioning time, not a selection.
 
 ## Links

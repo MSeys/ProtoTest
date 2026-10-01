@@ -428,8 +428,8 @@ export default function Home(): ReactNode {
                 <Link to="/docs/project/leaving">Adoption and exit costs</Link>
               </p>
               <Link className={styles.measurement} to="/docs/project/benchmarks#opencsms-at-1000-tests">
-                <strong>35–36 ms</strong>
-                <span>per-test median in a 1,000-test benchmark, with its limits →</span>
+                <strong>{'< 1 ms'}</strong>
+                <span>of a 36 ms test in a real suite with a database and a broker is ProtoTest. Where the rest goes →</span>
               </Link>
             </div>
           </div>
@@ -441,7 +441,7 @@ export default function Home(): ReactNode {
               Your first suite, ready to run.
             </Heading>
             <p>
-              The template creates a small API and four integration tests. The .NET 10 SDK is enough; the
+              The template creates a small API and four integration tests. The .NET 10 SDK is enough. The
               default starter runs without containers or a browser.
             </p>
             <p>

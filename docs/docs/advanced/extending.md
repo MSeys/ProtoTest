@@ -11,9 +11,9 @@ Every built-in integration is built on public types, and a package you write use
 ## The contract
 
 - **The extension points are public.** A minimal broker adapter and a minimal web backend compile against the public surface only, so a point that regressed to internals would break them. An integration never reaches into another package's internals.
-- **One mechanism per concern.** A client is a client initializer, a wait is a readiness probe, run state is infrastructure, a capability is a capability descriptor, and evidence goes through the trace writer. An extension uses those mechanisms; it does not add a second lifecycle.
+- **One mechanism per concern.** A client is a client initializer, a wait is a readiness probe, run state is infrastructure, a capability is a capability descriptor, and evidence goes through the trace writer. An extension uses those mechanisms and does not add a second lifecycle.
 - **Options follow one shape.** An options type implements `IProtoConfigurableOptions`, registers through `ProtoOptionsRegistration`, and binds its section over the code callback, so configuration wins the same way everywhere.
-- **The run composes your package like any other.** A builder extension registers services on the `IProtoHostBuilder`; the host owns start, stop and release from there.
+- **The run composes your package like any other.** A builder extension registers services on the `IProtoHostBuilder`, and the host owns start, stop and release from there.
 
 ## Where each extension point lives
 
@@ -60,7 +60,7 @@ flowchart TD
 
 ## Your first integration package
 
-A minimal package is six small steps, in this order. The worked bus client below follows them, and each step runs before the next: register the package on a host, write one test through the context accessor, and read its trace before adding the collector.
+A minimal package is six small steps, in this order. The worked bus client below follows them. Finish each step before the next: register the package on a host, write one test through the context accessor, and read its trace before adding the collector.
 
 1. **Options.** An options type implementing `IProtoConfigurableOptions` with a section name, registered through `ProtoOptionsRegistration.Configure`, so code callbacks run in order and configuration binds over them. See [Options and configuration](#options-and-configuration).
 2. **The client and its initializer.** A client class plus an initializer that opens it per test and registers it, so tests get a fresh client with the test's cancellation token. See [part 1](#1-the-client-and-its-initializer).
@@ -119,7 +119,7 @@ internal sealed class BusClientInitializer(string name, BusOptions options) : IP
 }
 ```
 
-The initializer reads the test's cancellation token and passes it to its own I/O. A client that a test shares across tests must not hold the context: it resolves the context per call, only while it acts on the test's flow. See [Context lookups](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#context-lookups).
+The initializer reads the test's cancellation token and passes it to its own I/O. A client that a test shares across tests must not hold the context. It resolves the context per call, only while it acts on the test's flow. See [Context lookups](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#context-lookups).
 
 ### 2. A host builder extension
 
@@ -148,7 +148,7 @@ public static class ProtoExecutionContextBusExtensions
 
 ### 4. Optionally, a collector
 
-A collector consuming your `bus.publish` observations, so topics show up in coverage reports. It derives from `ProtoCoverageCollector`; the shape is in [writing a collector](../observability/coverage.md#writing-a-collector).
+A collector consuming your `bus.publish` observations, so topics show up in coverage reports. It derives from `ProtoCoverageCollector`, with the shape shown in [writing a collector](../observability/coverage.md#writing-a-collector).
 
 ### Options and configuration
 
@@ -264,7 +264,7 @@ catch (Exception exception)
 | Member | What it does |
 | --- | --- |
 | `Id` | the entry id the archive and the viewer use |
-| `SetAttribute(name, value)` | adds a string attribute; chainable |
+| `SetAttribute(name, value)` | adds a string attribute, and is chainable |
 | `Succeed()` | completes as `Succeeded` |
 | `Fail(exception)` | completes as `Failed` and records the exception |
 | `Cancel(exception?)` | completes as `Cancelled` |
@@ -308,14 +308,14 @@ Assert.That(click.Outcome, Is.EqualTo(ProtoTraceOutcome.Succeeded));
 A runner integration needs three things, and the five shipped adapters are the worked examples:
 
 1. Build and start one `ProtoHost` per process, and stop it at the end.
-2. Around each test, call `ProtoTestAdapter.Prepare(method, host)` and start the returned preparation with `StartAsync(host, publisher)`. Skip through your runner's own mechanism when `CanRun` is false; afterwards, call `CompleteTestAsync(result)` with the best outcome the runner can tell you. `ProtoTestResult` has factories for passed, skipped, partial, failed and cancelled.
+2. Around each test, call `ProtoTestAdapter.Prepare(method, host)` and start the returned preparation with `StartAsync(host, publisher)`. Skip through your runner's own mechanism when `CanRun` is false. Afterwards, call `CompleteTestAsync(result)` with the best outcome the runner can tell you. `ProtoTestResult` has factories for passed, skipped, partial, failed and cancelled.
 3. Implement `IProtoTestAttachmentPublisher` using the runner's own attachment API.
 
-Start the test on the same async flow the test body will run on, because `Proto.Context` depends on it. The shared `ProtoTest.AdapterContract` suite is what every adapter package runs; extend it instead of forking it.
+Start the test on the same async flow the test body will run on, because `Proto.Context` depends on it. The shared `ProtoTest.AdapterContract` suite is what every adapter package runs. Extend it instead of forking it.
 
 ## Limits of the contract
 
 - **There is no internal surface.** An extension compiles against the public packages only. When it needs a type it cannot see, the owning package publishes the contract or moves the code. If you believe a point is missing, open an issue so it can be added deliberately. See [Community packages](https://github.com/MSeys/ProtoTest/blob/main/CONTRIBUTING.md#community-packages).
-- **A capability is declared only by something that can serve it.** An extension declares its capability while its address can be provided; where the address is missing, the capability is absent and gated tests skip instead of failing at first use.
+- **A capability is declared only by something that can serve it.** An extension declares its capability while its address can be provided. Where the address is missing, the capability is absent and gated tests skip instead of failing at first use.
 - **The trace viewer contract is additive.** A new kind or attribute needs no viewer release for a new prefix.
 - **Use one mechanism per concern.** A second host builder or registry is not an extension.

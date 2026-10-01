@@ -25,11 +25,11 @@ These members existed in 1.0.1 and no longer exist. Your suite does not compile 
 | `ProtoExecutionContext.RegisterClient<T>(client, name, bool)` | the third argument is now `ProtoClientOwnership` (`Context` or `Caller`), so a `true` becomes `ProtoClientOwnership.Context` | [Clients](../foundation/clients.md) |
 | `ProtoDocumentSource.LoadText(source, baseUrl, httpClient)` | one `LoadText` method with optional parameters replaces the overload | [Extending](../advanced/extending.md) |
 | `ProtoHttpAuthLifecycleHook` constructor | sealed, and takes a `ProtoProtocol` instead of a string | [Hooks](../foundation/hooks.md) |
-| `ProtoHttpClientResolution` members | a positional record with `ClientEntityName`; `SourceName`, `SourceClientName` and `Deconstruct` are gone, and `ProtoHttpClientResolver.Resolve` takes the client name as an optional third argument | [Extending](../advanced/extending.md) |
+| `ProtoHttpClientResolution` members | a positional record with `ClientEntityName`. `SourceName`, `SourceClientName` and `Deconstruct` are gone, and `ProtoHttpClientResolver.Resolve` takes the client name as an optional third argument | [Extending](../advanced/extending.md) |
 | the backend operation's `Result` on `WebOperationContext` | gone | |
 | Playwright options `Context` | configure the browser context in code with `ConfigureContext` | [Web](../integrations/web/index.md) |
 | `RequiresPlaywrightBrowser.Session` | the condition probes the configured browser or channel | [Skip conditions](../foundation/skip-conditions.md) |
-| `GrpcAttachmentOptions` HTTP members | no longer derives from the HTTP attachment options, so `SensitiveHeaders` and `SensitiveQueryParameters` are gone; gRPC metadata redaction uses the gRPC client's `SensitiveMetadataKeys` | [gRPC](../integrations/grpc/index.md) |
+| `GrpcAttachmentOptions` HTTP members | no longer derives from the HTTP attachment options, so `SensitiveHeaders` and `SensitiveQueryParameters` are gone. gRPC metadata redaction uses the gRPC client's `SensitiveMetadataKeys` | [gRPC](../integrations/grpc/index.md) |
 | Raw `ServerStreaming` and `DuplexStreaming` helpers | moved from the gRPC client to the blocking facade: `client.Blocking.ServerStreaming(...)` | [gRPC](../integrations/grpc/index.md) |
 | the `PollInterval` on `RabbitMqOptions` | awaits are event-driven and `MessagingOptions.DefaultTimeout` bounds them | [Messaging](../integrations/messaging/index.md) |
 

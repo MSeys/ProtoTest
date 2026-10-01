@@ -37,12 +37,12 @@ FAILED orders match their shape (16 ms)
     {line: 2, title: 'The counts', note: 'Every test by outcome. A partial test passed its runner outcome but something inside it failed, and the summary does not hide it.'},
     {line: 4, title: 'The test', note: 'Outcome, name and duration. Every test that did not fully succeed gets a block like this one.'},
     {line: 5, title: 'The recorded error', note: 'The message the run recorded, so it points at the code that failed.'},
-    {line: 8, title: 'The source location', note: 'The file and line of the selected failure.'},
-    {line: 9, title: 'The selected operation', note: 'The kind and name of the failing operation, and its status. The kind prints once when it is the name.'},
-    {line: 10, title: 'The rule', note: 'The diagnosis rule that matched. An assertion lists its mismatches; an operation error names the error.'},
-    {line: 11, title: 'The mismatches', note: 'Path, expected and actual, capped at three per block with a truncation line.'},
+    {line: 7, title: 'The source location', note: 'The file and line of the selected failure.'},
+    {line: 8, title: 'The selected operation', note: 'The kind and name of the failing operation, and its status. The kind prints once when it is the name.'},
+    {line: 9, title: 'The rule', note: 'The diagnosis rule that matched. An assertion lists its mismatches, and an operation error names the error.'},
+    {line: 10, title: 'The mismatches', note: 'Path, expected and actual, capped at three per block with a truncation line.'},
   ]}
-  foot={<>A failed run gate gets its own block at the end, with the gate's message and details. The output above is the committed MCP test fixture; a run with nothing to report prints the header, the counts and <code>All green.</code></>}
+  foot={<>A failed run gate gets its own block at the end, with the gate's message and details. The output above is the committed MCP test fixture. A run with nothing to report prints the header, the counts and <code>All green.</code></>}
 />
 
 The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other three commands.
@@ -88,7 +88,7 @@ The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the
 }
 ```
 
-The failure selector matches the viewer's. It picks the deepest failing operation. An `assert.*` check outranks an error. Phase spans rank last. A cancelled operation never outranks a failed one. `prototest summary`, the MCP tools and the viewer therefore select the same failure and tell one story.
+The failure selector matches the viewer's. It picks the deepest failing operation. An `assert.*` check outranks an error. Phase operations rank last. A cancelled operation never outranks a failed one. `prototest summary`, the MCP tools and the viewer therefore select the same failure and tell one story.
 
 ## The rules
 
@@ -101,7 +101,7 @@ A non-succeeded test is explained by the first rule that matches, in this order:
 | runner failure | the runner reported a failure and no operation error exists | the message and the recorded source location |
 | finding | the runner outcome stayed green but a teardown or rollback finding attached | the finding, and the operation it names |
 
-A failed run gate is not a per-test rule; it gets its own block in the document, as above.
+A failed run gate is not a per-test rule. It gets its own block in the document, as above.
 
 Anything else is reported as **unexplained**, with the run and test ids and a pointer to the viewer. The diagnosis never guesses. If the evidence does not carry a cause, the document says so.
 
@@ -118,18 +118,18 @@ Anything else is reported as **unexplained**, with the run and test ids and a po
    the nearest call ancestor ──┘      operation        └─▶ report rows (≤ 10)
 ```
 
-- the selected failure operation: kind, name, phase, status, error, source file, line, function and the recorded attributes;
-- its ancestor chain to the test execution, and the nearest call ancestor (`http.request`, `graphql.operation`, `grpc.call`, a `messaging.*` operation);
-- the operation's sections (checks, diff, code, fields) with payload previews;
-- the embedded source snippet around the failing line, when the archive carries it. A file over the 512 KB embed cap, or a run with `EmbedSources` off, is absent with that reason;
-- the artifacts reachable from the failing operation, listed with media type and size. The MCP tool lists metadata only; reading the content is a library call (`ReadContext(..., includeArtifactContent: true)`), bounded at 64 KB;
-- the state changes the failing operation caused;
+- the selected failure operation: kind, name, phase, status, error, source file, line, function and the recorded attributes.
+- its ancestor chain to the test execution, and the nearest call ancestor (`http.request`, `graphql.operation`, `grpc.call`, a `messaging.*` operation).
+- the operation's sections (checks, diff, code, fields) with payload previews.
+- the embedded source snippet around the failing line, when the archive carries it. A file over the 512 KB embed cap, or a run with `EmbedSources` off, is absent with that reason.
+- the artifacts reachable from the failing operation, listed with media type and size. The MCP tool lists metadata only. Reading the content is a library call (`ReadContext(..., includeArtifactContent: true)`), bounded at 64 KB.
+- the state changes the failing operation caused.
 - the report rows for the test: findings, run gates and the coverage row the operation touched.
 
 ## Limits
 
 - Deterministic and offline: one archive and one report in, one JSON document out. No model runs inside ProtoTest, no network call is made, and nothing is written. The same archive produces byte-identical JSON.
-- Coverage, gates and findings come from the JSON report a `ProtoTest.Reporting` sink embedded. Without a report, coverage is omitted with the reason, and gates and findings fall back to the trace's own records. Coverage is never recomputed from spans.
+- Coverage, gates and findings come from the JSON report a `ProtoTest.Reporting` sink embedded. Without a report, coverage is omitted with the reason, and gates and findings fall back to the trace's own records. Coverage is never recomputed from the trace.
 - Hard caps bound every document and context:
 
 | What is capped | The cap |

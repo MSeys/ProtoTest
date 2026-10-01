@@ -14,7 +14,7 @@ description: "Register ProtoTest with xUnit v3: the assembly fixture, [ProtoTest
 dotnet add package ProtoTest.Xunit3
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. The `dotnet new prototest` template defaults to `net10.0`. Pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 **On .NET SDK 10, an xUnit v3 project runs on Microsoft.Testing.Platform.** The `dotnet new prototest` template carries the opt-in:
 
@@ -26,7 +26,7 @@ ProtoTest targets **.NET 8, 9 and 10**, and needs **xunit.v3 4.0.0 or newer**. T
 }
 ```
 
-With that file in the project or solution directory, run `dotnet test` from that directory. `dotnet test --project Starter.Tests/Starter.Tests.csproj` and `dotnet test Starter.slnx` work from that directory; from outside it they resolve through the old VSTest path and fail with `VSTest target is no longer supported` instead of running tests.
+With that file in the project or solution directory, run `dotnet test` from that directory. `dotnet test --project Starter.Tests/Starter.Tests.csproj` and `dotnet test Starter.slnx` work from that directory. From outside it they resolve through the old VSTest path and fail with `VSTest target is no longer supported` instead of running tests.
 
 ```bash
 dotnet test                                            # right: run from the global.json directory
@@ -79,7 +79,7 @@ public class OrderTests
 
 A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a test of its own.
 
-A plain `[Fact]` keeps running unchanged next to the converted tests; it simply has no `Proto.Context`, or add `[assembly: ProtoTestAutoWrap]` to give it one. [Bring an existing xUnit suite](./bring-your-existing-suite.md) covers the incremental path for both xUnit versions.
+A plain `[Fact]` keeps running unchanged next to the converted tests, without a `Proto.Context`. Add `[assembly: ProtoTestAutoWrap]` to give it one. [Bring an existing xUnit suite](./bring-your-existing-suite.md) covers the incremental path for both xUnit versions.
 
 **Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Fact]` and `[Theory]` runs through the same lifecycle. A test that carries `[ProtoTestFact]` or `[ProtoTestTheory]` keeps its own handler and is never wrapped twice.
 

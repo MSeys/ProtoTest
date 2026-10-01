@@ -8,13 +8,14 @@ import TabbedCode from '@site/src/components/TabbedCode';
 
 # Queries and mutations
 
-There are three ways to describe an operation. Pick per test; they all end in the same `ExecuteAsync()`.
+This page shows how to write a GraphQL query or mutation, pass variables and upload files. There are three ways to
+describe an operation. Pick one per test. They all end in the same `ExecuteAsync()`.
 
 | Style | Best for |
 | --- | --- |
 | **Shape-driven**: `Query("root", args).Select(shape)` | one root field, where the selection is also what you assert |
 | **Fluent**: `Query("Name", q => q.Field(...))` | several root fields, aliases, connections with filters and paging |
-| **Raw**: `Request("query { … }")` | fragments, directives, anything the builders don't cover |
+| **Raw**: `Request("query { … }")` | fragments, directives, anything the builders do not cover |
 
 One operation in all three styles:
 
@@ -72,11 +73,11 @@ using var response = await Proto.Context.GraphQL()
     .ExecuteAsync();
 ```
 
-`Gql.Field` is a placeholder meaning "select this scalar, I don't care about its value".
+`Gql.Field` is a placeholder meaning "select this scalar, whatever its value".
 
 ### Select and assert in one step
 
-`ExpectAsync(shape)` is `Select(shape)` + `ExecuteAsync()` + `Should.MatchShape(shape)`; on a shape mismatch it disposes the response and rethrows:
+`ExpectAsync(shape)` is `Select(shape)` + `ExecuteAsync()` + `Should.MatchShape(shape)`. On a shape mismatch it disposes the response and rethrows:
 
 ```csharp
 using var controlPlane = await Proto.Context.GraphQL()
@@ -127,11 +128,11 @@ new { total = JsonValue.GreaterThan(0) }     // → total (a matcher is a leaf: 
 - Every public property becomes a field, named by `[JsonPropertyName]` or else camelCase. `[JsonIgnore]` properties are skipped.
 - Recursion stops at a **leaf**: `Gql.Field`, any `JsonValue` matcher, or a value of a primitive, enum, `string`, `decimal`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `Guid` or `Uri` type.
 - An array or enumerable is unwrapped to its first element, so `new[] { new { id = Gql.Field } }` selects `{ id }`.
-- `IDictionary<string, …>` shapes are supported; the keys are the field names and the values describe their selections.
-- A nested object with no public properties throws `ArgumentException` (`GraphQL selection type '…' has no selectable public properties.`), because GraphQL doesn't allow an empty selection. A fluent operation with no fields at all throws `InvalidOperationException`.
+- `IDictionary<string, …>` shapes are supported. The keys are the field names, and the values describe their selections.
+- A nested object with no public properties throws `ArgumentException` (`GraphQL selection type '…' has no selectable public properties.`), because GraphQL does not allow an empty selection. A fluent operation with no fields at all throws `InvalidOperationException`.
 
 :::caution
-Don't put `Gql.Enum(...)` inside a *selection* shape; it isn't treated as a leaf. It belongs in *arguments*.
+Do not put `Gql.Enum(...)` inside a *selection* shape, because it is not treated as a leaf. It belongs in *arguments*.
 :::
 
 ### Arguments and variables
@@ -168,7 +169,7 @@ GraphQLRequestBuilder Mutation(string? name, Action<GraphQLOperationBuilder> con
 GraphQLRequestBuilder Subscription(string? name, Action<GraphQLOperationBuilder> configure);
 ```
 
-The second parameter decides the overload: a lambda gives you the fluent builder, an object gives you shape-driven.
+The second parameter decides the overload. A lambda gives you the fluent builder, and an object gives you shape-driven.
 
 ```csharp
 using var response = await Proto.Context.GraphQL()
@@ -191,7 +192,7 @@ using var response = await Proto.Context.GraphQL()
 | field | `Alias(alias)`, `Argument(name, value)`, `Fields(params names)`, `Select(configure)` |
 | selection | `Field(name, configure?)`, `Fields(params names)` |
 
-`Gql.Var("tenant")` references a declared variable (`$tenant`); supply its value with `.Variables(...)`. The builder above emits one `Dashboard` query with the `me` fields and the aliased `workspaces` selection, variables included.
+`Gql.Var("tenant")` references a declared variable (`$tenant`). Supply its value with `.Variables(...)`. The builder above emits one `Dashboard` query with the `me` fields and the aliased `workspaces` selection, variables included.
 
 ### Connections
 
@@ -231,8 +232,8 @@ response.Should.HaveNoErrors().Should.MatchShape(new
 
 The filter builder emits the `{ field: { op: value } }` convention used by Hot Chocolate: `Equal`, `NotEqual`, `Contains`, `StartsWith`, `EndsWith`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`, `In`, plus `Nested(field, …)`, `Some(field, …)` for lists, and `Or(...)`.
 
-:::note[Fluent responses aren't unwrapped]
-With shape-driven operations, `Should.MatchShape` compares against the **root field's value**. With fluent and raw operations there's no single root, so it compares against the whole `data` object. That is why the example above wraps its shape in `orders = …`.
+:::note[Fluent responses are not unwrapped]
+With shape-driven operations, `Should.MatchShape` compares against the **root field's value**. With fluent and raw operations there is no single root, so it compares against the whole `data` object. That is why the example above wraps its shape in `orders = …`.
 :::
 
 ## Raw documents
@@ -261,7 +262,7 @@ response.Should.HaveNoErrors().Should.MatchShape(new
 });
 ```
 
-The document is parsed when you call `Request`; if the named operation isn't in it, the call throws `ArgumentException`.
+The document is parsed when you call `Request`. If the named operation is not in it, the call throws `ArgumentException`.
 
 ## Headers and variables
 
@@ -275,7 +276,7 @@ The trace records header names and the count, not header values. `ConnectionPayl
 
 ## File uploads
 
-ProtoTest implements the GraphQL multipart request spec. Put `Gql.Upload(...)` in shape-driven arguments or anywhere inside `.Variables(...)`, and it's declared as `Upload!` automatically:
+ProtoTest implements the GraphQL multipart request spec. Put `Gql.Upload(...)` in shape-driven arguments or anywhere inside `.Variables(...)`, and it is declared as `Upload!` automatically:
 
 ```csharp
 var expected = new
@@ -303,10 +304,10 @@ static GraphQLUpload Upload(Func<Stream> openRead, string fileName, string conte
 
 The request is sent as `multipart/form-data` with `operations`, `map` and numbered file parts, plus the `GraphQL-preflight: 1` header that CSRF-protected servers expect. The `Func<Stream>` overload opens a fresh stream per send.
 
-:::caution[Fluent uploads are not normalized]
-`Gql.Upload` is only intercepted in shape-driven arguments and in `.Variables(...)`. A fluent `.Argument("file", Gql.Upload(...))` renders as a literal and is not routed through the multipart normalizer.
+:::caution[Fluent uploads fail]
+`Gql.Upload` is only intercepted in shape-driven arguments and in `.Variables(...)`. A fluent `.Argument("file", Gql.Upload(...))` cannot be written as a document literal, so building the document throws `ArgumentException` naming those two routes.
 :::
 
 ## Transport details
 
-Queries and mutations are sent as `POST` with `Accept: application/graphql-response+json, application/json;q=0.9`. The endpoint must be an absolute HTTP(S) URI; the resolve step is traced as `graphql.endpoint.resolve` with the server address. Calling `ExecuteAsync()` on a subscription throws; use [`SubscribeAsync()`](./subscriptions.md).
+Queries and mutations are sent as `POST` with `Accept: application/graphql-response+json, application/json;q=0.9`. The endpoint must be an absolute HTTP(S) URI. The resolve step is traced as `graphql.endpoint.resolve` with the server address. Calling `ExecuteAsync()` on a subscription throws, so use [`SubscribeAsync()`](./subscriptions.md).

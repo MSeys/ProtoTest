@@ -17,7 +17,7 @@ Not every test can run in every environment. A **skip condition** stops a test b
 [RequiresCapability(ProtoCapabilityKinds.Store, Reason = "The suite does not own the store.")]
 ```
 
-The test body never runs. No context is created, so no hook or attribute sees the test. Nothing is written to the trace. No teardown runs, because there is nothing to tear down. The reason reaches the runner's skip mechanism; see [what a skip means](#what-a-skip-means).
+The test body never runs, no hook or attribute sees the test, and nothing is written to the trace. The reason reaches the runner's skip mechanism, as [what a skip means](#what-a-skip-means) describes.
 
 One skipped test, as the runner reports it:
 
@@ -36,7 +36,7 @@ The archive for that run holds the run and nothing else:
   blindSpots={[]}
 />
 
-A condition is a `ProtoAttribute`. Conditions are evaluated with the test's other attributes, and an adapter that does not know them runs the test: the contract is opt-in. To write your own, see [writing your own](#writing-your-own).
+A condition is a `ProtoAttribute`. Conditions are evaluated with the test's other attributes. An adapter that does not know them runs the test, so the contract is opt-in. To write your own, see [writing your own](#writing-your-own).
 
 ## How it works
 
@@ -53,7 +53,7 @@ public class RequiresCapabilityAttribute : ProtoAttribute, IProtoSkipCondition
 }
 ```
 
-The test runs when `ProtoHost.HasCapability(kind, CapabilityName, CapabilityInstance)` is true. `CapabilityName` matches the descriptor name and `CapabilityInstance` matches the instance a capability describes (an `AddAspNetCoreServer` name); every non-null filter must match. Otherwise the test skips with `Reason`, or with *"This test requires the '...' capability, which this host is not composed with."* when no reason is given:
+The test runs when `ProtoHost.HasCapability(kind, CapabilityName, CapabilityInstance)` is true. `CapabilityName` matches the descriptor name, and `CapabilityInstance` matches the instance a capability describes (an `AddAspNetCoreServer` name). Every non-null filter must match. Otherwise the test skips with `Reason`, or with *"This test requires the '...' capability, which this host is not composed with."* when no reason is given:
 
 ```csharp
 [RequiresCapability(
@@ -67,7 +67,7 @@ Integrations register a capability when they are configured, so the condition an
 [RequiresCapability(ProtoCapabilityKinds.Server, CapabilityName = "ASP.NET Core")]
 ```
 
-An integration whose capability depends on an address can declare it conditionally: `AddCapabilityUnlessConfigured(capability, "ProtoTest:Applications:Api:BaseUrl")` drops the declaration when every listed key is already configured. The environment provides the address, so the capability stays honest and the tests that require it skip. `AddAspNetCoreServer` uses this: with `BaseUrl` configured its `ASP.NET Core` capability is absent and `[RequiresInProcess]` skips.
+An integration whose capability depends on an address can declare it conditionally. `AddCapabilityUnlessConfigured(capability, "ProtoTest:Applications:Api:BaseUrl")` drops the declaration when every listed key is already configured. The environment then provides the address, so the capability stays honest and the tests that require it skip. `AddAspNetCoreServer` uses this. With `BaseUrl` configured, its `ASP.NET Core` capability is absent and `[RequiresInProcess]` skips.
 
 Each declaration is evaluated on its own. A descriptor drops only when every conditional declaration for it drops and no unconditional declaration promises it. A capability for one named instance carries that instance, so satisfying one instance's keys drops only that instance.
 
@@ -76,7 +76,7 @@ The conditional registration kinds answer the address question in both direction
 | Registration | Drops when | For |
 | --- | --- | --- |
 | `AddCapabilityUnlessConfigured(capability, keys...)` | every key is configured, because the environment provides what the integration would serve | `AddAspNetCoreServer`, the in-process device transport |
-| `AddCapabilityWhenProvided(capability, keys...)` | none of the keys is provided, neither as a configured value nor as a key a registered infrastructure piece declares | an integration that cannot serve without an address: `UseRabbitMq` declares `broker` over its connection string, so a run with neither a configured key nor a broker container skips instead of failing |
+| `AddCapabilityWhenProvided(capability, keys...)` | none of the keys is provided, neither as a configured value nor as a key a registered infrastructure piece declares | an integration that cannot serve without an address. `UseRabbitMq` declares `broker` over its connection string, so a run with neither a configured key nor a broker container skips instead of failing. |
 
 ```mermaid
 flowchart TB
@@ -106,10 +106,10 @@ Three shipped conditions remove the stringly-typed gates for the most common cas
 public async Task ...() { ... }
 ```
 
-- `[RequiresWorker<TProgram>]` checks the `worker` capability by the program assembly's name, the identity `AddWorkerHost<TProgram>()` registers, so a typo cannot turn a missing worker into a plausible skip. Its default reason names `AddWorkerHost<TProgram>()`.
-- `[RequiresServer(name)]` checks the `server` capability's instance (the server name), not the descriptor name `ASP.NET Core`, so configuring one named server's `BaseUrl` drops only that server. Its default reason names `AddAspNetCoreServer<TProgram>(name: "...")`.
+- `[RequiresWorker<TProgram>]` checks the `worker` capability by the program assembly's name, the identity `AddWorkerHost<TProgram>()` registers. A typo then cannot turn a missing worker into a plausible skip. Its default reason names `AddWorkerHost<TProgram>()`.
+- `[RequiresServer(name)]` checks the `server` capability's instance (the server name), not the descriptor name `ASP.NET Core`. Configuring one named server's `BaseUrl` drops only that server. Its default reason names `AddAspNetCoreServer<TProgram>(name: "...")`.
 - `[RequiresApplication(name)]` checks that the suite declared the application with `AddApplication`, regardless of which protocols it registered. Its default reason names `AddApplication("...", app => ...)`.
-- `[RequiresTestClock]` checks the `clock` capability: the winning in-process application provider and a hosted worker declare it, because they bridge the test clock into the process they serve. A published, container, AppHost or loopback application declares none, so a journey that advances the clock skips instead of asserting a time the application never saw.
+- `[RequiresTestClock]` checks the `clock` capability. The winning in-process application provider and a hosted worker declare it, because they bridge the test clock into the process they serve. A published, container, AppHost or loopback application declares none, so a journey that advances the clock skips instead of asserting a time the application never saw.
 
 Each accepts `Reason` like `[RequiresCapability]`, and `[RequiresCapability(kind)]` stays for open kinds and integration-specific names.
 
@@ -132,11 +132,11 @@ builder.AddCapabilityReason(
     "Api");
 ```
 
-A gate whose `(kind, name)` has no declared reason falls back to its default message, so a suite can state the common reasons and leave the rest. `[RequiresApplication]` checks that an application was declared rather than a capability, so it keeps its own `Reason` and default.
+A gate whose `(kind, name)` has no declared reason falls back to its default message. A suite can state the common reasons and leave the rest. `[RequiresApplication]` checks that an application was declared rather than a capability, so it keeps its own `Reason` and default.
 
 ### In-process only
 
-`[RequiresInProcess]` is shorthand for `[RequiresCapability(ProtoCapabilityKinds.Server)]`: it skips unless a `server` capability is registered, with the reason *"This test requires an in-process application server; the suite is running against a published environment."*
+`[RequiresInProcess]` is shorthand for `[RequiresCapability(ProtoCapabilityKinds.Server)]`. It skips unless a `server` capability is registered, with the reason *"This test requires an in-process application server; the suite is running against a published environment."*
 
 ```csharp
 [RequiresInProcess]
@@ -164,7 +164,7 @@ The condition reads the host's Playwright options, where your `AddWeb(...)` call
 
 Like any condition, `Reason` replaces that default message.
 
-Selenium has no equivalent probe: the driver comes from your own factory, so the framework cannot know whether a browser exists. Gate Selenium tests with `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` and a try/catch around the first session that uses the browser, calling your runner's skip mechanism:
+Selenium has no equivalent probe. The driver comes from your own factory, so the framework cannot know whether a browser exists. Gate Selenium tests with `[RequiresCapability(ProtoCapabilityKinds.Browser, CapabilityName = "Selenium")]` and a try/catch around the first session that uses the browser, calling your runner's skip mechanism:
 
 ```csharp
 try
@@ -196,9 +196,9 @@ public interface IProtoSkipCondition
 
 Adapters evaluate the conditions before calling `StartTestAsync`:
 
-- the test body never runs;
-- no `ProtoExecutionContext` is created, so no hook or attribute sees the test;
-- nothing is written to the trace: no test record, no entries;
+- the test body never runs
+- no `ProtoExecutionContext` is created, so no hook or attribute sees the test
+- nothing is written to the trace: no test record, no entries
 - no teardown runs, because there is nothing to tear down.
 
 The reason is handed to the runner's skip mechanism:
@@ -211,7 +211,7 @@ The reason is handed to the runner's skip mechanism:
 | [TUnit](../runners/tunit.md) | `TUnit.Core.Skip.Test(reason)` | yes |
 | [MSTest](../runners/mstest.md) | an ignored `TestResult` | yes, on its `DisplayName` and `LogOutput` |
 
-MSTest has no public dynamic skip API in the version ProtoTest targets, so the adapter returns an ignored result instead. Its `IgnoreReason` is internal, so the reason travels on the public `LogOutput` and is also prefixed to the display name: the test reads as skipped and the runner's output still says why.
+MSTest has no public dynamic skip API in the version ProtoTest targets, so the adapter returns an ignored result instead. Its `IgnoreReason` is internal, so the reason travels on the public `LogOutput` and is also prefixed to the display name. The test reads as skipped, and the runner's output still says why.
 
 :::note[Skipped tests are absent, not empty]
 Because nothing starts, a skipped test has no context, no trace record and no report entry. It appears in the runner's own results as skipped and nowhere in ProtoTest's output. The [runner overview](../runners/overview.md) describes the same rule from the outcome side.
@@ -226,4 +226,4 @@ Because nothing starts, a skipped test has no context, no trace record and no re
 
 ## In the sample suite
 
-The sample suite gates each environment-dependent journey with a condition: the domain journey requires the `store` capability, the web journey requires the Playwright browser, and the broker journey requires the `broker` capability. The broker reason is declared once in the sample's `Setup` with `AddCapabilityReason`. See [Environments](../getting-started/environments.md) for how the three shapes select those capabilities.
+The sample suite gates each environment-dependent journey with a condition. The domain journey requires the `store` capability, the web journey requires the Playwright browser, and the broker journey requires the `broker` capability. The broker reason is declared once in the sample's `Setup` with `AddCapabilityReason`. See [Environments](../getting-started/environments.md) for how the three shapes select those capabilities.

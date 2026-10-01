@@ -54,7 +54,7 @@ builder.AddInfrastructure("NorthstarDatabase", chain => chain
     "ConnectionStrings:Northstar");
 ```
 
-No provider available fails the build, naming the target and every provider's unmet condition. Never a late "no client registered" inside the first test.
+When no provider is available, the build fails and names the target and every provider's unmet condition. You never get a late "no client registered" inside the first test.
 
 ## How it works
 
@@ -83,11 +83,11 @@ builder.AddInfrastructure(
     "ConnectionStrings:Northstar");
 ```
 
-There is no per-provider address parameter: a provider fills the target's keys or checks them. A provider piece registered for a target that declares keys must be able to fill them (an `IProtoConnectionInfrastructure` or `IProtoSettingsInfrastructure`), exactly like `AddInfrastructure`.
+There is no per-provider address parameter, because a provider fills the target's keys or checks them. A provider piece registered for a target that declares keys must be able to fill them, exactly like `AddInfrastructure`. That means an `IProtoConnectionInfrastructure` or `IProtoSettingsInfrastructure`.
 
 ### Writing a provider
 
-A provider is the availability condition, the start behavior and the service declaration in one public contract, so a third party can ship one without the framework knowing the environment it describes:
+A provider is the availability condition, the start behavior and the service declaration in one public contract. A third party can ship one without the framework knowing the environment it describes:
 
 ```csharp
 public sealed class GridProvider : IProtoTargetProvider
@@ -109,7 +109,7 @@ public sealed class GridProvider : IProtoTargetProvider
 | **`Name`** | identifies the provider in the resolution record and in every skip reason |
 | **`Condition`** | evaluated against `ProtoProviderConditionContext`: the resolved `Configuration`, the target's `Keys`, and the winners of the targets resolved before this chain (`Target("Api")`). A dependent chain declares `ResolveAfter("Api")` so it is resolved after the target it reads, whatever the registration order. |
 | **`Infrastructure`** | the piece the run starts and releases when this provider wins. `null` means configuration itself serves the target and there is nothing to start. |
-| **`Capabilities`** | declared only by the winner: a losing provider's capability stays absent, so `[RequiresCapability]` skips exactly when the environment cannot serve it |
+| **`Capabilities`** | declared only by the winner. A losing provider's capability stays absent, so `[RequiresCapability]` skips exactly when the environment cannot serve it. |
 | **`ConfigureServices`** | contributes the services that exist only while this provider serves its target. It runs while the host is built, for the winner only, so a losing provider cannot leave a second client or server behind. `ProtoTargetProvider` spells it `WinnerServices`. |
 
 `ProtoTargetProvider` builds the common shape, a name, a piece, a condition and capabilities, in one line. Implement the interface when the provider itself has behavior.
@@ -118,7 +118,7 @@ public sealed class GridProvider : IProtoTargetProvider
 
 ### Applications, workers and devices
 
-`AddApplication` is a target like any other: its derived key is `ProtoTest:Applications:{name}:BaseUrl`, and its providers decide how the run serves it.
+`AddApplication` is a target like any other. Its derived key is `ProtoTest:Applications:{name}:BaseUrl`, and its providers decide how the run serves it.
 
 ```csharp
 builder.AddApplication("Api", app => app
@@ -130,22 +130,22 @@ builder.AddApplication("Api", app => app
         .AddWebSocketClient("Chargers", path: "/ws/{deviceId}")));
 ```
 
-- `UseInProcess<TProgram>()` is the in-process server as a provider: when it wins it declares the `server` and `clock` capabilities, and `[RequiresInProcess]` / `[RequiresTestClock]` gate exactly the runs it serves. `AddAspNetCoreServer` keeps working unchanged and is the provider a suite that declares no chain gets.
-- `UseLoopback(createApp)` starts the hand-built application on a loopback listener and publishes the bound address. It is a real process boundary: no `server`, no `clock`, and the readiness probe waits for the address.
-- `AddWorkerHost<TProgram>(name)` nests the worker under the application: `UseEnvironment()` is available when the application's winner does not run it in-process (so the environment already runs the worker and the suite must not start a second consumer), and `UseHost()` hosts the worker's entry point in this process, bridging the test clock. A worker registered on the host builder keeps `UseHost` as its default.
-- Devices follow the application's winner: `AddInProcessWebSocketDevices<TProgram>(application)` serves through the TestServer while the in-process provider wins, and routes the same client over the socket at the winner's published address otherwise. Its capability is declared while the chain is served in-process, so a loopback or AppHost winner does not advertise a transport it cannot use.
+- `UseInProcess<TProgram>()` is the in-process server as a provider. When it wins it declares the `server` and `clock` capabilities, and `[RequiresInProcess]` / `[RequiresTestClock]` gate exactly the runs it serves. `AddAspNetCoreServer` keeps working unchanged, and it is the provider a suite gets when it declares no chain.
+- `UseLoopback(createApp)` starts the hand-built application on a loopback listener and publishes the bound address. It is a real process boundary, with no `server` and no `clock`, and the readiness probe waits for the address.
+- `AddWorkerHost<TProgram>(name)` nests the worker under the application. `UseEnvironment()` is available when the application's winner does not run it in-process. The environment then already runs the worker, and the suite must not start a second consumer. `UseHost()` hosts the worker's entry point in this process, bridging the test clock. A worker registered on the host builder keeps `UseHost` as its default.
+- Devices follow the application's winner. `AddInProcessWebSocketDevices<TProgram>(application)` serves through the TestServer while the in-process provider wins. Otherwise it routes the same client over the socket at the winner's published address. Its capability is declared while the chain is served in-process, so a loopback or AppHost winner does not advertise a transport it cannot use.
 
-An application that declares no provider registers no chain: `AddAspNetCoreServer` and a configured `BaseUrl` keep behaving as before, and the readiness probe's "in-process" claim follows the `server` capability as it always did.
+An application that declares no provider registers no chain. `AddAspNetCoreServer` and a configured `BaseUrl` keep behaving as before, and the readiness probe's "in-process" claim follows the `server` capability as it always did.
 
 ### Provided providers
 
 | Integration | Provider | Serves when |
 | --- | --- | --- |
 | Core | `UseConfigured()` | every key the target declares has a value |
-| ProtoTest.AspNetCore | `UseInProcess<TProgram>()` | always; the fallback of an application chain |
-| ProtoTest.AspNetCore | `UseLoopback(createApp)` | always; publishes the loopback address |
+| ProtoTest.AspNetCore | `UseInProcess<TProgram>()` | always, as the fallback of an application chain |
+| ProtoTest.AspNetCore | `UseLoopback(createApp)` | always, and publishes the loopback address |
 | ProtoTest.Testcontainers | `UseContainer(container)` | `DockerProbe.IsAvailable()` (the same endpoint Testcontainers uses) |
-| ProtoTest.Aspire | `UseAspireResource<TAppHost>(resource)` | `ProtoTest:Aspire:Enabled`, or the resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled`, is set, the integration-owned selection keys |
+| ProtoTest.Aspire | `UseAspireResource<TAppHost>(resource)` | one of the integration-owned selection keys is set: `ProtoTest:Aspire:Enabled`, or the resource's own `ProtoTest:Aspire:Resources:{resource}:Enabled` |
 | ProtoTest.Aspire | `ProtoAspireOptions.MapConnectionString(resource, key)` | a registered AppHost publishes the resource's connection string under `key` |
 | ProtoTest.Hosting | `UseEnvironment()` / `UseHost()` | the application is served elsewhere / always |
 
@@ -153,9 +153,9 @@ An application that declares no provider registers no chain: `AddAspNetCoreServe
 
 ## What the trace shows
 
-The run records one `environment.resolved` event per target with the target, its keys, the winning provider and every skipped provider with the reason, plus one `environment.provider.skipped` event per loser. A skipped provider's piece is never started, owned or released, and its run entity carries `infrastructure.state: skipped` with the reason. Read the record in a report to answer "which environment did this run actually use?" without reading the setup code.
+The run records one `environment.resolved` event per target. It holds the target, its keys, the winning provider and every skipped provider with the reason. Each loser also gets an `environment.provider.skipped` event. A skipped provider's piece is never started, owned or released, and its run entity carries `infrastructure.state: skipped` with the reason. Read the record in a report to answer "which environment did this run actually use?" without reading the setup code.
 
-The chain figure is in [Infrastructure](./infrastructure.md#what-it-is): one target, providers in order, one winner. The two recordings below show what that decision changes for a test. The drill hardcodes its address and never touches the composition:
+The chain figure is in [Infrastructure](./infrastructure.md#what-it-is): one target, providers in order, one winner. The two recordings below show what that decision changes for a test. The first drill hardcodes its address and never touches the composition:
 
 ```text
 FailureDrills.TheAddressWasHardcodedForOneMachine
@@ -173,16 +173,16 @@ The trace records the failure on `test.execution`, but the call it never wrapped
   blindSpots={[]}
 />
 
-A provider that lost to an earlier one records the earlier provider as the reason. A provider whose own condition failed records the condition: the missing keys, the unset selection key, or the requirement the probe did not meet.
+A provider that lost to an earlier one records the earlier provider as the reason. A provider whose own condition failed records that condition: the missing keys, the unset selection key, or the requirement the probe did not meet.
 
 ## Limits
 
-- **One chain per target.** A target name is unique on a host builder; a repeated registration throws. Add providers to the chain instead of registering the target twice.
+- **One chain per target.** A target name is unique on a host builder, and a repeated registration throws. Add providers to the chain instead of registering the target twice.
 - **Resolved once, while the host is built.** Conditions read the configuration the host resolved. They never see the settings a started piece publishes later, and there is no per-test re-resolution. A retried start records the same resolved chain.
-- **A chain with no satisfied provider is a build failure.** There is no implicit fallback: end a chain with an `Always` provider when the run must serve the target somehow.
+- **A chain with no satisfied provider is a build failure.** There is no implicit fallback. End a chain with an `Always` provider when the run must serve the target somehow.
 - **The winner starts at its registration position.** A provider piece starts where it was registered, like any infrastructure piece, and readiness still belongs to the pieces that publish an address.
 - **A worker's chain resolves after its application's.** `ResolveAfter` orders the resolution, not the registration. A worker nested under an application reads its winner, so the hosted-then-environment decision cannot race the application's own chain.
 - **The winner's services are registered once.** `ConfigureServices` runs for the winning provider while the host is built. A loser contributes nothing, and a host with no chain keeps the registrations its `Add...` calls made.
 - **Adapters without a chain use `AddCapabilityWhenInProcess`.** It declares the capability with the application's name and its fallback key, so the key's configured value decides.
-- **The old skip-key registration is obsolete.** `AddInfrastructure(piece, keys)` keeps its all-configured skip rule for 1.x; the chain overload on this page is the replacement. See [Infrastructure](./infrastructure.md).
+- **The old skip-key registration is obsolete.** `AddInfrastructure(piece, keys)` keeps its all-configured skip rule for 1.x. The chain overload on this page replaces it. See [Infrastructure](./infrastructure.md).
 - **The AppHost composes like any target.** `AddAspireAppHost` registers the AppHost with the configured provider first and the AppHost provider on the selection keys. See [Aspire](../integrations/aspire.md).

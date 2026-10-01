@@ -26,7 +26,7 @@ Run it with `dotnet test`. A green run prints `Passed An_overdue_invoice_of_125`
 
 ## What it adds
 
-Numbers, enums, dates and your own value objects are never invented: if nothing supplies a member, the build fails with a `ProtoDataException` naming it, rather than a silently wrong `0`.
+Numbers, enums, dates and your own value objects are never invented. If nothing supplies a member, the build fails with a `ProtoDataException` naming it, rather than a silently wrong `0`.
 
 A reader sees immediately that the test above cares about an overdue invoice of 125. Every other property, such as the id, the customer or the currency, comes from [defaults you configure once](./defaults.md).
 
@@ -36,7 +36,7 @@ A reader sees immediately that the test above cares about an overdue invoice of 
 dotnet add package ProtoTest.Data
 ```
 
-ProtoTest targets .NET 8, 9 and 10; the template defaults to `net10.0` unless `--framework` is passed. `ProtoTest.Data` depends only on `ProtoTest.Core`.
+ProtoTest targets .NET 8, 9 and 10. The template defaults to `net10.0` unless `--framework` is passed. `ProtoTest.Data` depends only on `ProtoTest.Core`.
 
 ## Compose
 
@@ -68,7 +68,7 @@ var project = Proto.Context.Data()
     .Build();
 ```
 
-`Build()` is enough when the test only needs an object; when the application must actually create it, use `CreateAsync` and a [provisioner](./provisioners.md).
+`Build()` is enough when the test only needs an object. When the application must actually create it, use `CreateAsync` and a [provisioner](./provisioners.md).
 
 ### Going further
 
@@ -89,11 +89,11 @@ Values set with `With` before `BuildMany` apply to every item.
 
 #### Constructors
 
-ProtoTest creates objects through the single public constructor or the parameterless one. It matches constructor parameters to properties by name, ignoring case. Then it sets the remaining writable properties. Records work naturally through their primary constructor. Multiple public constructors without a parameterless route, a `With` on a member the chosen route cannot assign, and a non-writable property that is named in `With` all throw `ProtoDataException`. For types that protect their invariants, register a [domain factory](./defaults.md#domain-factories) instead.
+ProtoTest creates objects through the single public constructor or the parameterless one. It matches constructor parameters to properties by name, ignoring case. Then it sets the remaining writable properties. Records work through their primary constructor. These throw `ProtoDataException`: several public constructors without a parameterless route, a `With` on a member the chosen route cannot assign, and a `With` on a non-writable property. For types that protect their invariants, register a [domain factory](./defaults.md#domain-factories) instead.
 
 #### The identity map
 
-`CreateAsync` and `CreateManyAsync` results are tracked per test under the identity string the provisioner returned, and `Ref<T>` resolves them again, typically to wire a foreign key:
+`CreateAsync` and `CreateManyAsync` results are tracked per test under the identity string the provisioner returned. `Ref<T>` resolves them again, typically to wire a foreign key:
 
 ```csharp
 var projects = await Proto.Context.Data()
@@ -103,11 +103,11 @@ var projects = await Proto.Context.Data()
 var first = Proto.Context.Data().Ref<ProjectResponse>(projects[0].Id);
 ```
 
-Matching, scoping and failure rules live with the [provisioner contract](./provisioners.md#refs-and-the-identity-map). In short: identities are case-sensitive, zero or ambiguous matches throw, only created (never built) values are in the map, and the map never crosses tests.
+Matching, scoping and failure rules live with the [provisioner contract](./provisioners.md#refs-and-the-identity-map). In short, identities are case-sensitive and zero or ambiguous matches throw. Only created values are in the map, never built ones, and the map never crosses tests.
 
 #### Explain
 
-When a value surprises you, ask where it came from, before constructing anything. The shape of the output, with illustrative values:
+When a value surprises you, ask where it came from before constructing anything. This is the shape of the output, with illustrative values:
 
 ```csharp
 var plan = Proto.Context.Data().For<Invoice>()
@@ -169,7 +169,7 @@ On the builder:
 
 | Member | Does |
 | --- | --- |
-| `With(member, value)` | sets a scenario-relevant member; returns the same builder |
+| `With(member, value)` | sets a scenario-relevant member and returns the same builder |
 | `Explain()` | resolves and describes every value without constructing the object |
 | `Build()` / `BuildMany(count, configure)` | constructs in memory only |
 | `CreateAsync()` / `CreateAsync<TResult>()` | builds, provisions through the registered provisioner, and returns the application's value |
@@ -190,7 +190,7 @@ data.create · Invoice → MembershipResponse        # operation
 | Operation | Notes |
 | --- | --- |
 | `data.explain`, `data.build` | carry `data.type`, `data.object_sequence`, `data.member_count` and `data.construction_source` (`Reflection` or the factory source) |
-| `data.create`, `data.create_many` | parent the `data.provision` operation; `data.create` adds `data.identity` |
+| `data.create`, `data.create_many` | parent the `data.provision` operation, and `data.create` adds `data.identity` |
 | `data.build_many` | adds `data.type` and `data.count` |
 | `data.create_many` | adds `data.type`, `data.result_type` and `data.count` |
 | `data.provision` | adds `data.input_type`, `data.result_type`, `data.provisioner`, `data.identity`, `data.owned` and `data.value_id` |
@@ -198,9 +198,9 @@ data.create · Invoice → MembershipResponse        # operation
 
 Each resolved member writes a `data.value.resolve` event under the build or explain operation, with `data.type`, `data.member`, `data.value_type`, `data.value`, `data.redacted`, `data.source_kind` and `data.source`. An unresolved member writes the same event with `data.source_kind = "Unresolved"` before the exception is thrown.
 
-Provisioned values are tracked as a `value` item whose id is `{type}:{id}`; the user-facing form in `data.value_id` is `value:{type}:{id}`, for example `value:invoice_line:INV-1`. The type segment is the CLR type name in snake_case with generic arity dropped (`Envelope<InvoiceLine>` becomes `envelope`); without an identity the segment ends in `#{n}`.
+Provisioned values are tracked as a `value` item whose id is `{type}:{id}`. The user-facing form in `data.value_id` is `value:{type}:{id}`, for example `value:invoice_line:INV-1`. The type segment is the CLR type name in snake_case with generic arity dropped, so `Envelope<InvoiceLine>` becomes `envelope`. Without an identity the segment ends in `#{n}`.
 
-The package emits no observations and ships no coverage collector: its evidence lives in ProtoTrace. Redaction protects that trace graph only; it says nothing about application logs or HTTP bodies.
+The package emits no observations and ships no coverage collector, so its evidence lives in ProtoTrace. Redaction protects that trace graph only. It says nothing about application logs or HTTP bodies.
 
 ## Skip
 
@@ -215,7 +215,7 @@ There are no package-specific skip attributes. See [Skip conditions](../../found
 ## Limits
 
 - **No invented semantics.** As above: an unresolved member fails with the member's name instead of a silently wrong `0`.
-- **Reflection needs a public constructor.** Multiple public constructors without a parameterless one is an error; `With` must target a settable property or be consumed by a registered factory.
+- **Reflection needs a public constructor.** Several public constructors without a parameterless one is an error. `With` must target a settable property or be consumed by a registered factory.
 - **The identity map is per test and read-only for `Build`.** Values built in memory are not referenceable, and another test's provisioned data is out of reach.
 - **Ref identity matching is case-sensitive** (`StringComparison.Ordinal`).
 - **Redaction is best-effort and trace-only.** Reference cycles are cut to `[circular]`, and nothing else is redacted, not logs, not HTTP bodies, not reports.

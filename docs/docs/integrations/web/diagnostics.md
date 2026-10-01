@@ -30,13 +30,19 @@ When an action or assertion fails, the backend captures the page at that moment:
 
 ProtoTest lowercases the name parts and replaces anything but letters and digits with `-`. It replaces `{element}` with the operation name when the failure has no element. It numbers repeats with a per-test sequence, so a failure repeated on the same element keeps both sets of artifacts. Captures run in order screenshot, DOM, location.
 
-A hand-written backend produces the same artifacts by calling `WebFailureArtifacts.CaptureAsync(…)` in `ProtoTest.Web`, and reports the same resolution and actionability wording through `WebBackendErrors`; both are part of the [backend-neutral building blocks](./index.md#compose).
+A hand-written backend produces the same artifacts with `WebFailureArtifacts.CaptureAsync(…)` from `ProtoTest.Web`, and the same error wording with `WebBackendErrors`. Both are [backend-neutral building blocks](./index.md#compose).
 
-Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capture itself fails, you'll see a `web.diagnostics.artifact_failed` entry, or `web.diagnostics.failed` when the backend produced no attachments at all, and still get the real exception.
+Capturing never replaces the original error. Each artifact registers on its own, so one failing attachment does not drop the rest. If capturing fails, the trace shows `web.diagnostics.artifact_failed`, or `web.diagnostics.failed` when no attachment was produced at all, and the test still gets the real exception.
 
 ## Captured downloads
 
-`WebSession.DownloadAsync` (and its [`WebPage` shortcut](./interactions.md#downloads)) also registers the file the browser downloaded as a test attachment, named `web-{session}-download-{n}-{file}`: the session and stem are sanitized, the sequence keeps two downloads of the same name apart, and the extension is kept so the file stays openable. The media type is guessed from the extension. The attachment reaches your runner's output and the `.prototrace` archive like any other; a download that cannot be attached is traced as `web.download.attachment_failed` and the file is still returned to the test. Selenium fails the call with `WebBackendCapabilityException` before the trigger runs, because the WebDriver protocol has no download API.
+`WebSession.DownloadAsync`, and its [`WebPage` shortcut](./interactions.md#downloads), also keeps the downloaded file as a test attachment named `web-{session}-download-{n}-{file}`:
+
+- The session and the file stem are cleaned up the same way as other artifact names.
+- The number keeps two downloads with the same name apart.
+- The extension is kept, so the file still opens, and the media type is guessed from it.
+
+The attachment reaches your runner's output and the `.prototrace` archive like any other. A download that cannot be attached is traced as `web.download.attachment_failed`, and the test still gets the file. Selenium fails the call with `WebBackendCapabilityException` before the trigger runs, because the WebDriver protocol has no download API.
 
 ## Playwright traces
 
@@ -48,9 +54,13 @@ Playwright's own trace, a timeline with DOM snapshots you can open in the [Playw
 | `Always` | for every test |
 | `Off` | never; tracing isn't started |
 
-The kept trace is attached as `playwright-{session}-trace.zip` with content type `application/vnd.microsoft.playwright.trace+zip`; a capture failure is traced as `web.playwright.trace_failed` and never replaces the test's own error.
+The kept trace is attached as `playwright-{session}-trace.zip`, with content type `application/vnd.microsoft.playwright.trace+zip`. A failure to capture it is traced as `web.playwright.trace_failed` and never replaces the test's own error.
 
-With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, `[correlationId] [session] {name}`, so the two timelines line up. Grouping is re-entrant: an operation nested inside another on the same session, such as a `WaitUntilAsync` predicate that reads an element, joins its caller's group instead of blocking on it. Groups are serialized by a semaphore, are skipped entirely when `TraceRetention = Off`, and a failure to start or end a group is traced as `web.playwright.correlation_failed`.
+With `CorrelateTraceGroups` on (the default), each ProtoTest operation is a named group in the Playwright trace, `[correlationId] [session] {name}`, so the two timelines line up.
+
+- An operation nested inside another on the same session, such as a `WaitUntilAsync` predicate that reads an element, joins its caller's group instead of waiting for it.
+- Groups run one at a time, and are skipped entirely when `TraceRetention = Off`.
+- A failure to start or end a group is traced as `web.playwright.correlation_failed`.
 
 ### Browser signals
 
@@ -74,11 +84,11 @@ Selenium has no equivalent trace format, so ProtoTest writes its own `selenium-{
 | `url`, `title` | the final location, best-effort |
 | `entries[]` | **every actionability attempt**: `TimestampUtc`, `Operation`, `ComponentPath`, `Element`, `Locator`, `Attempt`, `Outcome`, `Observation` and `ElapsedMilliseconds` |
 
-When a Selenium click "randomly" fails, this is where you find out it was covered by a toast for 4.8 seconds. A failure while writing the attachment is traced as `web.diagnostics.artifact_failed`. The timeline exists only as this one JSON attachment; there is no second report system.
+When a Selenium click "randomly" fails, this is where you find out it was covered by a toast for 4.8 seconds. A failure while writing the attachment is traced as `web.diagnostics.artifact_failed`. This one JSON attachment is the whole timeline. There is no second report.
 
 ## What the trace records for every operation
 
-Every web operation is a trace entry carrying `web.backend` and `web.session`; element operations add `web.component`, `web.element`, `web.locator` and `web.component.roots`:
+Every web operation is a trace entry carrying `web.backend` and `web.session`. Element operations add `web.component`, `web.element`, `web.locator` and `web.component.roots`:
 
 | Kind | For | Extra attributes |
 | --- | --- | --- |
@@ -100,7 +110,7 @@ Every web operation is a trace entry carrying `web.backend` and `web.session`; e
 | `web.session.initialize` | the browser starting | `web.backend` |
 | `web.session.complete` | the session closing, teardown phase | `web.backend` |
 
-Inside each parent operation, a child `web.backend.execute` named `{backend} · {kind}` carries `web.correlation_id`, the phase, the outcome and any failure; it is the link between a semantic operation and the native driver call.
+Inside each operation, a child `web.backend.execute` named `{backend} · {kind}` carries `web.correlation_id`, the phase, the outcome and any failure. It links the operation to the native driver call.
 
 Coverage observations are the other half of the trace: `web.page.visited`, `web.page.verified` and `web.page.available`, each with `web.session` and `web.page.source` (`navigate`, `assert`, `vue-router` or `aspnetcore`). See [Page coverage](./index.md#page-coverage).
 
@@ -108,14 +118,14 @@ Other event kinds worth knowing when you read a trace: `web.page.discovery.faile
 
 ## When artifacts are finalised
 
-Web sessions complete during teardown in reverse order, after normal teardown hooks but before attachments are published and before the browser is disposed. The Playwright trace and Selenium diagnostics are written at that point, and a failure is recorded on the session's `web.session.complete` entry and aggregated into a teardown failure. That ordering is what guarantees the native trace and diagnostics make it into the runner's output and the `.prototrace` archive.
+Web sessions complete during teardown, in reverse order: after the teardown hooks, before attachments are published and before the browser is disposed. The Playwright trace and the Selenium diagnostics are written then. A failure there is recorded on the session's `web.session.complete` entry and counts as a teardown failure. This order is what gets the native trace and diagnostics into the runner's output and the `.prototrace` archive.
 
 ## Where it lands and how to open it
 
 Run the failing test, then open what it left:
 
-- The `.prototrace` archive lands at `TestResults/prototest-{runId}.prototrace` relative to the test process's working directory (usually the test project's `bin/<config>/<tfm>`), unless `ConfigureTracing` set `OutputPath`. Drop it on the [ProtoTrace viewer](https://trace.prototest.dev) or read it from the terminal with `prototest summary <file>` ([ProtoTrace](../../observability/prototrace.md)).
-- Screenshots, page HTML, location files, the Playwright trace and the Selenium diagnostics are registered as test attachments: NUnit, MSTest, xUnit v3 and TUnit show them in their own output, while xUnit v2 writes each artifact to a file and prints the path to the console ([runner limits](../../runners/overview.md)).
+- The `.prototrace` archive lands at `TestResults/prototest-{runId}.prototrace`, relative to the test process's working directory (usually the test project's `bin/<config>/<tfm>`), unless `ConfigureTracing` set `OutputPath`. Drop it on the [ProtoTrace viewer](https://trace.prototest.dev), or read it in a terminal with `prototest summary <file>` ([ProtoTrace](../../observability/prototrace.md)).
+- Screenshots, page HTML, location files, the Playwright trace and the Selenium diagnostics are test attachments. NUnit, MSTest, xUnit v3 and TUnit show them in their own output. xUnit v2 writes each artifact to a file and prints the path ([runner limits](../../runners/overview.md)).
 - The trace also records every artifact on the failing operation, so the viewer's failure view shows them next to the exception even when the runner's output was lost.
 
 ## Next

@@ -14,7 +14,7 @@ description: "Register ProtoTest with NUnit: the SetUpFixture, the [ProtoTest] a
 dotnet add package ProtoTest.NUnit
 ```
 
-ProtoTest targets **.NET 8, 9 and 10**, and needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update NUnit first: `dotnet add package NUnit --version 4.6.1`. The `dotnet new prototest` template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime.
+ProtoTest targets **.NET 8, 9 and 10**, and needs **NUnit 4.6.1 or newer**. The standard `dotnet new nunit` template pins an older version, so update NUnit first: `dotnet add package NUnit --version 4.6.1`. The `dotnet new prototest` template defaults to `net10.0`. Pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 ## Register
 
@@ -64,7 +64,7 @@ Assembly
     └── Billing.Tests → InvalidOperationException naming the setup class
 ```
 
-**Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Test]` runs through the same lifecycle. NUnit applies the nearest `IWrapSetUpTearDown` attribute (method, then fixture, then assembly), so a test that carries `[ProtoTest]` keeps its own wrapper and is never wrapped twice.
+**Low-ceremony mode.** Add `[assembly: ProtoTestAutoWrap]` and every plain `[Test]` runs through the same lifecycle. NUnit applies the nearest `IWrapSetUpTearDown` attribute: method, then fixture, then assembly. A test that carries `[ProtoTest]` keeps its own wrapper and is never wrapped twice.
 
 ## The context window
 

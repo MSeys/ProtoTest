@@ -80,7 +80,7 @@ Two option sets exist only in code. You set them while the host is built, and th
 | `OutputPath` | `string?` | `null`, which means `TestResults/prototest-{runId}.prototrace` | read at host build |
 | `ActivitySources` | `IList<string>` | empty | read at host build |
 | `CaptureSourceLocations` | `bool` | `true` | read at host build |
-| `EmbedSources` | `bool` | `true`; embedding requires `CaptureSourceLocations && EmbedSources` | read at host build |
+| `EmbedSources` | `bool` | `true`. Embedding requires `CaptureSourceLocations && EmbedSources`. | read at host build |
 
 ```csharp
 builder
@@ -103,15 +103,15 @@ You rarely need this section. It matters when two parts of a setup call the same
 
 | You call | What a second call does |
 | --- | --- |
-| `AddTestHook`, `AddRunHook`, `AddRunGate` | adds another hook or gate; there is **no dedupe** |
+| `AddTestHook`, `AddRunHook`, `AddRunGate` | adds another hook or gate. There is **no dedupe**. |
 | `AddCapability` | an equal descriptor registers once |
-| `AddSink<TSink>` | the first registration of the sink type wins; a repeated generic call appends its `configure` callback |
-| `AddInfrastructure(piece, keys)`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys, and `AddInfrastructureAlways` still forces a start); a different instance under the same id throws *"already owned by the run"* |
-| `AddInfrastructure(name, chain, keys)` | a repeated target name throws; add providers to the existing chain instead |
+| `AddSink<TSink>` | the first registration of the sink type wins. A repeated generic call appends its `configure` callback. |
+| `AddInfrastructure(piece, keys)`, `AddResource` | the same instance is a no-op (`AddInfrastructure` also merges the repeated call's settings keys, and `AddInfrastructureAlways` still forces a start). A different instance under the same id throws *"already owned by the run"*. |
+| `AddInfrastructure(name, chain, keys)` | a repeated target name throws. Add providers to the existing chain instead. |
 | `AddClient` | clients compose and the first registration that initializes for a type and name wins |
-| `ConfigureResponses`, `CaptureAttachments` (all protocols) | callbacks compose; the known configuration section is bound over the result |
-| `AddSql`, `AddSheets`, `AddEntityFrameworkCore` | the first call wins; later calls are no-ops |
-| `AddData` | composes onto one registry; every call's callback runs |
+| `ConfigureResponses`, `CaptureAttachments` (all protocols) | callbacks compose, and the known configuration section is bound over the result |
+| `AddSql`, `AddSheets`, `AddEntityFrameworkCore` | the first call wins, and later calls are no-ops |
+| `AddData` | composes onto one registry, and every call's callback runs |
 | `AddCollector<TCollector>` | the same collector type for the same target registers once |
 
 ```mermaid

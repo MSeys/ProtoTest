@@ -62,7 +62,7 @@ read in a hurry, often from a failing build, and come back later for depth.
 
 A lesson teaches one new idea. Words from the trace (operation, phase, gap) are taught in a lesson before another
 lesson uses them. A lesson still gives each ProtoTest word a few plain words at its first use on that page, even
-when an earlier lesson taught it: readers skip around. [Words used in Learn](/learn/words) lists them all, and a
+when an earlier lesson taught it: readers skip around. The [Vocabulary](/docs/foundation/vocabulary) page lists them all, and a
 new word gets a row there.
 
 A lesson aims for 750 reading words or fewer: prose, callouts and checkpoint answers, not code. `prose-check`

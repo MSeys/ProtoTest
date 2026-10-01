@@ -48,7 +48,13 @@ flowchart LR
 
 ## Which backend
 
-Default to Playwright. It launches and manages browsers for you, downloads the browser on a clean machine with `InstallBrowsers`, probes for it without launching one for skips, records the native Playwright trace, supports downloads, and translates the wider set of locator combinations. Pick Selenium when the browsers are driven through WebDriver already: a grid, a driver setup, or a browser you provide yourself through your own `IWebDriver` factory.
+Default to Playwright. It launches and manages the browsers for you, and:
+
+- downloads the browser on a clean machine with `InstallBrowsers`,
+- checks for an installed browser without launching one, so a test can skip,
+- records the native Playwright trace,
+- supports downloads,
+- accepts more locator combinations. Pick Selenium when the browsers are driven through WebDriver already: a grid, a driver setup, or a browser you provide yourself through your own `IWebDriver` factory.
 
 | Question | Playwright | Selenium |
 | --- | --- | --- |
@@ -70,7 +76,7 @@ dotnet add package ProtoTest.Web.Playwright
 dotnet add package ProtoTest.Web.Selenium
 ```
 
-Either backend brings `ProtoTest.Web` with it. The packages target `net8.0`, `net9.0` and `net10.0`; the project templates default to `net10.0`, so pass `--framework net8.0` or `--framework net9.0` when a suite targets an older baseline.
+Either backend brings `ProtoTest.Web` with it. The packages target `net8.0`, `net9.0` and `net10.0`. The project templates default to `net10.0`, so pass `--framework net8.0` or `--framework net9.0` for an older baseline.
 
 ## Browsers
 
@@ -84,7 +90,7 @@ builder.AddWeb(options =>
 });
 ```
 
-On Linux, the operating-system libraries a bundled browser needs come from Playwright's own tooling; ProtoTest only runs the driver's install command for the browser binary.
+On Linux, the system libraries a bundled browser needs come from Playwright's own tooling. ProtoTest only runs the driver's install command for the browser itself.
 
 Selenium takes the driver factory you provide, so the browser itself must already be installed on the machine.
 
@@ -97,9 +103,9 @@ A machine may have no browser at all. Gate Playwright tests with the opt-in skip
 public async Task ...() { ... }
 ```
 
-It probes the installed browser before the lifecycle starts, without launching one, and skips with a reason naming Playwright and the install options; `InstallBrowsers = true` never skips. Selenium has no equivalent probe (see [Skip](#skip)).
+It checks for the installed browser before the test starts, without launching one, and skips with a reason naming Playwright and the install options. With `InstallBrowsers = true` it never skips. Selenium has no equivalent probe (see [Skip](#skip)).
 
-A session uses its application address from `ProtoTest:Applications:{application}:BaseUrl`. It appends `Endpoints:{endpoint}` when the session names one. Infrastructure that started an application with the run advertises that same setting, so a browser journey can run against a standalone instance, an application image in its own container or an in-process loopback listener without fixture code ([ASP.NET Core](../aspnetcore.md#hosting-a-browser-journey) has both recipes).
+A session uses its application address from `ProtoTest:Applications:{application}:BaseUrl`. It appends `Endpoints:{endpoint}` when the session names one. Infrastructure that started an application with the run publishes that same setting. So a browser journey runs against a standalone instance, an application container or an in-process loopback listener without extra code. [ASP.NET Core](../aspnetcore.md#hosting-a-browser-journey) has the recipes.
 
 ## Compose
 
@@ -131,7 +137,7 @@ public static IProtoApplicationBuilder AddWeb(
 
 The shipped backends compose shared helpers from `ProtoTest.Web`, so a hand-written backend behaves the same way. See [Writing a backend](#writing-a-backend).
 
-Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` keeps the first registration. A host resolves exactly one `IWebBackendFactory`. Zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback while only the first supplies the skip-probe defaults; the Selenium application overload guards the whole call so a repeat is a no-op.
+Sessions are not declared at registration: a test names the sessions it needs with `Proto.Context.Web(name)` ([below](#sessions)). `AddWebBackend` keeps the first registration. A host resolves exactly one `IWebBackendFactory`. Zero or more than one throws `InvalidOperationException`. For Playwright, every `AddWeb(...)` call still runs its `configure` callback, but only the first supplies the skip-check defaults. For Selenium, a repeated call on an application does nothing.
 
 ### Options and keys
 
@@ -140,7 +146,7 @@ Both backends also read their options from configuration, so CI can run headless
 1. your `AddWeb(...)` callback,
 2. `ProtoTest:Web:Playwright` or `ProtoTest:Web:Selenium`, the run's backend options.
 
-Started infrastructure settings are merged over static configuration before binding, so they win over the same key in `appsettings.json`. Selenium's `ActionTimeout`/`PollInterval` and Playwright's `ActionTimeout` are validated after binding; a non-positive value throws `ArgumentOutOfRangeException`. `TimeSpan` values bind as `"hh:mm:ss(.fffffff)"` and enums bind by name.
+Started infrastructure settings are merged over static configuration before binding, so they win over the same key in `appsettings.json`. Selenium's `ActionTimeout`/`PollInterval` and Playwright's `ActionTimeout` are checked after binding. A value of zero or less throws `ArgumentOutOfRangeException`. `TimeSpan` values bind as `"hh:mm:ss(.fffffff)"` and enums bind by name.
 
 #### Playwright options
 
@@ -232,7 +238,7 @@ Options are bound once, the first time a session opens a browser.
 
 ### Sessions
 
-`Proto.Context.Web(sessionName = null, application = null, endpoint = null, discoverRoutes = false)` returns the test's `WebSession`. The browser is created **lazily** on the first operation, so a test that never touches the browser never starts one, and the session is completed and disposed at teardown. `application` defaults to the application selected for the test; `sessionName` defaults to the application's `Web` client name, then `"Default"`.
+`Proto.Context.Web(sessionName = null, application = null, endpoint = null, discoverRoutes = false)` returns the test's `WebSession`. The browser is created **lazily** on the first operation, so a test that never touches the browser never starts one, and the session is completed and disposed at teardown. `application` defaults to the test's selected application. `sessionName` defaults to the application's `Web` client name, then `"Default"`.
 
 ```mermaid
 sequenceDiagram
@@ -265,7 +271,7 @@ public sealed class WebSession : IAsyncDisposable
 }
 ```
 
-`WaitUntilAsync` polls until the condition holds or the timeout passes, throwing `WebAssertionException` with the expectation when it doesn't. Inside the predicate, "element not found yet" and "not actionable yet" (`WebElementResolutionException`, `WebActionabilityException`) are treated as "not yet"; every other exception fails the wait immediately.
+`WaitUntilAsync` polls until the condition holds or the timeout passes, throwing `WebAssertionException` with the expectation when it doesn't. Inside the predicate, "element not found yet" and "not actionable yet" (`WebElementResolutionException`, `WebActionabilityException`) count as "not yet". Any other exception fails the wait at once.
 
 #### Several sessions in one test
 
@@ -285,7 +291,7 @@ await admin.Orders.RowMatching(By.HasText("42")).Approve.ClickAsync();
 await customer.Orders.RowMatching(By.HasText("42")).Status.Should.HaveTextAsync("Approved");
 ```
 
-The `Should*` methods on an element poll until they pass, so they double as cross-session waits. For any other condition, including one that spans sessions, use `WaitUntilAsync`; its description defaults to the predicate's source text:
+The `Should*` methods on an element poll until they pass, so they double as cross-session waits. For any other condition, including one that spans sessions, use `WaitUntilAsync`. Its description defaults to the predicate's source text:
 
 ```csharp
 await customer.WaitUntilAsync(async ct =>
@@ -316,11 +322,11 @@ var backend = await Proto.Context.Web().GetBackendAsync<PlaywrightWebBackend>();
 await backend.Page.SetContentAsync(html);
 ```
 
-`GetBackendAsync` creates the browser if needed; the synchronous `GetBackend` throws until the backend exists, and asking for the wrong type throws `WebBackendCapabilityException`.
+`GetBackendAsync` creates the browser if needed. The synchronous `GetBackend` throws until the backend exists. Asking for the wrong type throws `WebBackendCapabilityException`.
 
 ## The tasks
 
-A page object describes the page; the sign-in test at the top of this page drives it. The smallest page objects behind that test are below; the sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
+A page object describes the page, and a test drives it. These are the smallest page objects behind the sign-in test at the top of this page. The sample's full journey is in [WebJourney.cs](../../../../samples/Northstar.ProtoTest/WebJourney.cs):
 
 ```csharp
 public sealed class LoginPage : WebPage
@@ -383,13 +389,23 @@ Coverage for a browser journey is measured in **pages**, not lines: a page count
 ## Limits
 
 - **One backend per host.** Resolving zero or more than one `IWebBackendFactory` throws `InvalidOperationException`, and `AddWebBackend` keeps the first registration.
-- **`HasText` cannot stand alone**: it is a filter and must be composed with `And`. Selenium additionally accepts only `HasText` as the right-hand side and rejects a `By.Css` left side; Playwright accepts more combinations. See [Locators](./locators.md#combining-with-and).
+- **`HasText` cannot stand alone**: it is a filter and must be composed with `And`. Selenium also accepts only `HasText` on the right and rejects a `By.Css` on the left. Playwright accepts more combinations. See [Locators](./locators.md#combining-with-and).
 - **`WaitUntilAsync`** only absorbs `WebElementResolutionException` and `WebActionabilityException`; any other exception fails it immediately.
-- **Scanner:** a relative `Source` may not escape the test assembly's base directory; there is no Nuxt 2 underscore-dynamic support, only absolute route literals are collected, and there is no runtime React discovery.
+- **Scanner:** a relative `Source` may not leave the test assembly's base directory. Nuxt 2 underscore dynamics are not mapped, only absolute route literals are collected, and there is no runtime React discovery.
 - **Vue discovery** latches after the first non-null route table, so a router that later adds routes in the same session is not re-read.
 - **Page origin:** an external redirect contributes no visited or verified coverage, and a backend that cannot report an address still passes the test.
-- **Playwright:** the browser pool is scoped to one test; identical launch options share a process only inside that test. Reads and actions use Playwright's own auto-waiting, bounded by `ActionTimeout` (5 s by default); a timeout becomes the same resolution or actionability exception Selenium raises. `InstallBrowsers` does nothing when `Channel` is set, trace groups are serialized by a semaphore and skipped when `TraceRetention = Off`, console/page-error/request-failure text is truncated at 4096 characters, and the skip probe starts the Playwright driver.
-- **Selenium:** one driver per session, no pooling, so sessions do not share cookies or storage; native failures surface as `WebActionabilityException` after `ActionTimeout`; `CheckAsync` and `SelectOptionAsync` verify the selected state after the click, so a click the page ignored fails like Playwright's auto-wait instead of passing silently; `SelectOptionAsync` requires exactly one option carrying the requested `value`.
+- **Playwright:**
+  - The browser pool belongs to one test. Identical launch options share a process only inside that test.
+  - Reads and actions use Playwright's own auto-waiting, up to `ActionTimeout` (5 s by default). A timeout becomes the same resolution or actionability exception Selenium raises.
+  - `InstallBrowsers` does nothing when `Channel` is set.
+  - Trace groups run one at a time, and are skipped when `TraceRetention = Off`.
+  - Console, page-error and request-failure text is cut at 4096 characters.
+  - The skip check starts the Playwright driver.
+- **Selenium:**
+  - One driver per session, without pooling, so sessions share no cookies or storage.
+  - Native failures surface as `WebActionabilityException` after `ActionTimeout`.
+  - `CheckAsync` and `SelectOptionAsync` check the selected state after the click. A click the page ignored fails, as with Playwright's auto-wait, instead of passing silently.
+  - `SelectOptionAsync` requires exactly one option with the requested `value`.
 
 ## Writing a backend
 

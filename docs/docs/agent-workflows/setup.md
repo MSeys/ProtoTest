@@ -20,7 +20,7 @@ The tool command is `prototest-mcp`. The package targets .NET 8, 9 and 10, so th
 
 ## Register it
 
-An MCP client starts the server and talks to it over stdio. Add the server to the client's configuration file. The shape is the same everywhere; only the file and the root key change.
+An MCP client starts the server and talks to it over stdio. Add the server to the client's configuration file. The shape is the same everywhere. Only the file and the root key change.
 
 <TabbedCode
   label="Client configuration"
@@ -106,7 +106,7 @@ Three steps, none of which needs a suite of your own.
      cause: runner-reported failure
    ```
 
-   That is the drill file's own output, so it matches what you just downloaded; your own runs print different ids and times. `prototest summary` prints the same diagnosis the MCP tools return, which makes it the quickest way to check that the file an agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
+   That is the drill file's own output, so it matches what you downloaded. Your own runs print different ids and times. `prototest summary` prints the same diagnosis the MCP tools return, which makes it the quickest way to check that the file an agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
 
 2. Point the server at one file with `--trace`, or at a folder of runs with `--project`. For one archive, `--trace` works wherever the file was written.
 
@@ -156,7 +156,7 @@ The skill is optional. The MCP server's tool descriptions are the contract, so a
 
 ## What the agent can see
 
-The tools read your traces and return their content, including expected and actual values, to the connected agent, so run the server as an identity that may see them.
+The tools read your traces and return their content, including expected and actual values, to the connected agent. Run the server as an identity that may see them.
 
 Every tool is read-only and returns a compact JSON document. `list_runs` over a folder holding one failing run:
 
@@ -179,7 +179,7 @@ Every tool is read-only and returns a compact JSON document. `list_runs` over a 
 }
 ```
 
-The run id, file paths and timestamps above stand in for any run; a real call returns your machine's.
+The run id, file paths and timestamps above stand in for any run. A real call returns your machine's.
 
 | Tool | Input | Returns | Cap |
 | --- | --- | --- | --- |
@@ -195,6 +195,6 @@ The run id, file paths and timestamps above stand in for any run; a real call re
 - Read-only: no trace is written, no suite is rerun, the stdio host binds no port, and nothing on disk is modified.
 - Nothing leaves the machine by default: no telemetry, no uploads, no accounts. The stdio host reads local archives, stdout carries the protocol only, and logs go to stderr.
 - Hard caps bound every payload. `list_runs` returns at most 50 runs, `get_coverage` at most 200 uncovered units, and `get_diagnosis` applies the [diagnosis caps](./diagnosis.md#limits).
-- The server reads evidence that already exists. A run with no `.prototrace` is not visible to it; write the trace first.
+- The server reads evidence that already exists. A run with no `.prototrace` is not visible to it, so write the trace first.
 - One external dependency: the official `ModelContextProtocol` SDK (Apache-2.0).
 - The demo endpoint is a local sample. See [Coding agents](./coding-agents.md#demo-endpoint).

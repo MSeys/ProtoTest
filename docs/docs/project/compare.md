@@ -23,9 +23,9 @@ This page says where each alternative wins, where ProtoTest wins, and ends with 
 
 ## What stays in the test
 
-ProtoTest moves setup to the suite host and attributes. The scenario lines stay the same. The same scenario against the same in-process application, first with a regular fixture and then with ProtoTest. Select a task to see both versions.
+ProtoTest moves setup to the suite host and attributes, and the scenario lines stay the same. Below is one test against the same in-process application, written as a regular NUnit fixture and with ProtoTest. Both send the same requests and check the same values. The marked lines are **plumbing**: they start the application, create clients, provision the tenant and user, authenticate, deserialize, clean up, or are the file's own scaffolding. Everything else is the scenario.
 
-<Comparison without={withoutProtoTest} with={withProtoTest} concerns={comparisonConcerns} verdict="35 lines of plumbing per fixture without, 13 with. The scenario lines stay the same." />
+<Comparison without={withoutProtoTest} with={withProtoTest} concerns={comparisonConcerns} />
 
 ## WebApplicationFactory, Testcontainers, Verify and Shouldly
 
@@ -34,16 +34,16 @@ The established .NET combination: host the application with `WebApplicationFacto
 **Where they win**
 
 - Nothing new to adopt. Each library is maintained by people who focus on one thing, and you can replace any of them independently.
-- There is no lifecycle to learn beyond the primitives themselves; a team that knows `WebApplicationFactory` is productive on day one.
+- There is no lifecycle to learn beyond the primitives themselves. A team that knows `WebApplicationFactory` is productive on day one.
 - You assemble the diagnostics you need, library by library: container logs here, a snapshot there, a browser trace when a browser is involved.
 
-What adopting ProtoTest costs: one setup class per test project, one package per integration, and three ideas to learn (the host, the lifecycle, the trace). Tests swap `[Test]` or `[Fact]` for `[ProtoTest]`, select the application with `[Application]`, and reach clients through `Proto.Context`. One test beside your existing suite costs five minutes ([your first test](../getting-started/first-test.md)); a suite pays that learning cost once, then per test only the attribute and accessor lines.
+What adopting ProtoTest costs: one setup class per test project, one package per integration, and three ideas to learn (the host, the lifecycle, the trace). Tests swap `[Test]` or `[Fact]` for `[ProtoTest]`, select the application with `[Application]`, and reach clients through `Proto.Context`. One test beside your existing suite costs five minutes ([your first test](../getting-started/first-test.md)). A suite pays that learning cost once, and then per test only the attribute and accessor lines.
 
 **Where ProtoTest wins**
 
-- One host, one [execution context](../foundation/execution-context.md) and one [lifecycle](../foundation/lifecycle.md) across every integration a test uses, so the API, the database, the broker and the browser share the setup that already ran.
-- One [`.prototrace`](../observability/prototrace.md) per run: the operations of every integration, with the failing assertion in place, readable in the static [trace viewer](https://trace.prototest.dev) or summarized with `prototest summary` in CI.
-- [Contract coverage](../observability/coverage.md) - which endpoints, responses and fields the suite actually asserted - which the four-library stack does not provide.
+- One host, one [execution context](../foundation/execution-context.md) and one [lifecycle](../foundation/lifecycle.md) across every integration a test uses. The API, the database, the broker and the browser share the setup that already ran.
+- One [`.prototrace`](../observability/prototrace.md) per run, with the operations of every integration and the failing assertion in place. Read it in the static [trace viewer](https://trace.prototest.dev), or summarize it with `prototest summary` in CI.
+- [Contract coverage](../observability/coverage.md): which endpoints, responses and fields the suite actually asserted. The four-library stack does not provide it.
 - [Provisioners and seed data](../integrations/data/provisioners.md) as reusable setup instead of helpers that grow inside the test project.
 - Five [test-runner adapters](../runners/overview.md): the same suite shape works across runners.
 
@@ -51,7 +51,7 @@ If your suite is already shaped this way and the glue does not hurt, keep it. Th
 
 ## Alba
 
-Alba is the closest neighbour: a mature declarative testing library for ASP.NET Core with a `Scenario` DSL, service registration stubbing, and deep integration with the Critter Stack (Marten and Wolverine).
+Alba is the closest neighbour. It is a mature declarative testing library for ASP.NET Core with a `Scenario` DSL, service registration stubbing, and deep integration with the Critter Stack (Marten and Wolverine).
 
 **Where they win**
 
@@ -61,7 +61,7 @@ Alba is the closest neighbour: a mature declarative testing library for ASP.NET 
 
 **Where ProtoTest wins**
 
-- Scope beyond HTTP: one test can write through REST, read through [GraphQL](../integrations/graphql/index.md), check the [database](../integrations/sql/index.md), publish through [messaging](../integrations/messaging/index.md) and drive a [browser](../integrations/web/index.md), all in one [trace](../observability/prototrace.md).
+- Scope beyond HTTP. One test can write through REST, read through [GraphQL](../integrations/graphql/index.md), check the [database](../integrations/sql/index.md), publish through [messaging](../integrations/messaging/index.md) and drive a [browser](../integrations/web/index.md), all in one [trace](../observability/prototrace.md).
 - [Coverage](../observability/coverage.md), [provisioning](../integrations/data/provisioners.md) and [reporting](../observability/reporting.md) belong to the foundation instead of being assembled per project.
 - The trace is a versioned, documented file ([format 2.0](../observability/prototrace.md)) with a static viewer, so a CI failure is readable where it happened.
 - Runner adapters for each framework rather than one testing style.
@@ -74,17 +74,17 @@ For per-test substitution use `context.Override<T>()`, `[ReplaceService<T>]` or 
 
 **Where they win**
 
-- Real topology: every service and dependency runs as its own process, so the suite sees the system closed-box, exactly as it deploys.
+- Real topology. Every service and dependency runs as its own process, so the suite sees the system closed-box, exactly as it deploys.
 - Microsoft backing, first-class tooling and the .NET 10 toolchain.
 - The best choice when deployment fidelity itself is what you are testing.
 
 **Where ProtoTest wins**
 
-- In-process speed and direct assertions: services run inside the test process where the test can inspect them, and [contract coverage](../observability/coverage.md) can see every response.
+- In-process speed and direct assertions. Services run inside the test process where the test can inspect them, and [contract coverage](../observability/coverage.md) can see every response.
 - No AppHost requirement. In-process hosting with Testcontainers runs on .NET 8, 9 and 10 today, with less CI machinery.
 - The same suite can point at a deployed environment through [configuration](../getting-started/environments.md) when closed-box fidelity is what a given run needs.
 
-These are complementary rather than competing. Keep Aspire where deployment topology matters, and a ProtoTest suite can test the same system from outside; `ProtoTest.Aspire` composes an AppHost through the same infrastructure hooks and publishes its resources as application targets.
+These are complementary rather than competing. Keep Aspire where deployment topology matters, and a ProtoTest suite can test the same system from outside. `ProtoTest.Aspire` composes an AppHost through the same infrastructure hooks and publishes its resources as application targets.
 
 ## Playwright .NET alone
 
@@ -95,8 +95,8 @@ These are complementary rather than competing. Keep Aspire where deployment topo
 
 **Where ProtoTest wins**
 
-- The browser is one integration among several. `ProtoTest.Web.Playwright` (or the Selenium backend) drives the same flows, but the API call that arranged the data and the database check that proves it landed are in the same test and the same trace.
-- A Playwright trace shows what the browser did; a [`.prototrace`](../observability/prototrace.md) shows the browser alongside everything that led to it.
+- The browser is one integration among several. `ProtoTest.Web.Playwright` (or the Selenium backend) drives the same flows. The API call that arranged the data and the database check that proves it landed are in the same test and the same trace.
+- A Playwright trace shows what the browser did. A [`.prototrace`](../observability/prototrace.md) shows the browser alongside everything that led to it.
 - Login, page objects and [attachments](../foundation/attachments.md) belong to the same lifecycle rather than a separate helper layer.
 
 If browser testing is the whole problem, Playwright alone is simpler. If the browser is one hop in a longer journey, ProtoTest keeps the hops together.
@@ -113,7 +113,7 @@ Some teams build their own integration-testing layer instead. [I did too](./why-
 **Where ProtoTest wins**
 
 - The same idea already exists in public, with documentation, tests and a [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
-- It survives people. An in-house framework usually stops being maintained when its author changes teams; ProtoTest is MIT, the [trace format is documented](../observability/prototrace.md) and [extension points](../advanced/extending.md) are public.
+- It survives people. An in-house framework usually stops being maintained when its author changes teams. ProtoTest is MIT, the [trace format is documented](../observability/prototrace.md) and [extension points](../advanced/extending.md) are public.
 - Diagnostics you would rarely fund yourself: the trace, the viewer, contract coverage and reports.
 - Runner adapters and container-backed infrastructure that you would otherwise rebuild one integration at a time.
 
@@ -134,9 +134,9 @@ The full ProtoTest story is on the [support and sustainability page](./sustainab
 
 - **You only test HTTP endpoints.** `WebApplicationFactory` plus an assertion library is smaller and has no lifecycle to learn.
 - **You want zero framework dependencies.** Every ProtoTest integration is an opinionated wrapper. That is the design, and it is fair to decline it.
-- **Closed-box topology is the requirement.** Aspire testing tests processes as they deploy; ProtoTest's in-process strengths are the wrong fit for that.
+- **Closed-box topology is the requirement.** Aspire testing tests processes as they deploy. ProtoTest's in-process strengths are the wrong fit for that.
 - **You need per-test DI-level stubbing over a declarative HTTP scenario.** ProtoTest's substitution works and is traced, but a library built entirely around scenario stubbing has a smaller surface.
-- **You are not on .NET 8, 9 or 10.** ProtoTest targets those three runtimes; earlier frameworks are out of scope.
+- **You are not on .NET 8, 9 or 10.** ProtoTest targets those three runtimes, and earlier frameworks are out of scope.
 - **Your team already has a foundation it likes.** Do not replace working infrastructure to gain a trace.
 
 And the honest caveat in the other direction: ProtoTest is young. The alternatives have larger ecosystems, longer track records and more answers on the internet. If community size decides it for you, that is a fair reason to choose them.

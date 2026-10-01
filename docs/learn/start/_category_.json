@@ -4,6 +4,6 @@
   "customProps": {
     "outcome": "Run the sample suite, write your first test, and see in the viewer why a test failed.",
     "time": "About 30 minutes",
-    "needs": "The .NET 8 SDK or newer"
+    "needs": "The .NET 10 SDK and the .NET 8 runtimes"
   }
 }

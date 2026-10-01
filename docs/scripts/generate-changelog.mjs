@@ -121,7 +121,7 @@ const page = [
   '',
   '# Changelog',
   '',
-  'Every ProtoTest package shares one version number, so this page lists releases, not packages. Each release that changes a public API lists the change under **Breaking** with what to write instead.',
+  'Every ProtoTest package shares one version number, so this page lists releases, not packages. Each release that changes a public API lists the change under **Breaking changes**, with what to write instead.',
   '',
   'Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).',
   '',

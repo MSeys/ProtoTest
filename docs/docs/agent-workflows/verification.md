@@ -37,7 +37,7 @@ Every line of the block says one thing. The `::error` line is the check annotati
 
 The command exits `0` when no finding is a `fail`, and `1` when one is, so CI can use it as the gate. The [CLI reference](./cli.md#exit-codes) lists the exit codes.
 
-The verdict also prints a `spec checks:` block when specifications were compared. Only a library caller can compare candidate specifications; the verb reports the identity each run recorded.
+The verdict also prints a `spec checks:` block when specifications were compared. Only a library caller can compare candidate specifications. The verb reports the identity each run recorded.
 
 ## What it finds
 
@@ -48,7 +48,7 @@ The verdict also prints a `spec checks:` block when specifications were compared
 | `stale-spec` | fail | the recorded specification identity does not match the content, or the specification changed between the two runs |
 | `gate-failed` | fail | a run gate that failed in the current run |
 
-Those four defaults are a pull request gate. The library lets a consumer override each severity; the CLI uses the defaults. A finding also carries the target, the category, the unit or gate identifier, the baseline and current values, and an evidence pointer.
+Those four defaults are a pull request gate. The library lets a consumer override each severity, and the CLI uses the defaults. A finding also carries the target, the category, the unit or gate identifier, the baseline and current values, and an evidence pointer.
 
 ## The specification identity
 
@@ -65,7 +65,7 @@ var verdict = ProtoVerification.Verify(baseline, current,
 ]);
 ```
 
-A remote specification source is recorded, not fetched. Without a candidate, the identity is recorded, not re-verified. The `prototest verify` verb takes no spec candidates; that comparison is a library call.
+A remote specification source is recorded, not fetched. Without a candidate, the identity is recorded, not re-verified. The `prototest verify` verb takes no spec candidates, so that comparison is a library call.
 
 ## Gate the pull request
 
@@ -73,10 +73,10 @@ Give the [ProtoTest Feedback action](../continuous-integration/index.md#add-the-
 
 ## Limits
 
-- The comparison reads reports, not traces. No spans are re-read and no coverage is recomputed; the arithmetic is the report's own (`CoverageUnits` and `CoverageTotals`).
+- The comparison reads reports, not traces. No trace is re-read and no coverage is recomputed. The arithmetic is the report's own (`CoverageUnits` and `CoverageTotals`).
 - Units are matched by target, category and identifier, so an OpenAPI property, a GraphQL field and a REST route compare by their own vocabulary.
 - A unit or a target that disappeared from the candidate is not a finding. The delta row shows it instead.
-- Unmatched traffic and schema drift are out of scope: either a collector records them or Verification does not claim them.
+- Unmatched traffic and schema drift are out of scope. Either a collector records them, or Verification does not claim them.
 - Failed candidate run gates are surfaced from the report's gate items. Verification does not add run gates and does not duplicate a suite's single-run coverage threshold, which stays in a run gate.
 - Nothing is written and nothing is rerun.
 

@@ -24,7 +24,7 @@ dotnet add package ProtoTest.GraphQL
 dotnet add package ProtoTest.AspNetCore
 ```
 
-`ProtoTest.NUnit` needs NUnit 4.6.1 or newer; the standard `dotnet new nunit` template pins an older version, so update NUnit first.
+`ProtoTest.NUnit` needs NUnit 4.6.1 or newer. The standard `dotnet new nunit` template pins an older version, so update NUnit first.
 
 ## 2. Configure the host
 
@@ -48,7 +48,7 @@ public sealed class Setup : ProtoTestAssembly
 }
 ```
 
-`endpoint: "GraphQL"` appends `ProtoTest:Applications:Api:Endpoints:GraphQL` to the application's address; set the key when the path differs. The in-process server steps aside when `ProtoTest:Applications:Api:BaseUrl` is configured, so the same suite runs against a deployed environment.
+`endpoint: "GraphQL"` appends `ProtoTest:Applications:Api:Endpoints:GraphQL` to the application's address. Set the key when the path differs. The in-process server steps aside when `ProtoTest:Applications:Api:BaseUrl` is configured, so the same suite runs against a deployed environment.
 
 ## 3. Query with a shape
 
@@ -75,7 +75,7 @@ public sealed class ViewerTests
 }
 ```
 
-`ExpectAsync` builds the selection set from the shape and asserts the same shape against the result; `JsonValue` adds constraints beyond equality (greater than, not null, one of). Run it with `dotnet test`. [Queries and mutations](./operations.md) covers variables, the fluent builder and raw documents.
+`ExpectAsync` builds the selection set from the shape and asserts the same shape against the result. `JsonValue` adds constraints beyond equality: greater than, not null, one of. Run it with `dotnet test`. [Queries and mutations](./operations.md) covers variables, the fluent builder and raw documents.
 
 :::tip[Checkpoint: first green run]
 `dotnet test` passes after this step. The trace lands at `TestResults/prototest-{runId}.prototrace` with a `graphql.operation` entry for the query. Steps 4 and 5 build on this host without changing it.
@@ -96,7 +96,7 @@ created.Should.HaveNoErrors();
 created.Should.MatchShape(new { id = JsonValue.GreaterThan(0), status = "pending" });
 ```
 
-`Select` names the fields the assertion needs, so the response stays small; `ReadRequired<T>()` deserializes the same response into a record when the test wants a typed value. See [Responses](./responses.md).
+`Select` names the fields the assertion needs, so the response stays small. `ReadRequired<T>()` deserializes the same response into a record when the test wants a typed value. See [Responses](./responses.md).
 
 ## 5. Subscribe to an event
 
@@ -133,15 +133,15 @@ async Task TriggerAsync(CancellationToken cancellationToken)
 }
 ```
 
-[Subscriptions](./subscriptions.md) has the full surface, including SSE, connection payloads and custom sockets. Pass a cancellation token. Without one, a subscription with no events waits indefinitely.
+Pass a cancellation token. Without one, a subscription with no events waits indefinitely. [Subscriptions](./subscriptions.md) has the full surface, including SSE, connection payloads and custom sockets.
 
 :::tip[Checkpoint: the suite is green]
-`dotnet test` passes with all three tests. The trace holds `graphql.operation` entries for the query and the mutation plus `graphql.subscription.start|next|complete` events for the subscription. If the subscription test flakes, check the two items in the list below: a token on every wait, and triggers that run until the event lands.
+`dotnet test` passes with all three tests. The trace holds `graphql.operation` entries for the query and the mutation plus `graphql.subscription.start|next|complete` events for the subscription. If the subscription test flakes, check two things: a token on every wait, and triggers that run until the event lands.
 :::
 
 ## Where the run is recorded
 
-Every call is a ProtoTest trace entry: `graphql.operation` for queries and mutations, `graphql.subscription.start|next|complete` for subscriptions, and `graphql.response`/`graphql.failure` observations for coverage. The tables are on the [GraphQL overview](./index.md#in-the-trace-and-coverage) and [ProtoTrace](../../observability/prototrace.md). The trace lands at `TestResults/prototest-{runId}.prototrace` unless `ConfigureTracing` set `OutputPath`; open it on [trace.prototest.dev](https://trace.prototest.dev).
+Every call is a ProtoTest trace entry. Queries and mutations record `graphql.operation`, subscriptions record `graphql.subscription.start|next|complete`, and coverage reads the `graphql.response` and `graphql.failure` observations. The details are on the [GraphQL overview](./index.md#in-the-trace-and-coverage) and [ProtoTrace](../../observability/prototrace.md). The trace lands at `TestResults/prototest-{runId}.prototrace` unless `ConfigureTracing` set `OutputPath`. Open it on [trace.prototest.dev](https://trace.prototest.dev).
 
 ## Where to next
 

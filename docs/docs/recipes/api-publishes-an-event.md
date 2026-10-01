@@ -58,7 +58,7 @@ public sealed class BrokerJourney
 }
 ```
 
-`[NorthstarMember]` is the sample suite's own composite attribute: it groups an isolated tenant provisioned through [Data](../integrations/data/index.md) with the authenticator that carries the member's token through REST. `IssueInvoiceAsync` is a shortcut over the same data surface.
+`[NorthstarMember]` is the sample suite's own composite attribute. It groups an isolated tenant provisioned through [Data](../integrations/data/index.md) with the authenticator that carries the member's token through REST. `IssueInvoiceAsync` is a shortcut over the same data surface.
 
 The predicate matches this test's invoice id. Parallel tests pay invoices too. The timeout is 15 seconds.
 
@@ -132,6 +132,6 @@ A timeout fails at `03` and names the destination. The REST call at `02` stays i
 ## What it does not prove
 
 - **The await proves arrival, not delivery guarantees.** One matching message on this test's tap says nothing about duplicates, ordering or broker durability.
-- **Match on something this test owns.** Parallel tests pay invoices too; a predicate on the invoice id awaits this test's event, not the first `invoice.paid` that happens to arrive.
+- **Match on something this test owns.** Parallel tests pay invoices too. A predicate on the invoice id awaits this test's event, not the first `invoice.paid` that happens to arrive.
 - **Declare before you await, and make sure the destination exists.** A destination first bound in `AwaitAsync` misses events published before the call. The adapter creates nothing on its own. Declare suite-owned destinations with `Declare`. See [Suite-owned topology](../integrations/messaging/index.md#suite-owned-topology).
 - **Where there is no broker, skip.** `[RequiresCapability(ProtoCapabilityKinds.Broker)]` skips the test in an environment without one instead of passing against the in-memory double. See [Skip conditions](../foundation/skip-conditions.md).

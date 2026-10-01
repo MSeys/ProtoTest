@@ -10,13 +10,13 @@ Report sinks write out what [collectors](./coverage.md) gathered, once, when the
 
 ## What it is
 
-A sink implements `IProtoSink` and receives the run's report items. `ProtoTest.Core` owns the interface; `ProtoTest.Reporting` ships the two built-in sinks.
+A sink implements `IProtoSink` and receives the run's report items. `ProtoTest.Core` owns the interface, and `ProtoTest.Reporting` ships the two built-in sinks.
 
 ```bash
 dotnet add package ProtoTest.Reporting
 ```
 
-The package targets .NET 8, 9 and 10 (the project template defaults to `net10.0`; pass `--framework net8.0` or `--framework net9.0` for an older runtime) and depends on `ProtoTest.Core` only.
+The package targets .NET 8, 9 and 10 and depends on `ProtoTest.Core` only. The project template defaults to `net10.0`. Pass `--framework net8.0` or `--framework net9.0` for an older runtime.
 
 ```csharp
 builder
@@ -35,9 +35,9 @@ builder
 
 Both files are also added to the [`.prototrace` archive](./prototrace-archive.md#the-file-format) under `resources/run/{SinkName}/run-artifact-{n}/{fileName}`, so a single artifact from CI contains the trace and the reports.
 
-The template and the sample set their own paths, so what a reader sees differs from the defaults by design: the template writes `TestResults/Shop.html`, and the sample writes `report.*` under its output folder.
+The template and the sample set their own paths, so what a reader sees differs from the defaults by design. The template writes `TestResults/Shop.html`, and the sample writes `report.*` under its output folder.
 
-Items arrive sorted by target, category and identifier. Only top-level items are passed; walk `Children` for nested ones.
+Items arrive sorted by target, category and identifier. Only top-level items are passed, so walk `Children` for nested ones.
 
 ## How to read it
 
@@ -71,7 +71,7 @@ A quiet footer points at the ProtoTrace viewer: drop the run's `.prototrace` fil
 
 ### Occurrences
 
-Every coverage and observation row carries its own occurrence count. The summary's **Occurrences** card adds those per branch: each top-level coverage unit contributes its hit count once, and observations contribute their counts. Units nested under another unit (an OpenAPI response and its properties under the endpoint) are that unit's breakdown of the same calls, so they add nothing again. An aggregate row (a GraphQL type, `IsCovered` null) contributes nothing itself and does not hide the units below it. Findings and gate verdicts are recorded once rather than observed repeatedly, so they never inflate the count.
+Every coverage and observation row carries its own occurrence count. The summary's **Occurrences** card adds those per branch. Each top-level coverage unit contributes its hit count once, and observations contribute their counts. Units nested under another unit (an OpenAPI response and its properties under the endpoint) are that unit's breakdown of the same calls, so they add nothing again. An aggregate row (a GraphQL type, `IsCovered` null) contributes nothing itself and does not hide the units below it. Findings and gate verdicts are recorded once rather than observed repeatedly, so they never inflate the count.
 
 Worked through with numbers:
 
@@ -128,9 +128,9 @@ The same data, for tooling:
 }
 ```
 
-Every property of `ProtoReportItem` is written, so an unset one is present with a `null` value. The responses and properties of that endpoint are nested under `Children`; the row above is the endpoint and its `200` response, abridged to the fields the example is about.
+Every property of `ProtoReportItem` is written, so an unset one is present with a `null` value. The responses and properties of that endpoint are nested under `Children`. The row above is the endpoint and its `200` response, abridged to the fields the example is about.
 
-Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. `Total` counts nested items too. `TotalOccurrences` uses the per-branch rule above: coverage hit counts and observation counts, no double-counted nested breakdowns, no findings or gates. `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items. Coverage totals count units only: an item whose `IsCovered` is `null` is an aggregate row, not a unit, so it stays out of `CoverageTotal`, `Covered`, `Uncovered` and `CoveragePercentage`. A run gate's `CoverageSummaries` leaves it out too.
+Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. `Total` counts nested items too. `TotalOccurrences` uses the per-branch rule above. It adds coverage hit counts and observation counts, with no double-counted nested breakdowns and no findings or gates. `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items. Coverage totals count units only. An item whose `IsCovered` is `null` is an aggregate row, not a unit, so it stays out of `CoverageTotal`, `Covered`, `Uncovered` and `CoveragePercentage`. A run gate's `CoverageSummaries` leaves it out too.
 
 ## The artifact
 
@@ -195,7 +195,7 @@ public abstract class FileReportSink<TOptions> : IProtoSink, IProtoSinkArtifactS
 }
 ```
 
-`IProtoFileReportOptions` is just `string OutputPath { get; set; }`. The sink's constructor takes the configuration section name, which is how both built-in sinks bind `ProtoTest:Reporting:Json` and `ProtoTest:Reporting:Html`.
+`IProtoFileReportOptions` holds only `string OutputPath { get; set; }`. The sink's constructor takes the configuration section name, which is how both built-in sinks bind `ProtoTest:Reporting:Json` and `ProtoTest:Reporting:Html`.
 
 Two optional interfaces make a sink a first-class citizen:
 
@@ -208,16 +208,18 @@ Two optional interfaces make a sink a first-class citizen:
 
 Snapshot timing (what the report can and cannot show):
 
-- A teardown failure never replaces the outcome the test reported. The failing teardown operation is marked failed, and the error becomes a **finding on the test's trace record**: status `Error`, category `Teardown`, target the test name, exception type as a tag. A passing test whose teardown failed reads as **Partial** rather than green in the trace; the runner still reports the test itself as passed. That finding travels the same `AddFinding` path as any other finding, so it appears in the report's Findings section, counts in the summary, and run gates see it, as well as living on the trace record and in the viewer.
+- A teardown failure never replaces the outcome the test reported. The failing teardown operation is marked failed, and the error becomes a **finding on the test's trace record**: status `Error`, category `Teardown`, target the test name, exception type as a tag.
+- A passing test whose teardown failed reads as **Partial** rather than green in the trace. The runner still reports the test itself as passed.
+- That finding travels the same `AddFinding` path as any other finding. It appears in the report's Findings section, counts in the summary and is seen by run gates, as well as on the trace record and in the viewer.
 - The report is a snapshot taken before the run's own resources are released. Test-scoped resources have already been released when it is written, but a run-scoped resource (infrastructure, a container) still reads as registered and neutral there. Its release is recorded in the [ProtoTrace](./prototrace.md) afterwards.
 
 Sink failures (what happens when writing fails):
 
-- If a sink throws, the others still run. One failure is rethrown as-is; several become an `AggregateException("One or more report sinks failed to export.")`.
+- If a sink throws, the others still run. One failure is rethrown as-is, and several become an `AggregateException("One or more report sinks failed to export.")`.
 - The built-in sinks write one report per run. They do not append to a previous report or keep a history.
 
 ## Learn more
 
 - [Coverage and observations](./coverage.md): what the items mean.
 - [ProtoTrace](./prototrace.md): the run record that carries the report file.
-- [Run gates](../foundation/lifecycle.md) and [configuration](../getting-started/configuration.md).
+- [Run gates](../foundation/lifecycle.md#run-gates-and-resources) and [configuration](../getting-started/configuration.md).

@@ -14,7 +14,7 @@ description: "The prototest CLI: the four verbs, their arguments, the environmen
 dotnet tool install --global ProtoTest.Cli
 ```
 
-The tool command is `prototest`. The package targets .NET 8; on a machine with only a newer runtime, set `DOTNET_ROLL_FORWARD=LatestMajor` so the tool starts. The action sets that for you.
+The tool command is `prototest`. The package targets .NET 8. On a machine with only a newer runtime, set `DOTNET_ROLL_FORWARD=LatestMajor` so the tool starts. The action sets that for you.
 
 ## The verbs
 
@@ -36,7 +36,7 @@ An unknown verb, or the wrong arguments, prints that usage to stderr and exits `
 
 ### summary
 
-Reads one trace and prints the deterministic diagnosis as text: the run id, the outcome counts, every test that did not fully succeed with its error, source location and failing operation, and the run gates. It is the document `get_diagnosis` returns as JSON.
+Reads one trace and prints the deterministic diagnosis as text. It shows the run id, the outcome counts, the run gates, and every test that did not fully succeed with its error, source location and failing operation. It is the document `get_diagnosis` returns as JSON.
 
 ```bash
 prototest summary TestResults/ProtoTest/run.prototrace
@@ -52,7 +52,7 @@ FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.
   cause: runner-reported failure
 ```
 
-Run ids and timestamps are new on every run; compare the shape, not the values.
+Run ids and timestamps are new on every run, so compare the shape, not the values.
 
 A run with nothing to report prints the header, the counts and the words `All green.`:
 
@@ -74,7 +74,7 @@ Trace file not found: TestResults/ProtoTest/run.prototrace
 
 Discovers the `.prototrace` archives under the folder, newest first, and writes the evidence into a folder you can share:
 
-- `index.html` in the folder, listing each run's outcome counts, the tests that did not pass, links to its trace and its digest, and every archive that could not be read with the reason.
+- `index.html` in the folder. It lists each run's outcome counts, the tests that did not pass, and links to its trace and its digest. Every archive that could not be read is listed with the reason.
 - A `.digest.json` file beside each archive, the diagnosis JSON the page links to.
 
 ```bash
@@ -85,7 +85,7 @@ prototest index TestResults
 Indexed 2 runs into 'C:\dev\your-repo\TestResults\index.html'.
 ```
 
-Discovery looks at the folder's `TestResults/` first and walks the tree only when that yields no readable run; [Setup](./setup.md#where-it-reads) has the details. An archive it could not read is named, not guessed at:
+Discovery looks at the folder's `TestResults/` first and walks the tree only when that yields no readable run. [Setup](./setup.md#where-it-reads) has the details. An archive it could not read is named, not guessed at:
 
 ```text
 Indexed 1 run into 'C:\dev\your-repo\TestResults\index.html'.
@@ -102,7 +102,7 @@ Compares two JSON reports from a `ProtoTest.Reporting` sink:
 prototest verify baseline.json TestResults/ProtoTest/report.json
 ```
 
-The baseline is the default branch report. The current report is the run under review. The failing findings print one `::error` workflow command each, which a GitHub runner turns into an annotation, and the verdict then lists the findings and the coverage deltas. The default severities make the verb a pull request gate: `regressed`, `stale-spec` and `gate-failed` fail, and `added-uncovered` warns.
+The baseline is the default branch report. The current report is the run under review. The failing findings print one `::error` workflow command each, which a GitHub runner turns into an annotation. The verdict then lists the findings and the coverage deltas. The default severities make the verb a pull request gate: `regressed`, `stale-spec` and `gate-failed` fail, and `added-uncovered` warns.
 
 ```text
 ::error::regressed: Target 'Northstar:Api' unit 'GET /api/v1/orders' in category 'OpenAPI' was covered in the baseline and is uncovered now.
@@ -144,7 +144,7 @@ prototest feedback: github-pr-comment skipped (No GitHub token: set GITHUB_TOKEN
 prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBHOOK_URL.)
 ```
 
-The stdout half is the annotation GitHub renders on the pull request, and [The evidence loop](./loop.md#run-it-locally) shows the same command with both streams. A failure with a source location renders it as properties (`::error file=path/to/OrderTests.cs,line=42::message`); without one it is the bare `::error::message` form, and run-gate annotations never carry a location.
+The stdout half is the annotation GitHub renders on the pull request, and [The evidence loop](./loop.md#run-it-locally) shows the same command with both streams. A failure with a source location renders it as properties (`::error file=path/to/OrderTests.cs,line=42::message`). Without one it is the bare `::error::message` form. Run-gate annotations never carry a location.
 
 Every channel reports its outcome on stderr. A channel with no target, or nothing to post, skips. Only a channel that reached its target and failed makes the verb exit `1`. With no target configured the verb is safe to run locally.
 
@@ -154,14 +154,14 @@ Every channel reports its outcome on stderr. A channel with no target, or nothin
 
 | Variable | Channel | Meaning |
 | --- | --- | --- |
-| `GITHUB_TOKEN` | comment | the token that posts the comment; the workflow needs `issues: write` |
+| `GITHUB_TOKEN` | comment | the token that posts the comment. The workflow needs `issues: write`. |
 | `GITHUB_REPOSITORY` | comment | the repository as `owner/name` |
-| `GITHUB_EVENT_PATH` | comment | the event payload file; the pull request number is read from it |
-| `GITHUB_API_URL` | comment | the GitHub REST base URL; defaults to `https://api.github.com` |
+| `GITHUB_EVENT_PATH` | comment | the event payload file, which the pull request number is read from |
+| `GITHUB_API_URL` | comment | the GitHub REST base URL, by default `https://api.github.com` |
 | `PROTOTEST_FEEDBACK_TRACE_URL` | comment | the artifact URL the comment links to |
 | `PROTOTEST_FEEDBACK_WEBHOOK_URL` | webhook | the address the digest JSON is posted to |
-| `PROTOTEST_FEEDBACK_WEBHOOK_SECRET` | webhook | the shared-secret header value; no header is sent without it |
-| `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER` | webhook | the shared-secret header name; defaults to `X-ProtoTest-Secret` |
+| `PROTOTEST_FEEDBACK_WEBHOOK_SECRET` | webhook | the shared-secret header value. No header is sent without it. |
+| `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER` | webhook | the shared-secret header name, by default `X-ProtoTest-Secret` |
 
 The [feedback action](../continuous-integration/index.md#action-inputs) maps its inputs to these names, so a local command and the action take the same path.
 
@@ -250,7 +250,7 @@ flowchart TD
 - The verbs read files. The only writes are the `index` page, the digests beside the traces and the `--digest` file.
 - No network call happens unless a target is configured. A missing target is a named skip, never a failure.
 - The verbs take no other arguments, and there is no verb that reruns a suite, writes a trace or changes an archive.
-- The CLI writes UTF-8 without a BOM and sets the console output encoding, so the `·` separator renders on a default Windows console; redirected output stays parsing-friendly.
+- The CLI writes UTF-8 without a BOM and sets the console output encoding, so the `·` separator renders on a default Windows console. Redirected output stays parsing-friendly.
 - The digest is built from the written archive after the run, so it reflects what the run recorded ([The evidence loop](./loop.md#limits)).
 - These four verbs are the whole `prototest` surface.
 

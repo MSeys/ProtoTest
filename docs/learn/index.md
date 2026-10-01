@@ -20,8 +20,8 @@ Some lessons ask you to run or change sample code. Others walk through recorded 
 You need no ProtoTest experience to start. The [reference](/docs/) holds the details when you want them.
 
 **New here?** Start with [Run the sample suite](./start/install-and-run.md). For an introduction to the problems
-these lessons address, read [Why integration tests get hard](./why-it-gets-hard.md). Forgot a word? [Words used in
-Learn](./words.md) explains each one in a sentence.
+these lessons address, read [Why integration tests get hard](./why-it-gets-hard.md). Forgot a word? The
+[Vocabulary](/docs/foundation/vocabulary) explains each one in a sentence and links the lesson that teaches it.
 
 ## The tracks
 

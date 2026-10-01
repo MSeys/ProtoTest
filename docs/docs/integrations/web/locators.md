@@ -6,7 +6,7 @@ description: "Find elements by role, label and text rather than CSS; each backen
 
 # Locators
 
-`By` builds a `WebLocator`, a description of how to find something, translated by each backend into its native query. Prefer locators that describe what a user sees (roles, labels, text) over ones that describe markup (CSS); they survive redesigns and double as accessibility checks.
+`By` builds a `WebLocator`: a description of how to find something, which each backend translates into its own query. Prefer locators that describe what a user sees (roles, labels, text) over ones that describe markup (CSS). They survive redesigns, and they double as accessibility checks.
 
 :::caution[Two `By` types in a Selenium suite]
 A Selenium suite imports `OpenQA.Selenium` for its driver types, and `OpenQA.Selenium.By` collides with `ProtoTest.Web.By` in any file that uses both (CS0104). Alias one of them in the page-object file, for example `using By = ProtoTest.Web.By;`, or keep the driver factory in its own file. Playwright has no second `By`.
@@ -51,7 +51,7 @@ flowchart TD
 
 The full per-backend translation lives in [How each backend translates a locator](#how-each-backend-translates-a-locator).
 
-`Attribute` only accepts names made of letters, digits, `-`, `_` and `:`; anything else throws an `ArgumentException` at build time.
+`Attribute` accepts only names made of letters, digits, `-`, `_` and `:`. Anything else throws an `ArgumentException` when the locator is built.
 
 ## Roles
 
@@ -71,13 +71,13 @@ Element(By.Role(WebRole.Status))            // any element with role=status
 Component<InvoiceRow>(By.Role(WebRole.Row).And(By.HasText("INV-123")))
 ```
 
-`HasText` is **only valid as the right-hand side of `And`**; on its own, both backends throw `WebBackendCapabilityException`.
+`HasText` is **only valid as the right-hand side of `And`**. On its own, both backends throw `WebBackendCapabilityException`.
 
 :::caution[Selenium limitations]
 Selenium supports a narrower set of combinations: the right-hand side of `And` must be `HasText`, and the left-hand side cannot be `By.Css`. Playwright is not limited to those two forms.
 :::
 
-In Playwright, `And(By.HasText(...))` becomes a native filter on the left locator; other right-hand sides become Playwright's own `And`. Selenium throws `WebBackendCapabilityException` for both of those cases.
+In Playwright, `And(By.HasText(...))` becomes a filter on the left locator, and any other right-hand side becomes Playwright's own `And`. Selenium throws `WebBackendCapabilityException` for the combinations it does not support.
 
 ## Picking the nth match
 
@@ -85,13 +85,15 @@ In Playwright, `And(By.HasText(...))` becomes a native filter on the left locato
 Element(By.At(By.Role(WebRole.Button, "Remove"), 2))   // the third "Remove" button
 ```
 
-The index is zero-based and must not be negative. Playwright applies `.Nth(index)`; Selenium resolves all matches for the source and indexes the in-memory list. Through the element API, an out-of-range index counts as a missing element. An action or assertion waits until the timeout, then fails with `WebElementResolutionException` naming the locator. A direct resolution reports the count instead (`NoSuchElementException` on Selenium).
+The index is zero-based and must not be negative. Playwright applies `.Nth(index)`. Selenium finds all matches and picks from that list.
+
+An index past the last match counts as a missing element. An action or assertion waits until its timeout, then fails with `WebElementResolutionException` naming the locator. A direct resolution reports the count instead (`NoSuchElementException` on Selenium).
 
 For repeated components, [`Components<T>()`](./page-objects.md#lists-of-components) with `At`, `Number`, `First` and `Matching` usually reads better.
 
 ## Table cells
 
-Inside a `WebTableRow`, use the row's `Cell(...)`, `CellNumber(...)` and `CellAt(...)` methods rather than these locators directly; they're built on `By.TableCell*` and give the element a readable name.
+Inside a `WebTableRow`, use the row's `Cell(...)`, `CellNumber(...)` and `CellAt(...)` methods rather than these locators. They are built on `By.TableCell*` and give the element a readable name.
 
 ## Describing a locator
 
@@ -104,7 +106,7 @@ By.Role(WebRole.Row).And(By.HasText("INV-123", exact: true)).Describe()
 
 ## How each backend translates a locator
 
-Both backends resolve the component scope first (outermost root to innermost) and then the element locator, but they speak different native languages (`src/ProtoTest.Web.Playwright/PlaywrightWebBackend.cs`, `src/ProtoTest.Web.Selenium/SeleniumLocatorTranslator.cs`):
+Both backends resolve the component scope first, from the outermost root inward, then the element locator. Each translates into its own query language (`src/ProtoTest.Web.Playwright/PlaywrightWebBackend.cs`, `src/ProtoTest.Web.Selenium/SeleniumLocatorTranslator.cs`):
 
 | Locator | Playwright | Selenium | Selenium limits |
 | --- | --- | --- | --- |
@@ -137,19 +139,24 @@ When a name is given, Selenium's predicate matches it against `aria-label`, `tit
 
 ### Deepest-match text
 
-Both backends match the deepest element carrying the text, not every ancestor. Playwright's `GetByText` does this natively; Selenium's XPath adds `and not(.//*[predicate])`, because `normalize-space(.)` includes descendant text and would otherwise make a banner's text match `body` and `html` too, and every single-element resolution would find several matches.
+Both backends match the deepest element carrying the text, not every ancestor. Playwright's `GetByText` does this by itself. Selenium's XPath adds `and not(.//*[predicate])`. Without it, `normalize-space(.)`, which includes descendant text, would make a banner's text match `body` and `html` too, and every single-element lookup would find several matches.
 
 ### Document versus element scope
 
-A component root narrows the search. `By.TableCell*` is relative by nature, so its axis widens to the document when the search context is the driver rather than an element: Playwright uses `th, td` at page root and `:scope > th, :scope > td` inside a component; Selenium uses `(//*[self::th or self::td])[n]` from the driver and `./*[self::th or self::td][position()=n]` from an element. The shared header lookup keeps the column's own header cells out of a document-wide search.
+A component root narrows the search. `By.TableCell*` is relative, so it widens to the whole document when there is no component around it:
+
+- Playwright uses `th, td` at the page root, and `:scope > th, :scope > td` inside a component.
+- Selenium uses `(//*[self::th or self::td])[n]` from the driver, and `./*[self::th or self::td][position()=n]` from an element.
+
+The shared header lookup keeps the column's own header cells out of a document-wide search.
 
 ### Namespaced attributes
 
-Selenium matches a namespaced attribute name literally, through `@*[name()='xml:lang']`, because XPath's `@prefix:name` would need a namespace resolver Selenium does not expose; in HTML the name is a plain attribute and in XML it keeps its prefix, so `name()` covers both. Playwright escapes the name into a CSS attribute selector and rejects names that cannot be represented safely.
+Selenium matches a namespaced attribute name literally, through `@*[name()='xml:lang']`. XPath's `@prefix:name` would need a namespace resolver that Selenium does not expose. In HTML the name is a plain attribute, and in XML it keeps its prefix, so `name()` covers both. Playwright escapes the name into a CSS attribute selector, and rejects names it cannot represent safely.
 
 ### Multiple matches
 
-Single-element operations are strict on both backends. Playwright translates its strict-mode violation into `WebElementResolutionException`; Selenium's `ResolveSingle` throws `NoSuchElementException` for zero matches and `WebElementResolutionException` for more than one.
+Single-element operations are strict on both backends. Playwright turns its strict-mode violation into `WebElementResolutionException`. Selenium's `ResolveSingle` throws `NoSuchElementException` for zero matches, and `WebElementResolutionException` for more than one.
 
 ## Next
 

@@ -2,7 +2,7 @@
 sidebar_position: 10
 title: Devices
 sidebar_label: Devices
-description: "Talk to devices - a simulator or the real hardware - from the same test context, lifecycle and trace."
+description: "Talk to devices over WebSocket, MQTT, TCP or a serial port, build their data strings as typed messages, and keep every exchange in the trace."
 ---
 
 # Devices
@@ -28,8 +28,11 @@ Run it with `dotnet test`. A green run prints `Passed A_charger_boots_and_acknow
 - **Every exchange in the trace**, with the frames sent and received.
 - **Protocol coverage.** A catalog of message kinds reports the ones no test asserted.
 
-The transport is a separate package, `ProtoTest.Devices.WebSocket` for sockets and `ProtoTest.Devices.Mqtt` for
-publish/subscribe. So the same suite runs against a simulator in CI and lab hardware on a bench.
+- **Data strings as classes.** A record describes a message such as `$MTR,M-1,12.50*4B`, and the device sends and expects it by type.
+
+The transport is a separate package: `ProtoTest.Devices.WebSocket` for WebSockets, `ProtoTest.Devices.Mqtt` for
+publish/subscribe, `ProtoTest.Devices.Tcp` for raw sockets and `ProtoTest.Devices.Serial` for COM ports. So the same
+suite runs against a simulator in CI and lab hardware on a bench.
 
 ## Install
 
@@ -39,6 +42,8 @@ dotnet add package ProtoTest.Devices.WebSocket              # ws:// and wss:// e
 dotnet add package ProtoTest.Devices.WebSocket.AspNetCore   # in-process endpoints, no socket
 dotnet add package ProtoTest.Devices.Mqtt                   # MQTT publish/subscribe
 dotnet add package ProtoTest.Devices.Mqtt.Testcontainers    # a Mosquitto broker for the run
+dotnet add package ProtoTest.Devices.Tcp                    # raw TCP, connecting out or listening
+dotnet add package ProtoTest.Devices.Serial                 # COM ports and /dev/tty lines
 ```
 
 ## Compose
@@ -145,6 +150,48 @@ provider chain, and the same registration follows it.
 capability, so gated tests skip instead of failing when the device is created. An explicit `address:` or a
 resolver comes from code, so the capability stays.
 
+### TCP and serial
+
+A raw socket or a serial line is a stream of bytes with no message boundaries. A framer cuts it into frames and
+writes frames back:
+
+| Framer | A frame is |
+| --- | --- |
+| `DeviceFramers.Lines("\r\n")` | the text before each terminator |
+| `DeviceFramers.Delimited(delimiter)` | the bytes before each delimiter |
+| `DeviceFramers.Enveloped(stx, etx)` | the bytes between a start and an end marker, after skipping noise before the start |
+| `DeviceFramers.LengthPrefixed(2)` | a payload after its 1, 2 or 4 byte length |
+| `DeviceFramers.FixedLength(16)` | exactly that many bytes |
+
+A protocol with its own envelope, such as a checksum after the end marker, implements `IDeviceFramer`. A client
+without a framer reads text lines ending in `\n`.
+
+`ProtoTest.Devices.Tcp` connects devices out to `tcp://host:port`:
+
+```csharp
+builder.AddDevices(devices => devices
+    .AddTcpClient("Meters", DeviceFramers.Lines("\r\n"), address: "tcp://127.0.0.1:7000")
+        .AddDevice<FlowMeter>());
+```
+
+Inside `AddApplication`, pass a `port:` instead of an address, and the client uses the application's host.
+
+`ProtoTest.Devices.Serial` opens a serial line:
+
+```csharp
+builder.AddDevices(devices => devices
+    .AddSerialClient("Meters", DeviceFramers.Lines("\r\n"), address: "serial://COM3?baud=9600")
+        .AddDevice<FlowMeter>());
+```
+
+The address names the port and its line settings: `serial:///dev/ttyUSB0?baud=115200&parity=even`. The settings
+are `baud`, `databits`, `parity`, `stopbits` and `handshake`. Unset ones default to 9600 baud, 8 data bits, no
+parity, one stop bit and no handshake.
+
+A serial client without an address reads its port from `ProtoTest:Devices:Serial:Ports:{client}`. Its devices
+exist only where that key is set, so `[RequiresDevice<TDevice>]` skips the hardware tests on a machine without the
+device.
+
 ## The tasks
 
 The `A_charger_boots_and_acknowledges` test above is the whole pattern: resolve the device for an id, call its domain method.
@@ -156,8 +203,10 @@ Beyond that:
 
 1. [Define a device class](#defining-a-device) with the domain methods your scenarios use.
 2. [Let a test-side peer talk to an MQTT device](#a-conversation-with-a-test-side-peer).
-3. [Run the same tests on a simulator or on hardware](#simulator-or-hardware).
-4. [Report the message kinds no test asserted](#coverage-with-gaps).
+3. [Write and read data strings as typed messages](#data-strings-as-messages).
+4. [Let the system under test connect to the device](#a-device-the-system-connects-to).
+5. [Run the same tests on a simulator or on hardware](#simulator-or-hardware).
+6. [Report the message kinds no test asserted](#coverage-with-gaps).
 
 ### Defining a device
 
@@ -241,6 +290,72 @@ public async Task A_meter_converses_with_a_test_side_peer()
 }
 ```
 
+### Data strings as messages
+
+Many devices send fields in one line of text, such as `$MTR,M-1,12.50*4B`. Describe that line as a record, and
+`DeviceMessage` writes and reads it:
+
+```csharp
+[DeviceMessage("$MTR", Checksum = typeof(NmeaChecksum))]
+public sealed record MeterReading(
+    string MeterId,
+    [DeviceField(Format = "0.00")] decimal Volume);
+
+DeviceMessage.Format(new MeterReading("M-1", 12.5m));   // "$MTR,M-1,12.50*" plus the checksum
+DeviceMessage.Parse<MeterReading>(text);                // the record, or a DeviceMessageFormatException
+```
+
+- **The fields are the record's parameters, in order.** On a class with settable properties, `[DeviceField(0)]`, `[DeviceField(1)]` and so on set the order.
+- **`Separator`** sets the text between fields, a comma by default. An empty separator makes a fixed-width message. Every field then needs a `Width`, with `Pad` and `PadLeft` for zero-padded numbers.
+- **`Format`** takes a .NET format for numbers, dates and times, `D` for an enum's number, or `Y|N` style words for a boolean. Values use the invariant culture. An empty field reads as `null` for a nullable field.
+- **`Checksum`** takes `NmeaChecksum` (`*` and two hex digits) or your own `IDeviceMessageChecksum`.
+- **A mismatch names its cause:** the prefix, the field count, the checksum, or the field and value that would not parse.
+
+A device sends and expects messages by type:
+
+```csharp
+public sealed class FlowMeter : ProtoDevice
+{
+    public async Task<MeterAck> ReportAsync(decimal volume)
+    {
+        await SendMessageAsync(new MeterReading(Id, volume));
+        return await ExpectMessageAsync<MeterAck>(ack => ack.Accepted);
+    }
+}
+```
+
+`ExpectMessageAsync` skips frames that are not that message, and records the wait like `ExpectAsync`, named after
+the message type. A test builds its data strings as objects, and a wrong field fails with the field's name.
+
+### A device the system connects to
+
+Some systems dial their devices: a backend that polls meters, or a gateway that opens the connection. Register a
+listening client, and each device binds its own port:
+
+```csharp
+builder.AddDevices(devices => devices
+    .AddTcpListener("Meters", DeviceFramers.Lines("\r\n"))
+        .AddDevice<FlowMeter>());
+```
+
+`ListenAsync` returns the address with the port the operating system chose. Give the device class a method that
+exposes it, and hand the address to the application:
+
+```csharp
+public sealed class FlowMeter : ProtoDevice
+{
+    public ValueTask<string> OpenPortAsync() => ListenAsync();
+}
+
+var meter = Proto.Context.Devices("Meters").For<FlowMeter>("M-001");
+var address = await meter.OpenPortAsync();                  // tcp://127.0.0.1:53817
+await RegisterMeterAsync(address);                          // however the application learns its devices
+var request = await meter.AwaitRequestAsync();              // waits for the application to connect
+```
+
+The first send or receive waits for the connection, up to `AcceptTimeout`. Each device has its own port, so
+parallel tests never share one.
+
 ### Simulator or hardware
 
 Nothing is registered per device id. `[RequiresDevice<TDevice>]` skips a test when no client registers that device
@@ -288,6 +403,22 @@ The MQTT transport takes its defaults in `AddMqttClient(..., configure)`:
 | `ProtoTest:Devices:Mqtt:KeepAlivePeriod` | the keep-alive interval sent to the broker | library default |
 | `ProtoTest:Devices:Mqtt:MaxPacketBytes` | the largest MQTT packet the client accepts, offered to the broker as MQTT 5 `MaximumPacketSize`; 0 reads without a cap | 4 MiB |
 
+The TCP transports take their defaults in `AddTcpClient(..., configure)` or `AddTcpListener(..., configure)`:
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `ProtoTest:Devices:Tcp:ConnectTimeout` | how long a connection attempt may take | 10 s |
+| `ProtoTest:Devices:Tcp:AcceptTimeout` | how long a listening device waits for the application to connect | 30 s |
+| `ProtoTest:Devices:Tcp:MaxFrameBytes` | the most bytes a receive buffers without completing a frame | 1 MiB |
+| `ProtoTest:Devices:Tcp:NoDelay` | send small writes at once instead of batching them | true |
+
+The serial transport takes its defaults in `AddSerialClient(..., configure)`:
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `ProtoTest:Devices:Serial:Ports:{client}` | the port address of a client registered without one | unset |
+| `ProtoTest:Devices:Serial:MaxFrameBytes` | the most bytes a receive buffers without completing a frame | 1 MiB |
+
 ## In the trace and coverage
 
 ```text
@@ -299,6 +430,7 @@ device.command · the peer reads a flow reading
 
 - **A `device` entity per device**, with its client, type, transport, address and connection state. Its id is `device:{client}:{deviceType}:{id}`, so two device types can share an id.
 - **Operations** `device.connect`, `device.send`, `device.receive` and `device.command`. A failed expectation is a failed `device.command`, with the awaited description and the frame log.
+- **A `device.listen` event** for a listening device, with the address it handed out.
 - **A disconnect at the end of the test.** The final state is `device.connected = false`, with a `device.disconnect` event, even when the test never called `DisconnectAsync`.
 
 ## Limits
@@ -308,7 +440,11 @@ device.command · the peer reads a flow reading
 - **Configuration is per client.** The address template or resolver, the settings and the device id are all there is. The transport options are shared by the whole run.
 - **In-process endpoints follow the application's provider chain.** With `AddInProcessWebSocketDevices<TProgram>(application)` registered, the client uses the `TestServer` while the in-process provider (`UseInProcess<TProgram>()`, or `AddAspNetCoreServer` without a chain) serves the application. When a configured, loopback or AppHost provider wins, the in-process transport declines, and the socket at that address serves the client. Its `device` capability exists only while the in-process provider can serve it.
 - **`ExpectAsync` consumes frames.** The exchange log is for failure messages, not for matching a frame twice.
-- **Two transports ship.** ProtoTest ships WebSocket and MQTT. There is no TCP or serial transport.
+- **Four transports ship.** WebSocket, MQTT, TCP and serial. There is no TLS for TCP: `tcp://` only.
+- **A listening device accepts one connection.** It stops listening once the application connected. An application that reconnects needs a new device in a new test.
+- **A serial port is open in one test at a time.** Tests that share a port must not run in parallel.
+- **A stream frame has a size limit.** A receive that buffers more than `MaxFrameBytes` without a whole frame fails and shows the first bytes. That usually means the framer does not match the device.
+- **A message has a fixed list of fields.** Repeated groups and optional trailing fields need a string field, or a class per variant. A field holds a string, number, boolean, enum, date or time.
 - **MQTT speaks MQTT 5 over plain TCP.** `mqtt://` only. An MQTT 3.1.1-only broker and `mqtts://` fail the connect.
 - **An MQTT client has one publish topic and one subscribe filter.** `{deviceId}` is the only placeholder, so one client covers one topic convention, and two device families need two clients. The filter may use the `+` and `#` wildcards; the publish topic may not.
 - **MQTT options are one set per run.** Connect timeout, keep-alive, the packet cap and a broker set through `configure` apply to every MQTT client. A client that needs its own broker passes a resolver, because a configured or container broker wins over `address:`.
@@ -317,5 +453,9 @@ device.command · the peer reads a flow reading
 - **The transport moves frames.** Protocol meaning, such as message kinds, sessions and OCPP operations, is the suite's code. Coverage names only what the catalog declares.
 
 ## Writing a transport
+
+A transport over a byte stream, such as a Bluetooth socket or a USB bridge, wraps its stream in
+`StreamDeviceConnection` with the client's framer (`DeviceEndpoint.Framer`). Framing, the size limit and the
+mid-frame errors then match the TCP and serial transports.
 
 A hand-written in-process transport applies `ProtoTestContextPropagation.ApplyTo(HttpRequest)` (from `ProtoTest.AspNetCore`) to the request it opens. The handshake then carries the test id, and the application's clock bridge uses the connecting test's clock, as with the in-process HTTP client.

@@ -15,6 +15,13 @@ public sealed record DeviceEndpoint(
 {
     /// <summary>Gets a transport setting, or <see langword="null"/> when the registration did not fill it.</summary>
     public string? Setting(string key) => Settings is not null && Settings.TryGetValue(key, out var value) ? value : null;
+
+    /// <summary>
+    /// Gets how a stream transport cuts bytes into frames, as the client declared it with
+    /// <c>WithFramer</c>; <see langword="null"/> when the client declared none. Message transports
+    /// (WebSocket, MQTT) ignore it.
+    /// </summary>
+    public IDeviceFramer? Framer { get; init; }
 }
 
 /// <summary>

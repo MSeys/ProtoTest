@@ -3,6 +3,8 @@
   "sections": [
     "ProtoTest:Applications",
     "ProtoTest:Devices:Mqtt",
+    "ProtoTest:Devices:Serial",
+    "ProtoTest:Devices:Tcp",
     "ProtoTest:Devices:WebSocket",
     "ProtoTest:GraphQL:Attachments",
     "ProtoTest:GraphQL:Responses",
@@ -40,6 +42,10 @@
     {
       "key": "ProtoTest:Database",
       "reason": "the demo's environment switch; sample-side, not a package option"
+    },
+    {
+      "key": "ProtoTest:Devices:Serial:Ports:{client}",
+      "reason": "the per-client port address a serial client without an address reads; the client name is its registration name, not an options section"
     },
     {
       "key": "ProtoTest:Http:Attachments",

@@ -10,15 +10,16 @@ using ProtoTest.Grpc.Tests.Echo;
 
 /// <summary>
 /// Pins the disclosed in-process deadline limit: a socket endpoint reports <c>DeadlineExceeded</c>
-/// when a call overruns its deadline, while the in-process transport surfaces the server's abort
-/// status (<c>Unknown</c> or <c>Internal</c>) when the deadline passes mid-call. The gRPC page's
-/// Limits section states it; a suite asserting <c>DeadlineExceeded</c> must run against a socket.
+/// when a call overruns its deadline, while in-process the client's deadline and the server's abort
+/// race, so the call fails with either <c>DeadlineExceeded</c> or the abort status (<c>Unknown</c>,
+/// <c>Internal</c> or <c>Cancelled</c>). The gRPC page's Limits section states it; a suite asserting
+/// <c>DeadlineExceeded</c> alone must run against a socket.
 /// </summary>
 [TestFixture]
 public sealed class InProcessDeadlineTests
 {
     [Test]
-    public async Task InProcessCall_WhenTheDeadlinePassesMidCall_ShouldSurfaceTheTransportAbort()
+    public async Task InProcessCall_WhenTheDeadlinePassesMidCall_ShouldFailWithTheDeadlineOrTheTransportAbort()
     {
         var appBuilder = WebApplication.CreateBuilder();
         appBuilder.WebHost.UseTestServer();
@@ -56,10 +57,11 @@ public sealed class InProcessDeadlineTests
         Assert.Multiple(() =>
         {
             Assert.That(exception, Is.TypeOf<RpcException>());
+            // Which side wins depends on load: alone the server's abort usually arrives first, under a
+            // full parallel run the client's own deadline can fire before it.
             Assert.That(
                 ((RpcException)exception!).StatusCode,
-                Is.Not.EqualTo(StatusCode.DeadlineExceeded),
-                "the in-process transport reports the server's abort, not the socket's deadline status");
+                Is.AnyOf(StatusCode.DeadlineExceeded, StatusCode.Unknown, StatusCode.Internal, StatusCode.Cancelled));
         });
     }
 

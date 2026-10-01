@@ -33,6 +33,9 @@ internal sealed class DeviceClientRegistration(string name)
     /// </summary>
     public List<string> AddressKeys { get; } = [];
 
+    /// <summary>How a stream transport frames this client's bytes, or null for the transport's default.</summary>
+    public IDeviceFramer? Framer { get; set; }
+
     public List<Type> DeviceTypes { get; } = [];
 
     public List<Type> ProtocolTypes { get; } = [];

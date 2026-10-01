@@ -318,6 +318,54 @@
       ]
     },
     {
+      "name": "TCP transport",
+      "does": "Raw sockets with line, delimited, length-prefixed or custom framing, connecting out or listening.",
+      "packages": [
+        "ProtoTest.Devices.Tcp"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Devices",
+          "to": "/docs/integrations/devices#tcp-and-serial"
+        }
+      ],
+      "builder": [
+        {
+          "id": "devices-tcp",
+          "label": "Talk to a device over TCP",
+          "note": "Data strings over a raw socket, either direction",
+          "packages": [
+            "ProtoTest.Devices.Tcp"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Serial transport",
+      "does": "COM ports and /dev/tty lines with the same framing, skipped where the port is not configured.",
+      "packages": [
+        "ProtoTest.Devices.Serial"
+      ],
+      "preview": true,
+      "links": [
+        {
+          "label": "Devices",
+          "to": "/docs/integrations/devices#tcp-and-serial"
+        }
+      ],
+      "builder": [
+        {
+          "id": "devices-serial",
+          "label": "Talk to a device on a serial port",
+          "note": "RS-232 or USB serial lines",
+          "packages": [
+            "ProtoTest.Devices.Serial"
+          ]
+        }
+      ]
+    },
+    {
       "name": "MQTT transport",
       "does": "Publish and subscribe against a real broker, with a Mosquitto broker owned by the run.",
       "packages": [

@@ -10,7 +10,7 @@ All ProtoTest packages share one version; breaking API changes are called out be
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
 CLI), the devices family (WebSocket and MQTT), the topology integrations (Aspire, WireMock,
 Testcontainers), the extended runner surface, and a rewritten documentation site with the Learn track.
-It ships 44 packages, 16 more than 1.0; the breaking changes are listed at the end.
+It ships 46 packages, 18 more than 1.0; the breaking changes are listed at the end.
 See [Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0) for the renames
 and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the rest.
 
@@ -109,6 +109,10 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `ProtoTest.Devices.Mqtt.Testcontainers` owns a Mosquitto broker for the run. [Devices](https://prototest.dev/docs/integrations/devices)
 - `ProtoDeviceConnect` and its timeout live in `ProtoTest.Devices`, shared by every transport. [Devices](https://prototest.dev/docs/integrations/devices)
 - `IProtoDeviceTransport.ConnectAsync` gains a default context overload for custom transports. [Devices](https://prototest.dev/docs/integrations/devices)
+- `ProtoTest.Devices.Tcp` connects devices out (`AddTcpClient`) or listens for the system under test (`AddTcpListener`, `ListenAsync`). [Devices](https://prototest.dev/docs/integrations/devices#tcp-and-serial)
+- `ProtoTest.Devices.Serial` opens `serial://` lines; a client without an address reads `ProtoTest:Devices:Serial:Ports:{client}`. [Devices](https://prototest.dev/docs/integrations/devices#tcp-and-serial)
+- stream framing (`IDeviceFramer`, `DeviceFramers`, `WithFramer`) and `StreamDeviceConnection` serve any byte-stream transport. [Devices](https://prototest.dev/docs/integrations/devices#tcp-and-serial)
+- `DeviceMessage` writes and reads device data strings as records, with `SendMessageAsync`/`ExpectMessageAsync`. [Devices](https://prototest.dev/docs/integrations/devices#data-strings-as-messages)
 
 #### Web
 
@@ -194,7 +198,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - a copy-in skill (`skills/prototest-evidence-loop`) teaches agents the evidence loop and the CLI. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#the-skills-bundle)
 - the xUnit pages cover converting an existing suite and the Microsoft.Testing.Platform opt-in on SDK 10. [Runners](https://prototest.dev/docs/runners/overview)
 - the integrations overview lists every `ProtoTest.Devices*` package with a one-line purpose. [Overview](https://prototest.dev/docs/integrations/overview)
-- the 44 packages are tiered into supported and preview sets, with the stability promise and the graduation path stated. [Installation](https://prototest.dev/docs/getting-started/installation)
+- the 46 packages are tiered into supported and preview sets, with the stability promise and the graduation path stated. [Installation](https://prototest.dev/docs/getting-started/installation)
 - the web pages make the backend choice explicit (Playwright or Selenium), and the conversion order covers NUnit, MSTest and TUnit suites. [Web](https://prototest.dev/docs/integrations/web)
 - the agent workflows document the feedback webhook payload, the configuration page lists every section's keys, and the template page shows what the scaffold creates. [CLI](https://prototest.dev/docs/agent-workflows/cli)
 - the reference pages gain the recorded trace walks, the decision figures and the triage tables; the longest pages split into child pages (web page coverage, messaging adapters, gRPC calls, the ProtoTrace archive, the CI providers). [Docs](https://prototest.dev/docs/)
@@ -214,7 +218,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Packaging
 
-- 44 packages pack in one version, 16 more than 1.0; the installation page lists the supported and preview tiers. [Installation](https://prototest.dev/docs/getting-started/installation)
+- 46 packages pack in one version, 18 more than 1.0; the installation page lists the supported and preview tiers. [Installation](https://prototest.dev/docs/getting-started/installation)
 
 #### Engineering
 

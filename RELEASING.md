@@ -55,7 +55,7 @@ that needed it. Write every release section this way from the start.
 ```
 
 `-Full` is the CI shape (lint, full test suite, docs) and `-Pack` validates every package against
-the baseline: `./proto pack` packs all 44 packages and checks the shared version, READMEs,
+the baseline: `./proto pack` packs all 46 packages and checks the shared version, READMEs,
 dependency edges, symbol pairs and package validation. `release.ps1 -DryRun` prints the
 dependency-ordered push plan from the packed folder without touching NuGet.
 
@@ -84,9 +84,9 @@ had no baseline now have one. After `x.y.z` is on nuget.org:
 
 1. Set `<PackageValidationBaselineVersion>` in `Directory.Build.targets` to `x.y.z`.
 2. Remove `EnablePackageValidation=false` and `PackageValidationOptOutReason` from every package
-   that now has a released baseline. Today that is 17 packages: `ProtoTest.Hosting`,
+   that now has a released baseline. Today that is 19 packages: `ProtoTest.Hosting`,
    `ProtoTest.Devices`, `ProtoTest.Devices.Mqtt`, `ProtoTest.Devices.Mqtt.Testcontainers`,
-   `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`, `ProtoTest.Web.Pages`,
+   `ProtoTest.Devices.Serial`, `ProtoTest.Devices.Tcp`, `ProtoTest.Devices.WebSocket`, `ProtoTest.Devices.WebSocket.AspNetCore`, `ProtoTest.Web.Pages`,
    `ProtoTest.Traces`, `ProtoTest.Cli`, `ProtoTest.Analyzers`, `ProtoTest.Aspire`,
    `ProtoTest.Diagnosis`, `ProtoTest.Feedback`, `ProtoTest.Mcp`, `ProtoTest.Messaging.MassTransit`,
    `ProtoTest.Verification` and `ProtoTest.WireMock`. `./proto pack` fails a packable project that

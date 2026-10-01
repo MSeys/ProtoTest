@@ -1,8 +1,6 @@
 /*
- * The Northstar sample's four failure drills and the tests that fix them. Every name, status and message
- * comes from a run of samples/Northstar.ProtoTest with the drills enabled; the durations are read from
- * the committed archives under docs/static/lessons, so the gallery shows what the reader downloads.
- * Nothing here is invented. A rerun writes its own durations, never different names or statuses.
+ * Selected evidence from the saved Northstar failure drills and their paired tests.
+ * Durations and failure messages come from the archives under docs/static/lessons.
  */
 
 export interface DrillRecord {
@@ -65,16 +63,15 @@ export const failureDrills: DrillPair[] = [
       elapsed: '286.8 ms',
       record: [
         {
-          kind: 'clock.advance',
-          name: 'Clock advanced by 8:0:00:00',
-          status: 'succeeded',
-          detail: 'recorded on test.execution, from the test side',
-        },
-        {
           kind: 'data.create',
           name: 'Create · IssueInvoiceRequest',
           status: 'succeeded',
           detail: '165.8 ms, provisioned in the test tenant',
+        },
+        {
+          kind: 'clock.advance',
+          name: 'Clock advanced by 8:0:00:00',
+          detail: 'event on test.execution, from the test side',
         },
         {
           kind: 'http.request',
@@ -110,7 +107,7 @@ export const failureDrills: DrillPair[] = [
     ask: 'What does the test leave behind?',
     drill: {
       test: 'AnUnknownProjectIdIsTreatedAsMine',
-      what: 'Reads a project id no test in the run created.',
+      what: 'Reads the hardcoded project id prj_1 in its test tenant.',
       elapsed: '134.6 ms',
       record: [
         {
@@ -149,7 +146,7 @@ export const failureDrills: DrillPair[] = [
           kind: 'assert.http.status',
           name: 'Assert status · 200 OK',
           status: 'succeeded',
-          detail: 'the list holds one project, the one this test created',
+          detail: 'HTTP 200; separate NUnit checks verify the returned project',
         },
       ],
     },
@@ -161,7 +158,7 @@ export const failureDrills: DrillPair[] = [
     ask: 'Where does the address come from?',
     drill: {
       test: 'TheAddressWasHardcodedForOneMachine',
-      what: 'Connects a plain HttpClient to a hardcoded address, 127.0.0.1:5099. The raw client is outside the composition, so the run records no operation for the call.',
+      what: 'Calls 127.0.0.1:5099 with a raw HttpClient inside the test. This client bypasses ProtoTest REST instrumentation, so this trace has no HTTP request operation.',
       elapsed: '2.05 s',
       record: [
         {
@@ -213,7 +210,7 @@ export const failureDrills: DrillPair[] = [
     },
     fix: {
       test: 'TheProblemBodyNamesTheCodeAndDetail',
-      what: 'Sends the same request and asserts the problem body.',
+      what: 'Sends the same empty-name request and checks HTTP 400 and the problem body.',
       elapsed: '155.6 ms',
       record: [
         {
@@ -230,6 +227,6 @@ export const failureDrills: DrillPair[] = [
         },
       ],
     },
-    change: 'Assert the error body the application returned.',
+    change: 'Check the expected rejection and its validation problem body.',
   },
 ];

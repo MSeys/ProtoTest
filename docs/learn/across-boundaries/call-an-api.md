@@ -26,21 +26,23 @@ import Checkpoint from '@site/src/components/Checkpoint';
 
 Most applications you test have an HTTP API. A good test calls it the way a client does and checks what comes back. Checking only the status code misses a wrong body. Comparing the whole body as text breaks when an id or a timestamp changes.
 
-ProtoTest checks the shape: the fields you care about, with the exact values you know and a placeholder for the ones you do not.
+In this lesson, you run a REST test and check its response shape. The shape names fields, expected values and constraints for values the application chooses.
 
 ## Do it
 
 ### 1. Run the test alone
 
+From the repository root:
+
 ```bash
-dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~CreatingAProjectReturnsIt"
+dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName=Northstar.ProtoTest.ProjectsJourney.CreatingAProjectReturnsIt"
 ```
 
-It should report one passed test.
+It should report one passed test. The full name selects the sample test even if you kept `MyFirstJourney.cs` from the Start track.
 
 ### 2. Read the call
 
-The test creates a project in the Northstar sample application:
+The test in `samples/Northstar.ProtoTest/ProjectsJourney.cs` creates a project in the Northstar sample application:
 
 ```csharp
 var name = $"atlas-{Proto.Context.TestId}";
@@ -49,9 +51,11 @@ using var created = await Proto.Context.Rest()
     .PostAsync("/api/v1/projects");
 ```
 
-`Proto.Context` is the test context: the object that holds everything this one test uses. `Rest()` returns the REST client for the application the class selected with `[Application(NorthstarTargets.Api)]`. The client already knows the address, so the test passes only a path.
+`Proto.Context` is the test context, which holds this test's clients and state. `Rest()` starts a request using the REST client for the application selected by `[Application(NorthstarTargets.Api)]`.
+The client already has a base address, so the test passes a path.
 
-The name includes `TestId`, so two runs of the test never create the same project.
+The name includes `TestId`, which distinguishes tests within the run. It does not guarantee uniqueness across runs.
+Northstar also provisions a tenant for each test and registers its cleanup.
 
 ### 3. Check the response
 
@@ -67,29 +71,41 @@ created
     });
 ```
 
-Read the shape as a description of the JSON. `name`, `status` and `environmentCount` must equal the values given. `id` only has to exist, because the application chooses it.
+Read the shape as a description of the JSON. `name`, `status` and `environmentCount` must equal the values given.
+`id` must exist and have a non-null value. `JsonValue.NotNull()` does not check its type, format or whether a string is empty.
+
+By default, the shape allows additional object fields. It checks the named fields rather than comparing the response as raw text.
 
 ### 4. See the refusals
 
-The same file tests the failures. `AnEmptyProjectNameIsRefused` posts an empty name and expects `400 Bad Request` with `code = ProblemCodes.ValidationFailed` in the body. `AViewerCannotCreateProjects` signs in as a viewer and expects `403 Forbidden`. A refusal is an ordinary response, so you check it with the same two calls.
+The same file tests refusals. `AnEmptyProjectNameIsRefused` posts an empty name and expects `400 Bad Request` with `code = ProblemCodes.ValidationFailed` in the body.
+`AViewerCannotCreateProjects` signs in as a viewer and expects `403 Forbidden` with `code = ProblemCodes.Forbidden`.
+These refusals return HTTP responses, so the tests check both status and body. A connection failure instead throws before a response is available.
 
 ### 5. Look at the trace
 
-Open the `.prototrace` file the run wrote under `TestResults/` in the [viewer](https://trace.prototest.dev). The execution phase of this test holds an operation `REST · POST /api/v1/projects`, then the checks `Assert status · 201 Created` and `Assert response shape`. An operation is one recorded step of a test, and a check is an assertion as the trace records it.
+Find the newest `.prototrace` file under `samples/Northstar.ProtoTest/bin/Debug/net8.0/TestResults/` and open it in the [viewer](https://trace.prototest.dev).
+Select `ProjectsJourney.CreatingAProjectReturnsIt`. Its execution phase contains `REST · POST /api/v1/projects`, followed by `Assert status · 201 Created` and `Assert response shape`.
+An operation is one recorded step. A check is an assertion recorded in the trace.
 
 The recorded run is also here: [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace).
 
 ## What happened
 
-The host built the REST client once, from the composition in the sample's setup class. Each test got its own client through its context. The request and the response were recorded as operations, so a failure shows the exact request that was sent.
+The setup class registered the clients. The framework initializes a client for each test context, which owns its cleanup.
+In the default local sample, the HTTP client sends requests through an in-process test server's handler. Its base address does not require a network listener.
 
-A shape mismatch lists every wrong field with its JSON path at once, so you can fix all of them in one pass.
+The trace records the HTTP exchange as one operation and the assertions as separate checks. The sample enables `CaptureAttachments()`, whose defaults capture request bodies, response bodies and expected shapes.
+Text diagnostics apply the configured redaction rules. The trace is diagnostic evidence, not an exact copy of everything sent over the transport.
+
+The shape matcher collects mismatches and identifies their JSON paths. These are differences against the expected shape, not every possible defect in the response.
 
 ## Check yourself
 
 <Checkpoint question="The application adds a field createdAt to the response. Does this test fail?">
 
-No. The reference page describes `MatchShape` as comparing the fields you name. It has an `exact` overload for the stricter check, which also rejects fields you did not name.
+No. `MatchShape` allows additional object fields by default. Passing `exact: true` also rejects fields that the shape leaves unmentioned.
+Value constraints still define what they check. For example, `JsonValue.NotNull()` accepts an entire non-null object without checking its children, even in exact mode.
 
 </Checkpoint>
 
@@ -97,7 +113,7 @@ No. The reference page describes `MatchShape` as comparing the fields you name. 
 
 - `Proto.Context.Rest()` gives a client that already knows the address.
 - `Should.HaveHttpStatus(...)` and `Should.MatchShape(...)` chain on the response.
-- Use `JsonValue.NotNull()` for values the application chooses.
+- Use `JsonValue.NotNull()` when presence and a non-null value are enough. Use a stronger constraint when type or format matters.
 
 Next: [Write over REST, read over GraphQL](./query-graphql.md).
 

@@ -102,7 +102,7 @@ A covered row says what the suite checked. A traffic row says what it only saw. 
 
 Coverage is kept per target and per protocol. A GraphQL shape assertion claims GraphQL fields. It says nothing about a REST response.
 
-The REST write response was only judged on its status, so every field it carried is listed in the traffic section as observed and unasserted. Adding one `Should.MatchShape` to the write moves the fields it names into the covered row.
+The REST write response was only judged on its status, so every field it carried is listed in the traffic section as observed and unasserted. Adding one `Should.MatchShape` to the write removes the fields it names from the traffic row.
 
 </Checkpoint>
 

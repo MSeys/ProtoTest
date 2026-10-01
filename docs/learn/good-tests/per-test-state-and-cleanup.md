@@ -30,15 +30,15 @@ import Link from '@docusaurus/Link';
 
 ## The problem
 
-A test that reads data it did not create depends on whatever ran before it. In the sample's state drill, a test asks for the project `prj_1`. The request is valid and the id looks valid, but no test in that run created it, so the application answers 404. The drill is one of four in the [failure tour](/learn/understand-failures/a-failure-tour).
+A test that assumes a record exists can depend on earlier tests or leftover data. The sample's state drill requests the project `prj_1` without creating it. The application answers 404, while the test expects 200. The drill is one of four in the [failure tour](/learn/understand-failures/a-failure-tour).
 
-The fix is to create the data the test needs and read only that. This lesson shows how the sample does it.
+The fix creates a project in the test's own tenant, then checks that its list contains that project. You can follow the source excerpts and saved trace without running the sample.
 
 ## Do it
 
 ### 1. Give the test its own tenant
 
-In the sample the unit of isolation is the tenant. An attribute provisions one before each test, using a name taken from the test:
+In this sample, a tenant groups one customer's data. `NorthstarTenantAttribute` creates one during test setup. `NorthstarMember` includes that attribute, so the state drill and its fix both receive a tenant:
 
 <AnnotatedCode
   filename="NorthstarAttributes.cs"
@@ -58,8 +58,8 @@ In the sample the unit of isolation is the tenant. An attribute provisions one b
 }`}
   callouts={[
     {line: 3, title: 'Provision through the data client', note: 'The request says what the test needs. The registered provisioner decides how it is created.'},
-    {line: 5, title: 'Name it from the test', note: 'UniqueName turns "northstar" into "northstar-<test id>", so no other test can share the record.'},
-    {line: 8, title: 'Hand the result to the test', note: 'The tenant lands in the test context, where the test and its clients read it.'},
+    {line: 5, title: 'Include the test id in the name', note: 'UniqueName returns "northstar-<test id>". This distinguishes names within one host using the default id generator; it does not enforce access or cleanup.'},
+    {line: 8, title: 'Keep the tenant details in context', note: 'SetContext stores the returned ids, address and owner credentials for this test. Helpers and the sample authenticator use those details.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/NorthstarAttributes.cs</code>.</>}
 />
@@ -78,38 +78,44 @@ var page = response
     .Should.HaveHttpStatus(HttpStatusCode.OK)
     .ReadRequired<CursorPage<ProjectResponse>>();`}
   callouts={[
-    {line: 1, title: 'Create with the test id', note: 'The name carries TestId, so the record belongs to this test.'},
-    {line: 4, title: 'Read only your own tenant', note: 'The list call runs inside the provisioned tenant, so it returns the one project this test created.'},
+    {line: 1, title: 'Make the name recognizable', note: 'The name includes TestId so you can associate it with the test. The provisioner creates the project in the authenticated member\'s tenant.'},
+    {line: 4, title: 'Read the member\'s tenant', note: 'The sample authenticator sends that tenant member\'s bearer token. The application lists projects for the authenticated tenant.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/FailureDrills.cs</code>. The drill next to it read <code>prj_1</code>.</>}
 />
 
-The list holds one project, and it is the one the test just created.
+The omitted NUnit assertions check `TotalCount == 1`, then compare the returned project's id and name with the values created above. Those checks prove that the list contains the expected project in this run.
 
 ### 3. Compare the drill and the fix
 
 | | The drill | The fix |
 | --- | --- | --- |
-| Before the read | nothing | `Create · CreateProjectRequest`, in the test's tenant |
+| Before the read | a tenant exists, but the test creates no project | `Create · CreateProjectRequest`, in the test's tenant |
 | The call | `GET /api/v1/projects/prj_1`, HTTP 404 | `GET /api/v1/projects`, HTTP 200 |
 | The check | expected 200, got 404 | the list holds one project, the one this test created |
 
 ### 4. Find the creation in the trace
 
-Download [l0-state-fix.prototrace](pathname:///lessons/l0-state-fix.prototrace) and open it in the [viewer](https://trace.prototest.dev). Look at the first two layers:
+Download [l0-state-fix.prototrace](pathname:///lessons/l0-state-fix.prototrace) and open it in the [viewer](https://trace.prototest.dev). Select `EachTenantSeesOnlyItsOwnProjects` and inspect Setup and Execution. These values belong to the saved recording:
 
 | Layer | Entry | What it shows |
 | --- | --- | --- |
-| Setup | `data.create` ProvisionTenantRequest, 149.6 ms, then `data.provision`, 144.6 ms | the tenant exists before the body runs, named `northstar-553135000001` in this recording |
-| Setup | `attribute.before` SignedInAs, then `auth.user.sign-in` | the member acts inside that tenant |
+| Setup | `data.create` ProvisionTenantRequest, 149.6 ms, with nested `data.provision`, 144.6 ms | the tenant exists before the body runs, named `northstar-553135000001` in this recording |
+| Setup | `attribute.before` SignedInAs, then `auth.user.sign-in` | the test declares its identity; the sample authenticator supplies the tenant member's token when needed |
 | Execution | `data.create` CreateProjectRequest, 100.2 ms | the project is created in the test's own tenant |
 | Execution | `http.request` REST `GET /api/v1/projects`, 72.6 ms, HTTP 200 | the read the check judged |
 
+Open the response attachment to see `totalCount: 1` and the project named `own-553135000001`. Fresh runs can have different ids and timings.
+
 ## What happened
 
-The test never looked up a well known id and never relied on a fixture seeded in advance. An attribute created the tenant, the test created the project inside it, and the read could only see that tenant.
+The test arranged its own tenant and project. Its authenticated request selected that tenant, and the application limited the list to that tenant's projects. The name helped identify the record, but did not provide the access boundary.
 
-The unique name is what makes this safe in parallel. The sample runs eight tests at a time. The tenant name comes from `UniqueName`, project names are fixed inside a tenant or carry `TestId`, and no other test can reach that tenant. Lesson 6 covers what happens to the tenant afterwards.
+The sample configures up to eight parallel workers. Each test provisions a tenant and keeps its credentials in its own context. Tests must continue using their own tenant details rather than sharing credentials or mutable state.
+
+The default id generator combines a random run prefix with a sequence within the host. It does not guarantee unique names across runs or processes. `UniqueName` also does not delete records or register their cleanup.
+
+Northstar's tenant provisioner explicitly returns a cleanup object that deletes the tenant. ProtoTest registers that object as a resource owned by the test. Merely calling `SetContext` would not register deletion. Lesson 6 follows that cleanup.
 
 ## Check yourself
 
@@ -117,17 +123,19 @@ The unique name is what makes this safe in parallel. The sample runs eight tests
   question="Why does EachTenantSeesOnlyItsOwnProjects find exactly one project, even when other tests run at the same time?"
   verify={<>In <a href="pathname:///lessons/l0-state-fix.prototrace">l0-state-fix.prototrace</a>, read the setup entry that provisions the tenant and the execution entry that creates the project.</>}>
 
-The test's own tenant is created from a name that carries its test id, and the list call runs inside that tenant. Other tests work in their own tenants, so nothing they create is visible here.
+Setup creates a tenant, and the test creates one project inside it. Its authenticated list request reads that tenant's projects. Other tests using their own tenant credentials do not add projects to this tenant.
+
+The assertions check the count, id and name. A test id in the name alone would not make a shared tenant safe.
 
 </Checkpoint>
 
 ## Remember
 
-- Create the data a test reads, in that test, under a name built from its test id.
-- Read only what the test created. A fixed id belongs to nobody.
+- Arrange the data a test needs and check the returned identity. Do not assume a fixed id already exists.
+- Use separate tenant state and credentials for isolation. Naming and cleanup are separate responsibilities.
 - The setup layer of the trace shows what was provisioned. The execution layer shows what the test did with it.
 
 ## Go deeper
 
-- [Parallel safety](/learn/reliable-tests/parallel-safety): what keeps these names apart when eight tests run at once.
+- [Parallel safety](/learn/reliable-tests/parallel-safety): how per-test ownership and scoped reads keep concurrent tests independent.
 - Next: [What a test leaves behind](/learn/good-tests/what-a-test-leaves-behind).

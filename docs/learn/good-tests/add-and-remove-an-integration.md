@@ -24,13 +24,14 @@ import Link from '@docusaurus/Link';
   ]}
   needs={[
     <>Lesson 1, <Link to="/learn/good-tests/capabilities-and-the-host">Read what your run provides</Link></>,
-    'For the container step: Docker running. The skip and its archive need nothing installed',
+    'The sample cloned and the .NET SDK installed to run the commands. Reading the saved archive needs neither.',
+    'Docker running for the container step',
   ]}
 />
 
 ## The problem
 
-The sample's broker journey pays an invoice and then waits for the application's `invoice.paid` event. In an ordinary run it skips. The test is not broken. The run has no broker, so it cannot serve the capability the test asks for.
+The sample's broker journey pays an invoice and waits for the application's `invoice.paid` event. With the default settings, it skips because the run has no real broker. The test declares that requirement through the `Broker` capability.
 
 You will see the skip, add the broker, and remove it again. The test file never changes.
 
@@ -47,23 +48,23 @@ You will see the skip, add the broker, and remove it again. The test file never 
 public sealed class BrokerJourney
 ```
 
-Run it alone:
+Use the sample's default settings, with no broker mode, RabbitMQ connection string or external application URL configured. From the repository root, run it alone:
 
 ```bash
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~BrokerJourney"
 ```
 
-The runner reports a skip with the reason the composition registered: "No broker is configured; set ProtoTest:Messaging:Broker=container."
+The runner reports the reason registered by the setup class: "No broker is configured; set ProtoTest:Messaging:Broker=container."
 
 ### 2. Read the skip's trace
 
-Open [l2-broker-skip.prototrace](pathname:///lessons/l2-broker-skip.prototrace) in the [viewer](https://trace.prototest.dev). It has no test in it. Its only operations are the run's own releases: the broker resource, the readiness probe and the loopback application. No setup, no execution, no checks.
+Open [l2-broker-skip.prototrace](pathname:///lessons/l2-broker-skip.prototrace) in the [viewer](https://trace.prototest.dev). This recording has no test in it. Its three operations release run-owned resources: the messaging broker resource, readiness probe and loopback application. It contains no test setup, execution or checks.
 
-A skipped test leaves no trace of its own, because it never started. The reason is in the runner output.
+This capability check skips the test before its lifecycle starts. The reason appears in the runner output. A test that skips from inside its body can already have trace entries.
 
 ### 3. Add the broker
 
-The composition decides whether the run has a broker. This is `ConfigureMessaging` from `Setup.cs`:
+The setup class chooses which messaging implementation the run uses. This is its `ConfigureMessaging` method:
 
 <AnnotatedCode
   filename="Setup.cs"
@@ -86,20 +87,24 @@ The composition decides whether the run has a broker. This is `ConfigureMessagin
 }`}
   callouts={[
     {line: 5, title: 'One switch', note: 'The run decides per configuration whether it has a broker. The test never asks.'},
-    {line: 9, title: 'The adapter is the capability', note: 'UseRabbitMq declares the Broker capability and registers the broker as a run resource.'},
+    {line: 9, title: 'Register the RabbitMQ adapter', note: 'The Broker capability requires a configured address or infrastructure that supplies one. Registration alone does not prove the broker is reachable.'},
     {line: 15, title: 'No adapter, no capability', note: 'The in-memory default keeps the API usable but declares no Broker capability, so a test that needs one skips instead of passing against a double.'},
   ]}
   foot={<>From <code>samples/Northstar.ProtoTest/Setup.cs</code>. The skip reason comes from <code>AddCapabilityReason(ProtoCapabilityKinds.Broker, "No broker is configured; ...")</code> in the same file.</>}
 />
 
-Turn the switch on with a setting. The container needs Docker:
+Turn on container mode with this setting. With no existing broker address configured, the run starts its own RabbitMQ container. Docker must be running:
 
 ```powershell
 $env:ProtoTest__Messaging__Broker = "container"
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~BrokerJourney"
 ```
 
-The run starts a RabbitMQ container, the journey pays the invoice over REST, and the test awaits `invoice.paid`. It passes. The trace now holds the request, the messaging publish and await, and the container in the run layer.
+The journey should now pass: it pays the invoice over REST and awaits `invoice.paid`. Look for the REST request and messaging await in the test's trace, and container operations in the run layer.
+
+`ConfigureInfrastructure` in the same setup class tries a configured address before starting a container. If you already supplied a RabbitMQ connection string, the run uses that broker instead.
+
+At the end of the run, ProtoTest releases its broker client and any container it started. It does not stop an externally supplied broker.
 
 ### 4. Remove it
 
@@ -110,20 +115,22 @@ Remove-Item Env:ProtoTest__Messaging__Broker -ErrorAction SilentlyContinue
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~BrokerJourney"
 ```
 
-The skip is back, with the same reason.
+With no RabbitMQ connection string configured, the next run skips again with the same reason. Clearing the container setting alone does not disable an explicitly configured broker.
 
 ## What happened
 
-One setting changed the composition, and the composition changed which capabilities the run declared:
+With the default settings used above, the switch changes the adapter and the capability available to the test:
 
 | | No broker configured | `ProtoTest__Messaging__Broker=container` |
 | --- | --- | --- |
-| The run's messaging | the in-memory default, no adapter | `UseRabbitMq()`, which declares the Broker capability |
+| The run's messaging | the in-memory default, no `Broker` capability | RabbitMQ adapter with a container-provided address and the `Broker` capability |
 | `BrokerJourney` | skipped, with the registered reason | runs: it pays the invoice and awaits `invoice.paid` |
-| The archive | three releases and no test | the request, the publish, the await and the container |
+| The archive | the saved example has three releases and no test | the REST request, messaging await and container operations |
 | The test file | unchanged | unchanged |
 
-The capability gate runs before a test's lifecycle starts. That is why the skipped run has no test in its trace. Adding or removing an integration is a run decision, made once when the host is composed.
+The capability check runs before the test's lifecycle starts. That is why this skipped run has no test in its trace.
+
+`AddMessaging` remains registered in both modes. This example adds or removes the RabbitMQ adapter through the host's setup, leaving the test unchanged. Changing the setting affects the next run, not a host already running.
 
 ## Check yourself
 
@@ -131,15 +138,15 @@ The capability gate runs before a test's lifecycle starts. That is why the skipp
   question="The skipped run's trace holds three entries, all releases, and no test execution. Why?"
   verify={<>Compare <a href="pathname:///lessons/l2-broker-skip.prototrace">l2-broker-skip.prototrace</a> with a passing journey's archive, which opens at test setup.</>}>
 
-The capability gate runs before the test lifecycle starts, so the test never began and there is nothing to record. The trace holds a run with no tests in it. The reason is in the runner output, and the composition registers it with `AddCapabilityReason`.
+The capability check stopped this test before setup, so it has no test lifecycle to record. The host still released its run-owned resources. The runner output carries the reason registered through `AddCapabilityReason`.
 
 </Checkpoint>
 
 ## Remember
 
-- The run leaves out a capability it cannot serve, and a test that needs it skips.
-- A skipped test has no trace of its own. Read the runner output for the reason.
-- Adding or removing an integration changes the composition, not the test.
+- A missing `Broker` capability skips this test before setup. A declared capability does not guarantee a healthy connection.
+- Read the runner output for the skip reason. The saved trace shows the run's cleanup.
+- Choose the adapter in host setup. Keep the test's requirement unchanged.
 
 ## Go deeper
 

@@ -29,7 +29,7 @@ import Link from '@docusaurus/Link';
 
 ## The problem
 
-You can read a failing trace. Now you have to fix the test, and a change that touches three things at once hides the next failure.
+You can read a failing trace. Now use it to decide what to change. Changing several things at once makes the next result harder to explain.
 
 The loop that works is short. Run the suite, open the trace, read the failing check, change one thing, run again and compare the two traces.
 
@@ -47,13 +47,13 @@ using var response = await Proto.Context.Rest()
 response.Should.HaveHttpStatus(HttpStatusCode.Created);
 ```
 
-The check failed with `Expected HTTP status 201 (Created), but received 400 (BadRequest)`. Open [l0-visibility-drill.prototrace](pathname:///lessons/l0-visibility-drill.prototrace) in the [viewer](https://trace.prototest.dev) and look at the request entry. The response body is attached, and it names `validation_failed` and the empty parameter.
+The check failed with a message starting `Expected HTTP status 201 (Created), but received 400 (BadRequest)`. That message also includes the problem body. Open [l0-visibility-drill.prototrace](pathname:///lessons/l0-visibility-drill.prototrace) in the [viewer](https://trace.prototest.dev) and look at the request entry. Its response attachment names `validation_failed` and the empty `name` parameter.
 
-The test never looked at that body. The answer was in the failed run all along.
+The test did not check the body, but the failed run already showed it. The application rejected an invalid request as expected.
 
 ### 2. Change one thing
 
-Assert what the application said, not only the status:
+Make this test check the rejection of an empty name. Expect HTTP 400 and check the problem code and message:
 
 ```csharp
 response
@@ -65,40 +65,44 @@ response
     });
 ```
 
-Nothing else changed. The request is the same and the address is the same.
+The paired test sends the same empty-name request through the same composed client. Its expectation changes from successful creation to a specific validation failure.
+
+Choose that expectation from the behavior you want to test. If a valid request should succeed, receiving HTTP 400 still needs investigation.
 
 ### 3. Run again and compare
 
-Open [l0-visibility-fix.prototrace](pathname:///lessons/l0-visibility-fix.prototrace) beside the first trace. Look for two checks, both recorded, where there was one. If the check fails again, its message now names the code and the parameter.
+Open [l0-visibility-fix.prototrace](pathname:///lessons/l0-visibility-fix.prototrace) beside the first trace. The request now has two passing checks: HTTP status and JSON shape. A later shape mismatch can identify which checked property differs.
 
 ### 4. When the trace is silent, the missing answer is the fix
 
-The environment failure has no request in its trace. The execution entry ran about two seconds and failed with a connection error. The call happened outside the run, so nothing wrapped it. The change is to call through `Proto.Context.Rest()` like every other journey.
+The environment failure has no HTTP request operation in its trace. The execution entry ran about two seconds and failed with a connection error.
+
+Check the source to explain the missing request. This test creates a raw `HttpClient` inside its body and calls a hardcoded address. That client bypasses ProtoTest's REST instrumentation. The paired test uses `Proto.Context.Rest()`, which takes its address from the composition and records the request.
 
 ## What happened
 
-You used the trace in two ways. In the visibility case it held the evidence the test ignored. In the environment case its silence was the evidence.
+The visibility trace showed why the request failed. The environment trace showed the execution failure. The source explained why no request operation appeared.
 
-The change was small on purpose. One change per run means the new trace differs from the old one in one place, so a pass or a new failure points at that change.
+Keep each change focused so you can compare its effect. IDs, timings and setup details can also differ between runs. Compare the relevant request and checks rather than expecting identical traces.
 
 When a failure looks random, walk the four questions in order:
 
-- Time: a real wait does not move the test clock. The fix advances the clock.
-- State: the id belonged to no test in the run. The fix creates and reads its own data.
+- Time: a real wait does not move the test clock. The fix advances it before reading the organization.
+- State: the test guessed `prj_1`. The fix creates a project and checks its tenant's list.
 - Environment: the address was hardcoded. The fix takes it from the composition.
-- Visibility: the test read the status and ignored the body. The fix asserts the body.
+- Visibility: the request had an empty name. The fix checks HTTP 400 and the validation problem body.
 
-A trace usually answers three of them. The one it stays silent on is the one to fix.
+Use these questions to choose what to inspect next. A missing operation is a reason to check instrumentation and source, not a diagnosis by itself.
 
 ## Check yourself
 
 <Checkpoint
-  question="The environment failure ended in a connection error and its trace holds no request. The visibility failure ended on the status alone, and its trace holds the response body. Both fixes call the composed client. What did each failure leave unanswered?"
+  question="The environment trace has a connection error but no HTTP request operation. The visibility trace already shows the validation body. What should each test change?"
   verify={<>Compare <a href="pathname:///lessons/l0-environment-drill.prototrace">l0-environment-drill.prototrace</a> and <a href="pathname:///lessons/l0-visibility-drill.prototrace">l0-visibility-drill.prototrace</a> in the <a href="https://trace.prototest.dev">viewer</a>, then read the two fixes.</>}>
 
-The environment test ran outside the composition, so the failure was recorded and the call was not. Its answer is to take the address from the composition.
+The environment test uses a raw client with a hardcoded address. Use the composed REST client to resolve the address and record the call.
 
-The visibility test ran inside it, so the request and the response were recorded. It asserted the status alone and never read the body. Its answer is to read what the application said.
+The visibility test sent invalid input but expected successful creation. Check the intended rejection: HTTP 400, `validation_failed`, and a message mentioning `name`.
 
 </Checkpoint>
 
@@ -106,7 +110,7 @@ The visibility test ran inside it, so the request and the response were recorded
 
 - Run, open the trace, read the failing check, change one thing, run again.
 - A trace turns a failed run into facts you can act on without rerunning it.
-- The four questions say where to look. The trace stays silent on the answer that is missing.
+- Use the four questions to choose what to inspect. Check source when the trace leaves something unexplained.
 
 ## Go deeper
 

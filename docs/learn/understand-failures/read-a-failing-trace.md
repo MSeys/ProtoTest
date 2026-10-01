@@ -30,7 +30,7 @@ import Link from '@docusaurus/Link';
 
 ## The problem
 
-CI reports one failing check. You cannot attach a debugger to that runner, and the log holds a single line. What is left of the run is the trace, and it holds both sides of the comparison that failed.
+CI reports a failing check, but its summary may omit the surrounding calls. These traces let you inspect the failed comparison alongside the request and response it judged.
 
 This lesson reads the failures from the last lesson as if they were your own.
 
@@ -38,22 +38,22 @@ This lesson reads the failures from the last lesson as if they were your own.
 
 ### 1. Open the two traces of one pair
 
-Each pair below is one journey run twice. The left pane is the failing test, the right pane the test that holds. Every name, duration and message is from a recording of the sample with the failing tests enabled.
+Each pair compares a deliberate failure with a different test that addresses it. The panes show selected evidence from saved sample traces, rather than the complete operation tree. Their durations describe those recorded executions, not a timing target for your machine.
 
 <TraceDiff />
 
-Pick the Time pair. Each pane links its own archive, which you can open in the [viewer](https://trace.prototest.dev).
+Pick the Time pair and expand each pane's recorded operations. Each pane links its own archive, which you can open in the [viewer](https://trace.prototest.dev). Select the named test and open Execution to inspect the full sequence.
 
 ### 2. Ask four questions of the failed entry
 
-1. **Which check failed?** The failed entry names the assertion, such as `Assert response shape`.
+1. **Which check failed?** Find the failed assertion, such as `Assert response shape`, beneath the failed test execution.
 2. **What did it expect, and what did it read?** The message carries both. A shape check adds the JSON path: `[$.status]: Values did not match. (Expected: "past_due", Actual: "active")`.
-3. **Which call did it judge?** The request sits one entry up, with its status, its duration and its attachments.
-4. **What differs in the paired test?** The fix changes one habit.
+3. **Which call did it judge?** These REST checks are children of the request they judge. Open that parent for its status, duration and attachments.
+4. **What differs in the paired test?** Compare its setup, actions and expectations with the failing test's source.
 
 ### 3. Compare the pair
 
-For the time pair, the two traces differ in one row.
+For the time pair, the important change is advancing the test clock before reading the organization. The passing test also continues to pay the invoice:
 
 | | The failing test | The test that holds |
 | --- | --- | --- |
@@ -61,37 +61,37 @@ For the time pair, the two traces differ in one row.
 | The call | `REST GET /api/v1/organization`, 74.0 ms, HTTP 200 | the same call, 65.3 ms, HTTP 200 |
 | The check | shape failed: `$.status` expected `past_due`, read `active` | shape succeeded, then the invoice is paid |
 
-Look at the call first. It succeeded in both runs. The application answered quickly with a subscription that was still `active`.
+Both requests returned HTTP 200, so the status checks passed. The failing test received `active`, while the passing test received `past_due`. A successful request operation does not mean every assertion on its response succeeded.
 
 ### 4. Read a trace that is silent
 
-Open the Environment pair. The failing side holds one entry of about 2 seconds and no request at all. It records a connection error and nothing about the call.
+Open the Environment pair. Its saved failing execution lasted about 2 seconds and contains no request operation. The execution error names the address and connection failure. Setup and teardown still appear elsewhere in the archive.
 
 ## What happened
 
-The time failure waited a real second. That changed nothing, because the application reads the test clock and nothing had moved it. The fix advanced the test clock, and the same shape check passed. The pair wrote the fix down.
+The time failure waited a real second, but that did not advance the test clock. The fix advanced it eight days before making the request. The application evaluated the overdue invoice during that request, and the same status shape check passed. Advancing the clock alone does not execute the application's billing logic.
 
-The environment failure is the other direction. The test used a raw client that ran outside the run, so the run never wrapped it. The missing request is the diagnosis. The fix takes the address from the run, and the same call turns into an ordinary request entry.
+The environment drill used a plain `HttpClient` with a hardcoded address. It ran inside the test, but bypassed ProtoTest's REST request instrumentation. The trace records the resulting test failure without a separate request operation. The fix uses `Proto.Context.Rest()`, which resolves the configured application and records the request and checks.
 
-So a trace answers in two ways. A failed check names what was read. An absent operation says the work ran outside the run.
+An absent operation is a clue, not proof that work ran outside the test. Check the source: the call may have been skipped, failed before recording began, or used an uninstrumented client. Here, the raw client explains the missing entry.
 
 ## Check yourself
 
 <Checkpoint
-  question='The visibility failure ended on "Expected HTTP status 201 (Created), but received 400 (BadRequest)". Its trace still holds the response body. What did the test fail to do, and what does the fix do instead?'
+  question='The visibility failure starts with "Expected HTTP status 201 (Created), but received 400 (BadRequest)" and includes the response body. What expectation does the paired test change?'
   verify={<>Read the Visibility pair above, then download <a href="pathname:///lessons/l0-visibility-drill.prototrace">l0-visibility-drill.prototrace</a> and <a href="pathname:///lessons/l0-visibility-fix.prototrace">l0-visibility-fix.prototrace</a> and open both in the <a href="https://trace.prototest.dev">viewer</a>.</>}>
 
-The test asserted the status alone and never read the body, so its message could only say 400. The application had answered with a problem body that names `validation_failed` and the empty parameter.
+The drill sends an empty project name but expects successful creation. Its status failure already includes the problem body, with `validation_failed` and a message naming the `name` parameter.
 
-The fix asserts that body, so the same failure names the code and the parameter when it happens again.
+The paired test sends the same invalid input and expects HTTP 400. It also checks `code == validation_failed` and that `message` contains `name`. This turns the application's rejection into an explicit test expectation, rather than making a hidden body visible.
 
 </Checkpoint>
 
 ## Remember
 
-- A failed check names what it expected and what it read. The call it judged sits one entry up.
-- The failing and passing tests run the same journey, so the pair names the fix.
-- Silence is evidence too: no request means the work ran outside the run.
+- Follow a failed REST check to its parent request and inspect the response.
+- Compare the paired tests' actions and expectations, not only their durations.
+- A missing request entry needs a source check before you decide why it is absent.
 
 ## Go deeper
 

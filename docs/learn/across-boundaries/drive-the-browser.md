@@ -21,29 +21,39 @@ import Checkpoint from '@site/src/components/Checkpoint';
   ]}
   needs={[
     <>The previous lesson, <a href="./check-the-database">Check what the application stored</a></>,
-    'A Playwright browser installed, or a run that installs it (see step 1)',
+    'The sample checkout from Start, with its .NET prerequisites',
+    'Playwright Chromium installed, or automatic browser installation enabled (see step 1)',
   ]}
 />
 
 ## The problem
 
-Browser tests break when a page changes a little. If every test repeats selectors such as `#login-btn`, one renamed id breaks fifty tests. The fix is to describe each page once, in one class, and let tests talk about what a user sees.
+When tests repeat selectors such as `#login-btn`, one markup change can require edits in many tests. A page object keeps those selectors in a class.
+This lesson uses the sample's page objects to sign in and check a project row in a real browser.
 
 ## Do it
 
 ### 1. Check the browser, then run the test alone
 
-The test needs a browser that Playwright can drive. The class carries `[RequiresPlaywrightBrowser]`. If the browser is missing, the test skips with a reason that names Playwright and the ways to fix it: run `playwright.ps1 install <browser>`, set `ProtoTest:Web:Playwright:InstallBrowsers=true`, or configure a channel for an installed system browser. The test does not fail.
+The sample uses Playwright's Chromium browser by default. Its test class carries `[RequiresPlaywrightBrowser]`.
+With the default settings, a missing browser produces a skip reason instead of an attempted launch.
+
+After the first build, install it with `pwsh samples/Northstar.ProtoTest/bin/Debug/net8.0/playwright.ps1 install chromium`.
+Alternatively, set `ProtoTest:Web:Playwright:InstallBrowsers=true` in configuration, or select a channel for an installed system browser.
+The availability check does not prove that launching or installing a browser will succeed. Those failures can still fail the test.
+
+Run this command from the repository root:
 
 ```bash
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~AProjectCreatedThroughTheApiAppearsOnThePage"
 ```
 
-With a browser available, it reports one passed test. Without one, it reports one skipped test.
+A successful run reports one passed test. With the default settings and no Playwright Chromium installation, it reports one skipped test.
+If it skips, resolve the reported browser requirement and rerun before looking for browser operations in the trace.
 
 ### 2. Read the page objects
 
-`Pages.cs` describes the screens, one class each:
+Read these excerpts from `samples/Northstar.ProtoTest/Pages.cs`. The sample already contains these classes:
 
 ```csharp
 public sealed class SignInPage : WebPage
@@ -70,18 +80,21 @@ public sealed class ProjectRow : WebComponent
 }
 ```
 
-The classes show only part of the file. Each property names one element by its test id. A `WebComponent` is a repeatable part of a page, here one project row. The selectors live in this file only.
+Each element property locates an element by its test id. `Rows` describes a collection of project rows, and `Project(name)` selects a row by its text.
+A `WebComponent` groups elements within part of a page, such as one project row. The tests use these named properties instead of repeating their selectors.
 
 ### 3. Prepare the data through the API
 
 ```csharp
+var name = $"browser-{Proto.Context.TestId}";
 using var created = await Proto.Context.Rest(NorthstarTargets.Api)
     .Body(new CreateProjectRequest(name))
     .PostAsync("/api/v1/projects");
 created.Should.HaveHttpStatus(HttpStatusCode.Created);
 ```
 
-The browser should not click through a form to create test data. The API does it in one call, and the page then has something to show.
+This excerpt comes from `samples/Northstar.ProtoTest/WebJourney.cs`. Its attributes prepare a tenant and identity before the test body runs.
+Here, the API creates the project so the browser test can focus on displaying it. A test of the creation form would use the browser instead.
 
 ### 4. Sign in and read the row
 
@@ -99,34 +112,42 @@ var row = projects.Project(name);
 await row.Status.Should.HaveTextAsync(ProjectStatuses.Active, NorthstarPages.Wait);
 ```
 
-`Page<SignInPage>()` gives a page object but does not navigate. `OpenAsync("/login")` does. A flow groups steps under one name, so the trace shows one operation with the steps nested beneath it.
+`Page<SignInPage>()` gives a page object but does not navigate. `OpenAsync("/login")` does.
+The sample's login form exchanges the tenant token for a cookie and redirects to `/projects`.
+The flow groups the fill and click under one named trace operation, with child operations for the steps.
 
-`HaveTextAsync` waits. It retries until the element shows the text or `NorthstarPages.Wait`, 15 seconds, runs out. The test never sleeps.
+`HaveTextAsync` polls for text equal to `ProjectStatuses.Active`. `NorthstarPages.Wait` supplies a 15-second assertion timeout.
+If the check times out, its failure includes the last observation. Backend operations have their own timing, so elapsed time can exceed the assertion timeout.
+The test needs no fixed sleep.
 
 ### 5. Look at the trace
 
-In the [viewer](https://trace.prototest.dev), find the flow `Sign in with the tenant token` in the execution phase. If a step fails, its steps tell you which one.
+Open the newest `.prototrace` under `samples/Northstar.ProtoTest/bin/Debug/net8.0/TestResults/` in the [viewer](https://trace.prototest.dev). Select `AProjectCreatedThroughTheApiAppearsOnThePage`.
+In its execution phase, find `Sign in with the tenant token` and inspect the fill and click beneath it.
+If a flow step fails, that operation and the containing flow fail. Later steps in that flow do not run.
 
 ## What happened
 
-The test worked on two layers of the same application. The REST call and the browser reach one store, so the project created by the API appears on the page. The `[Application(NorthstarTargets.Web)]` class selects the web instance, which the sample serves on a loopback address, because a browser needs a real listener. The REST call names `NorthstarTargets.Api` explicitly.
+The test used the API to create data and the browser to read it. In the default local configuration, both application instances share the same store.
+The class's `[Application(NorthstarTargets.Web)]` selects the web application. The sample serves it on a loopback listener because the browser needs a network address.
+The REST call explicitly selects `NorthstarTargets.Api`, whose default local transport uses an in-process test server.
 
-The page classes make the test read as what a user does. When the markup changes, you edit `Pages.cs`.
+The page classes separate selectors from the test's actions and assertions. A selector change belongs in `Pages.cs`. A changed user journey may also need test changes.
 
 ## Check yourself
 
 <Checkpoint question="Where would you change the test if the Search box changed its test id from search to filter?">
 
-Only in `ProjectsPage`, in the `Search` property. The test calls `page.Search` and never mentions the id.
+Change `By.TestId("search")` to `By.TestId("filter")` in `ProjectsPage.Search`. The sample's later filtering step uses `page.Search`, so that test code stays the same.
 
 </Checkpoint>
 
 ## Remember
 
 - One class per page, one property per element, selectors in one place.
-- Create data through the API and use the browser for what only a browser can show.
+- Arrange through the API when the browser behavior under test does not include creating that data.
 - Waits are part of the check (`HaveTextAsync`), not a sleep in the test.
-- `[RequiresPlaywrightBrowser]` turns a missing browser into a skip with a reason.
+- With default browser settings, `[RequiresPlaywrightBrowser]` skips a missing installation with a reason.
 
 Next: [Follow a message](./follow-a-message.md).
 

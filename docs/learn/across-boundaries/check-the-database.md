@@ -21,12 +21,13 @@ import Checkpoint from '@site/src/components/Checkpoint';
   ]}
   needs={[
     <>The previous lesson, <a href="./query-graphql">Write over REST, read over GraphQL</a></>,
+    'A sample checkout and the .NET SDK to run the command',
   ]}
 />
 
 ## The problem
 
-An API can answer `201 Created` and still not have stored the row. A test that reads the API again trusts the same code that made the claim. To be sure, the test asks the database itself.
+An API can answer `201 Created` while its storage path is wrong. Reading the API again tests another application path. This lesson instead checks the row through a separate database connection.
 
 ## Do it
 
@@ -36,11 +37,15 @@ An API can answer `201 Created` and still not have stored the row. A test that r
 dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~AProjectCreatedThroughRestIsCommittedToTheDatabase"
 ```
 
-By default the sample hosts the application in the test process and uses a SQLite file that each run creates fresh. No database server is needed.
+From the repository root, use the sample's default settings, with no external application URL or database override. It hosts the application in-process and recreates its SQLite file before each run. No database server is needed.
+
+The following excerpts come from `samples/Northstar.ProtoTest/DomainAccessJourney.cs`. Its class selects the Northstar API and provisions a tenant through `[NorthstarMember]`.
 
 ### 2. Create the project over REST
 
 ```csharp
+const string projectName = "rest-to-store";
+
 using var created = await Proto.Context.Rest()
     .Body(new CreateProjectRequest(projectName))
     .PostAsync("/api/v1/projects");
@@ -66,7 +71,9 @@ id.Value = project.Id;
 command.Parameters.Add(id);
 ```
 
-`Proto.Context.SqlConnection()` returns a database connection that belongs to this test. It is an ordinary ADO.NET `DbConnection`, so you write an ordinary command with a parameter.
+`Proto.Context.SqlConnection()` returns the connection opened for this test during setup. ProtoTest registers its disposal with the test context. The database can still be shared with the application and other tests.
+
+The connection is an ordinary ADO.NET `DbConnection`. This command reads only the project id returned by the API, using a parameter rather than inserting it into SQL text.
 
 ### 4. Assert the row
 
@@ -81,7 +88,8 @@ using (Assert.EnterMultipleScope())
 }
 ```
 
-These are plain NUnit assertions. The first one carries a message that says what a failure means. The multiple scope reports every wrong column together.
+The first NUnit assertion checks that a row exists. The multiple scope then checks its id, name and status together.
+The result shows that this API write is visible through the test's separate connection. It does not establish the database's behavior after a crash.
 
 ### 5. See the skip rule
 
@@ -91,27 +99,42 @@ The test carries this attribute:
 [RequiresCapability(ProtoCapabilityKinds.Store, Reason = "The suite does not own the store, so it cannot inspect it.")]
 ```
 
-A capability is what an integration lets a test do once it is added to the host. In the sample, the setup class adds the SQL connection only when `run.CanComposeDomain` is true, which is the case when the suite hosts the application itself or has a store address. Without it, this test skips and names the reason instead of failing.
+The `Store` capability describes registered database support. The sample registers SQL only when it hosts the application, has a configured store connection, or selects PostgreSQL.
+Without that registration, the capability check skips this test before setup and prints the reason above.
+
+The reason's ownership wording is specific to the sample. A suite can inspect an externally owned database when it has a connection and permission. Registered support also does not prove that the connection will open successfully.
 
 ## What happened
 
-The test went through two doors into the same system, the API and the database. The trace records `SQL · open SqliteConnection` in the setup phase and the REST call in the execution phase.
+The test writes through the API and reads through a separate connection to the same store. With default settings, the trace records `SQL · open SqliteConnection` during setup and the REST call during execution.
 
-The sample registers the connection with `SqlIsolation.None`. A comment in the setup class gives the reason: the application has its own connection, so a test transaction would hide fixture writes. The SQL reference adds that with the default `Transaction` isolation, writes through the owned connection roll back at teardown, while writes through the application's connection commit.
+The raw ADO.NET command does not produce a separate query operation here. Plain NUnit checks also do not each become ProtoTest check operations. A failure still appears in the test's outcome and error.
+
+The setup class chooses `SqlIsolation.None`: ProtoTest opens no per-test transaction and performs no automatic rollback. The application uses its own connection, so a transaction on the test's connection would not isolate its writes.
+
+In the default local run, domain provisioners use the application's store. With domain composition against a configured external application, they use the test's connection. `None` lets those writes become visible to the application.
+
+Cleanup is explicit. The tenant provisioner supplies a disposer that deletes the tenant and its dependent data after the test.
+
+The SQL integration defaults to `Transaction`, which rolls back work enlisted in the test's transaction. That transaction does not cover another connection automatically.
+With active SQL support, startup rejects transaction isolation with registered applications unless each is declared through `ShareConnectionWith`. Such a declaration must match actual connection sharing.
 
 ## Check yourself
 
 <Checkpoint question="This test only reads. Why does the sample's setup still choose SqlIsolation.None?">
 
-The same connection is used to create fixtures through the domain. The application writes on its own connection, and a transaction on the test's connection would hide those fixture writes from it. The setup class says so in a comment.
+The application uses a separate connection, so the test's transaction would not roll back its writes. Transaction isolation rejects registered applications that are not declared as sharing the connection.
+
+Local provisioners write through the application's store. Domain composition against a configured external application uses the test's connection, whose writes must be visible to the application.
+The sample therefore uses `None` with explicit tenant cleanup.
 
 </Checkpoint>
 
 ## Remember
 
-- Ask the database when the claim is "it was stored".
-- `Proto.Context.SqlConnection()` is an ordinary `DbConnection` owned by the test.
-- A test that needs the store declares the `Store` capability and skips with a reason where there is none.
+- Check the returned project id through a separate connection when testing the storage path.
+- The test owns its connection, while the database can be shared or externally owned.
+- Declare the `Store` requirement and register explicit cleanup when using `SqlIsolation.None`.
 
 Next: [Drive the browser](./drive-the-browser.md).
 

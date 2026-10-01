@@ -10,26 +10,28 @@ import LearnTracks from '@site/src/components/LearnTracks';
 
 # Learn integration testing
 
-An integration test checks that the pieces of your system work together: the API writes to the database, the
-browser shows what the API returned, a message reaches its handler. These lessons teach you to write such tests
-with ProtoTest, and to understand them when they fail.
+An integration test checks that the pieces of your system work together. An API writes to a database,
+a browser shows the response, or a message reaches its handler. These lessons teach you to write those tests
+with ProtoTest and understand them when they fail.
 
-Each lesson takes 5 to 10 minutes and teaches one skill. You run real code from a sample suite, see the result,
-and then read what happened. You need no ProtoTest experience. The [reference](/docs/) holds the details when you
-want them.
+Plan for about 5 to 10 minutes of reading per lesson. Running the examples may take longer.
+Some lessons ask you to run or change sample code. Others walk through recorded results.
 
-**New here?** Start with [Run the sample suite](./start/install-and-run.md). If you first want to know why
-integration tests are worth the effort, read [Why integration tests get hard](./why-it-gets-hard.md).
+You need no ProtoTest experience to start. The [reference](/docs/) holds the details when you want them.
+
+**New here?** Start with [Run the sample suite](./start/install-and-run.md). For an introduction to the problems
+these lessons address, read [Why integration tests get hard](./why-it-gets-hard.md).
 
 ## The tracks
 
-Start with track 1. After that, take the tracks in any order. Each card says what it assumes.
+Start with track 1, then choose a track whose prerequisites you have covered. Each card lists them under
+**Needs**. Follow the lessons within a track in order, and check each lesson for tools or earlier work it needs.
 
 <LearnTracks />
 
 ## How a lesson works
 
-Every lesson has the same shape, so you always know where you are:
+The track lessons follow the same shape:
 
 1. **The problem**, in a few sentences.
 2. **Do it**, step by step, with real code and what you should see.
@@ -37,16 +39,16 @@ Every lesson has the same shape, so you always know where you are:
 4. **Check yourself**, one question with the answer behind a button.
 5. **Remember**, the two or three lines worth keeping.
 
-The links at the bottom of each page take you to the next lesson in the track.
+The links at the bottom point to the next lesson or another track to explore.
 
 ## The sample behind the lessons
 
-The lessons use [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/version/1.1/samples/Northstar.ProtoTest),
+The lessons use [Northstar.ProtoTest](https://github.com/MSeys/ProtoTest/tree/HEAD/samples/Northstar.ProtoTest),
 the sample suite in this repository. It tests one application across its API, database, browser, messages and
-generated files. Some of its tests fail on purpose, so the lessons have real failures to look at.
+generated files. It includes deliberate failure drills that you enable when a lesson asks for them.
 
-Run it with `dotnet test samples/Northstar.ProtoTest`. You can also read its recorded traces without running
-anything: each lesson links to the trace it uses.
+Run it with `dotnet test samples/Northstar.ProtoTest`. Many lessons also link to recorded traces you can read
+without running anything. Some ask you to inspect the trace from your own run.
 
 The **Real systems** track uses a second suite, OpenCSMS, which runs on containers and real processes. It lives in
 its own repository, which is not public yet. Those lessons also work as a read-through of its recorded runs.

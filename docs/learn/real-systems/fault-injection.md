@@ -3,7 +3,7 @@ id: fault-injection
 title: Inject faults on purpose
 sidebar_label: Fault injection
 sidebar_position: 4
-description: "Swap a run piece for a failing one, watch a 503 target reach the dead letter, and read the regression the repository kept."
+description: "Replace a service for one test, follow failed notification deliveries into a dead-letter queue, and read a recorded billing regression."
 ---
 
 import Lesson from '@site/src/components/Lesson';
@@ -17,8 +17,8 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
   step="Lesson 4 of 4"
   minutes={9}
   outcomes={[
-    'Swap one run piece for a failing one and pin the recovery',
-    'Read a target that stays down through retries to the dead letter',
+    'Replace one service for a test and check recovery after publish failures',
+    'Follow failed HTTP notifications through retries to a dead-letter queue',
     'Read a real regression from the trace the repository kept',
   ]}
   needs={['Lesson 3, Point the suite at a real stack', 'Optional: an OpenCSMS checkout and a container runtime. The kept trace is on this site.']}
@@ -26,15 +26,16 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 ## The problem
 
-A dependency rarely fails at the moment your suite is watching. The broker rejects a publish. A webhook answers 503 to every call. Waiting for the environment to do that on demand does not work, so the suite causes it.
+A recovery test needs a repeatable failure. OpenCSMS tests inject publish errors and make an HTTP notification target return 503. They then check the retry result and stored invoice.
 
-OpenCSMS ends a charging session transactionally: the ended session and its event commit together. A publish that fails is retried from the stored row. That design is only worth trusting if a failed publish is exercised on purpose.
+OpenCSMS commits an ended charging session and its event together. The event waits in an outbox, a database table of messages to publish. If publication fails, a dispatcher retries the stored message.
 
 ## Do it
 
 ### 1. Substitute the failing piece
 
-An outbox test replaces the API's event publisher for one test. The substitute fails a bounded number of matching attempts and delegates every later attempt to the product's own RabbitMQ publisher:
+An outbox test replaces the API's event publisher in a dedicated server owned by that test. The run's shared server keeps its original services.
+The substitute fails a chosen number of matching attempts, then delegates to the product's RabbitMQ publisher:
 
 <AnnotatedCode
   filename="FailFirstAttemptsEventPublisher.cs"
@@ -56,19 +57,21 @@ An outbox test replaces the API's event publisher for one test. The substitute f
     await _publisher.PublishAsync(routingKey, message, cancellationToken);
 }`}
   callouts={[
-    {line: 3, title: 'Narrow the fault to this test', note: 'The match predicate keeps another test\'s pending row on the real path, so parallel tests do not spend each other\'s failure budget.'},
-    {line: 9, title: 'Fail a bounded number of attempts', note: 'The first N matching publishes throw. The count is the outage the test wants to survive.'},
+    {line: 3, title: 'Match the test\'s session', note: 'Nonmatching messages bypass the failure counter. These tests match messages containing their charging session id.'},
+    {line: 9, title: 'Count failures on this publisher', note: 'The first N matching publishes throw. This publisher instance owns the counter, including calls from its background dispatcher.'},
     {line: 16, title: 'Then travel the real path', note: 'Every attempt after the budget delegates to the product\'s own publisher, so a retry is a real publish, not a mock.'},
   ]}
   foot={<>From the suite, registered per test with <code>Proto.Context.Override&lt;IEventPublisher&gt;(publisher)</code>.</>}
 />
 
-Two tests pin the recovery:
+The predicate limits which messages spend this publisher's failure budget. It does not prevent other servers from dispatching rows in the shared database.
 
-- `AFailedPublishIsRetriedByTheDispatcherAndBillsOnce` fails the request's own publish. The end still commits, the event is stored as one pending row, the dispatcher retries it, and the worker stores exactly one invoice.
-- `ABrokerOutageIsRiddenOutByMoreThanOneBackedOffRetry` fails two attempts and keeps the event invisible to the dispatcher until both have happened. The stored row records both failed attempts, then reports itself sent, and the session is still billed once.
+Two tests check the recovery:
 
-Run them with a container runtime:
+- `AFailedPublishIsRetriedByTheDispatcherAndBillsOnce` fails the request's publish. It checks that the end committed and one outbox row remains pending. After retry, it checks one stored invoice and no pending row.
+- `ABrokerOutageIsRiddenOutByMoreThanOneBackedOffRetry` holds a database transaction open while two attempts fail. It drives the second attempt after the first backoff, then commits so other dispatchers can see the row. It checks two recorded failures, a sent timestamp and one invoice.
+
+With an OpenCSMS checkout and a container runtime, run this from the OpenCSMS repository root:
 
 ```bash
 dotnet test tests/OpenCsms.Suite --filter "FullyQualifiedName~OutboxTests"
@@ -76,15 +79,19 @@ dotnet test tests/OpenCsms.Suite --filter "FullyQualifiedName~OutboxTests"
 
 ### 2. Keep a target down
 
-The notification journeys point the product at per-run WireMock fakes, which are fake HTTP servers. One journey makes the fake answer 503 for a single entity's notifications. The worker spends its three in-process retries and dead-letters the fourth attempt. Look for three things:
+The notification journeys use WireMock HTTP servers shared by the run. One journey makes a target return 503 for notifications about its charging session.
+The consumer retries by republishing to the same RabbitMQ queue. After three retries, it dead-letters the fourth failed delivery. That sends the notification to a queue for deliveries the consumer gave up on.
+
+The test checks three things:
 
 - The target saw four requests, every one a 503.
 - The dead letter carries the event's own facts and `x-opencsms-retries: 3`.
-- The invoice the target never accepted is still stored, exactly once.
+- The session has one stored invoice with the expected id and total.
 
-The fake rejects by the session in the request body, because it is shared with notification journeys running in parallel. A fake that rejected everything would steal their deliveries.
+The rejection matches the session id in the request body and takes priority over the target's default 202 response. Other sessions still use that default response.
 
-A session the worker cannot bill follows the same shape. It produces a failure notification, and a target that stays down dead-letters that report with the reason the worker recorded. No invoice exists for that session.
+A second test publishes an event for a session absent from the database. Billing fails, and the notification target rejects the resulting failure report.
+The test checks its dead letter, the session id in its reason, the retry count, four 503 responses and no invoice.
 
 ### 3. Read a regression the repository kept
 
@@ -110,18 +117,22 @@ Download the trace and open it in the [viewer](https://trace.prototest.dev):
 
 ![The ProtoTrace viewer on the idle-fee failure: the failed test, the assertion message and the execution entry.](/images/opencsms/trace-viewer.png)
 
-The viewer on the kept trace. The failing assertion and the operation that produced it are one story.
+The viewer shows the failed test and its recorded assertion message.
 
 ## What happened
 
-A test can replace one piece of the run with its own failing one and keep the rest of the path real. The retry that follows is a real publish through the product's real broker, so the recovery you pin is the recovery the product has.
+The publisher override changes one test's API server. Successful retries still use the product's RabbitMQ path. The outbox tests check recovery after the injected failures, including one invoice for each tested session.
 
-A target that stays down ends in a dead letter with a recorded retry count, and the product state stays intact. The kept trace is the evidence a fault leaves when it happens for real. The fix copies the tariff's terms onto the session when it starts, so a later reprice never reaches an open session. The journey now asserts the same numbers and passes in container mode.
+The HTTP-target tests check a different failure: rejected notification delivery after billing. Their assertions verify the dead letter and stored invoice count. They do not establish exactly-once billing under every possible failure.
+
+The historical trace records a pricing regression. The current implementation copies tariff terms into `SessionTariff` when the charging session starts. Billing reads that stored snapshot instead of the edited tariff. The journey still asserts five idle hours, a 10.00 idle fee and a 20.30 total.
 
 Injection has limits:
 
 - The injected publisher fails attempts. It does not kill the broker process.
-- The fakes live inside the test process. A published or topology run cannot reach them, so those journeys skip there with their reason.
+- Publisher overrides require an in-process application. The outbox tests also require a broker and a hosted billing worker.
+- Notification fault tests require an in-process application, hosted billing and notification workers, a broker and a test clock. External application modes do not provide the required in-process capabilities.
+- HTTP fakes can serve other processes with reachable addresses. This suite configures their addresses for its hosted workers. The recorded external modes do not configure notification targets, so those consumers stay idle.
 - A retry count is bounded by the product's own policy. The tests assert the count the product promises.
 
 ## Check yourself
@@ -130,14 +141,14 @@ Injection has limits:
   question="A fake rejects every notification for one invoice with 503. How many requests does the target see before the delivery is dead-lettered, and what does the dead letter carry?"
   verify={<>Read the three points under "Keep a target down" above. The journey <code>NotificationTargetOutagesAreDeadLettered</code> in the suite asserts that shape.</>}>
 
-Four requests: the first attempt plus three in-process retries. The dead letter carries the invoice's ids and the completed-retry count in the `x-opencsms-retries` header, which reads 3. The invoice stays stored exactly once, because a rejected notification cannot roll back billing.
+Four requests: the first attempt plus three retries through the queue. The dead letter carries the invoice and session ids, with `x-opencsms-retries: 3`. The test also checks that this session still has one stored invoice.
 
 </Checkpoint>
 
 ## Remember
 
-- A test can substitute one run piece for its own failing one and keep the rest of the path real.
-- A target that stays down ends in a dead letter with a recorded retry count, and the product state stays intact.
+- Override a service on a test-owned server, and match the fault to that test's messages.
+- Check both the failed delivery's retry history and the resulting product state.
 - A kept trace is the evidence of a real regression.
 
 Next: [Write your own attribute](/learn/extend/attributes).

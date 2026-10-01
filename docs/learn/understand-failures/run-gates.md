@@ -76,7 +76,7 @@ Not every finding fails the run. Open [l4-partial.prototrace](pathname:///lesson
 
 | Record | Reading |
 | --- | --- |
-| `test.execution`, partial | the body passed with a warning, so the outcome is partial |
+| `test.execution`, partial | the test called `Assert.Warn`, so the outcome is partial. The finding alone would not change it |
 | finding `finding-001`, Warning, category `Coverage`, message `The create response carried 4 fields no assertion mentioned: createdAtUtc, environmentCount, id, slug.` | the report item |
 | gate `no error findings`, passed | a Warning is recorded, and this gate only looks for `Error` |
 

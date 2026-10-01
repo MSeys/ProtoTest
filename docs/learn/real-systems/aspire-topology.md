@@ -26,20 +26,22 @@ import AnnotatedCode from '@site/src/components/AnnotatedCode';
 
 ## The problem
 
-Container mode kept the product inside the test process. That is convenient, but the real product is separate processes: an API, a billing worker and a notification worker. You want the suite to run against those, started the way the product starts them.
+Container mode hosted the API and workers inside the test process, with a separate loopback application for the browser. Now you want to test the API and both workers as separate processes.
 
-OpenCSMS declares that topology in Aspire, in a project called the AppHost. As in lesson 1, the steps below walk through the recorded run, not a live one.
+OpenCSMS declares those processes and their dependencies in an Aspire AppHost project. This lesson explains the saved run and the configuration that selected it. Running the command yourself requires the optional OpenCSMS checkout and a container runtime.
 
 ## Do it
 
 ### 1. Read what the AppHost declares
 
-The AppHost project is a small file with no product code. It declares:
+Read `Program.cs` in the OpenCSMS AppHost project. It declares these resources:
 
-- PostgreSQL, with an `opencsms` database, as a container resource.
-- RabbitMQ as a container resource.
+- PostgreSQL, with an `opencsms` database, when `ConnectionStrings:Csms` is unset.
+- RabbitMQ when `Messaging:RabbitMq:ConnectionString` is unset.
 - The API project, which also serves the dashboard, as a project resource.
 - The billing worker and the notification worker as project resources.
+
+The API and worker resources always appear in this graph. Each receives either the configured database and broker addresses or the addresses of containers the AppHost starts.
 
 ### 2. Map its resources onto the suite's targets
 
@@ -56,25 +58,29 @@ The suite's registration says which resource fills which target:
     "opencsms",
     "rabbitmq")`}
   callouts={[
-    {line: 1, title: 'Pin the AppHost assembly', note: 'A public anchor type names the assembly, because the AppHost entry point is internal and the testing host runs that entry point in-process.'},
-    {line: 3, title: 'The API becomes the application', note: 'MapResource publishes the api resource under the Csms application, so the REST and browser clients follow its address.'},
-    {line: 4, title: 'The store and the broker', note: 'MapConnectionString fills the two keys the existing providers also serve, so nothing downstream changes.'},
-    {line: 6, title: 'Declare the resources', note: 'The last three names are the resources this registration follows.'},
+    {line: 1, title: 'Identify the AppHost assembly', note: 'The public anchor type identifies the assembly. Aspire runs its entry point inside the test process, then starts the declared project resources.'},
+    {line: 3, title: 'Map the API address', note: 'MapResource maps the api endpoint to the Csms application. The separate Dashboard provider chain also selects the api resource for browser requests.'},
+    {line: 4, title: 'Map the store and broker', note: 'The two MapConnectionString calls publish connection strings under keys the suite already uses.'},
+    {line: 6, title: 'Name the mapped resources', note: 'These three names identify resources whose settings ProtoTest can publish. They do not restrict the AppHost graph to three resources.'},
   ]}
   foot={<>From the suite's <code>Setup.cs</code>. The chain order still holds: a configured address wins over the AppHost.</>}
 />
 
 ### 3. Select the mode
 
-The run script does one thing to select this mode. It clears the keys a published run would export and sets the global selection key:
+From the OpenCSMS repository root, this command selects topology mode:
 
 ```bash
 pwsh eng/run-suite.ps1 -Mode topology
 ```
 
-That sets `ProtoTest__Aspire__Enabled=true`, the environment variable form of `ProtoTest:Aspire:Enabled`. Without a selection key the AppHost never starts, and the suite resolves every target through its other providers. A per-resource key, `ProtoTest:Aspire:Resources:{resource}:Enabled`, selects one resource instead of all of them.
+The script clears the five environment keys used by published mode: the database address, both RabbitMQ addresses and both application base URLs. It also clears existing global and per-resource Aspire selectors.
 
-The AppHost also steps aside for what the run already provides. A run that exports the store or the broker key keeps it. The AppHost declares its own resource only for a key the environment left unset.
+It then sets `ProtoTest__Aspire__Enabled=true`, the environment variable form of `ProtoTest:Aspire:Enabled`, builds the dashboard and runs the suite. Without an Aspire selection key, this registration does not start the AppHost.
+
+A per-resource key, `ProtoTest:Aspire:Resources:{resource}:Enabled`, selects which resource's settings ProtoTest uses. It does not remove other resources from the AppHost graph.
+
+Configured addresses still take precedence in the provider chains. Outside this script's cleared environment, the AppHost can use a configured store or broker instead of declaring that container.
 
 ### 4. Read the counts
 
@@ -82,7 +88,9 @@ The AppHost also steps aside for what the run already provides. A run that expor
 Passed!  - Failed:     0, Passed:    61, Skipped:    13, Total:    74, Duration: 20 s - OpenCsms.Suite.dll (net8.0)
 ```
 
-This is the run recorded on 2026-09-28 in `opencsms-topology-20260928-094052.log`. The log lists each of the 13 skips by name, and the condition on each test names the reason.
+This output comes from `artifacts/gates/opencsms-topology-20260928-094052.log` in the OpenCSMS checkout. It lists all 13 skipped test names, but does not print their reasons.
+
+This snapshot contains 74 tests. Lesson 1's later container recording contains 75, including the added tariff-repricing journey. That additional journey is absent from this log, not counted as skipped. These recordings do not compare identical test sets.
 
 ![The station timeline: a charge point, the remote-start panel and the sessions the dashboard lists.](/images/opencsms/station-timeline.png)
 
@@ -90,29 +98,39 @@ The dashboard the API resource serves. The station screen is the operator's view
 
 ## What happened
 
-Topology mode is one picture:
+In the recorded topology run:
 
 - **The application** runs as real processes: the API and both workers, started by the AppHost.
-- **The database and broker** are containers the AppHost starts, fresh for this run.
-- **What the suite skips**: 13 journeys. They need the test host or the run's clock, and real processes have neither.
+- **The database and broker** come from containers the AppHost starts for the run.
+- **The suite** still owns fixtures, local HTTP fakes, clients and the trace.
 
-The suite still owns the tests, the fixtures and the trace. It no longer owns the product's lifetime.
+The suite owns the AppHost's lifetime. Aspire manages the product processes, and ProtoTest stops the AppHost when it releases the run's resources.
 
-Two attributes gate the skips. A test marked `[RequiresInProcess]` needs the application inside the test process. A test marked `[RequiresTestClock]` needs the run's clock to reach the application. Here the processes read the machine clock, so a test that moves the run's clock cannot move them. Such a test declares `[RequiresTestClock]` and skips instead of failing.
+The skipped names fall into three groups. Their source declares the capabilities each test needs:
+
+| Group in the saved log | Requirement missing in this mode |
+| --- | --- |
+| Seven clock-dependent journeys, including the browser invoice export | `[RequiresTestClock]`: the suite's clock must control the application |
+| Two outbox retry journeys | `[RequiresInProcess]`: they replace the API's event publisher through its services |
+| Four notification delivery and outage journeys | In-process application and hosted workers, plus the test clock |
+
+Some tests also declare `[RequiresWorker<T>]`, which checks for a worker hosted by ProtoTest. A separate worker process does not provide that capability. The saved log does not establish which missing requirement the adapter reported first.
 
 :::note What this mode cannot do
 
-The AppHost must target the suite's framework. The testing host runs the AppHost's entry point inside the test process, and the AppHost launches project resources with `dotnet run`, which cannot choose a target framework. OpenCSMS keeps every project on net8.0 for this reason.
+OpenCSMS targets its suite, AppHost and product projects at net8.0. Aspire loads the AppHost entry point inside the test process. Its project launcher does not choose a target framework for multi-targeted project resources, so those resources use a single target.
 
 :::
 
 ## Check yourself
 
 <Checkpoint
-  question="The topology run is green with 13 skips, and the container run of the same suite has none. Name the two gates behind the skips and what each one needs that this mode does not have."
-  verify={<>Read the skipped lines in the topology log, then the conditions on the tests that skipped, such as <code>[RequiresInProcess]</code> and <code>[RequiresTestClock]</code>.</>}>
+  question="Why do the outbox retry and clock-dependent journeys skip even though the API and workers are running?"
+  verify={<>Compare the skipped names with <code>OutboxTests</code> and the clock-dependent journeys. Read their capability attributes, not only the pass count.</>}>
 
-`[RequiresInProcess]` needs the test host. The AppHost runs the product as separate processes, so there is no in-process server, no loopback application and no worker host to reach. `[RequiresTestClock]` needs the run's clock inside the application. These processes read the machine clock. The runner lists every skipped test, and `--logger "console;verbosity=detailed"` prints each reason beside it.
+`[RequiresInProcess]` requires an application server inside the test process. The outbox tests need it to substitute the event publisher. `[RequiresTestClock]` requires the suite's clock to control application time. These separate processes use their own clocks.
+
+Several journeys also require ProtoTest-hosted workers. Running an equivalent worker outside the test process does not grant access to its services or clock.
 
 </Checkpoint>
 
@@ -120,7 +138,7 @@ The AppHost must target the suite's framework. The testing host runs the AppHost
 
 - The AppHost is one provider in the same chain, selected by one key.
 - It runs the API and both workers as project resources beside PostgreSQL and RabbitMQ.
-- Real processes bring their own clock and no test host, so the clock and in-process journeys skip by name.
+- Separate processes do not provide ProtoTest's in-process services or clock. Capability attributes keep those journeys from running in an unsupported mode.
 
 Next: [Point the suite at a real stack](/learn/real-systems/published-mode).
 

@@ -63,6 +63,11 @@ read in a hurry, often from a failing build, and come back later for depth.
 A lesson teaches one new idea. Words from the trace (operation, phase, gap) are taught in a lesson before another
 lesson uses them.
 
+A lesson stays under 750 reading words: prose, callouts and checkpoint answers, not code. `prose-check` counts
+them and flags a lesson over budget. A lesson says what is true for the steps the reader does. Exceptions, edge
+cases and limits belong on the reference page under **Go deeper**. A correction replaces the wrong sentence; it
+does not add a caveat beside it.
+
 A lesson is Markdown with this skeleton. Keep the headings; the page outline is built from them.
 
 ```mdx
@@ -159,4 +164,5 @@ Moved or folded: <what, and where to>
 Flagged: <claims to check, things missing, things that seem wrong>
 ```
 
-Run `pwsh -NoProfile -File eng/check-docs.ps1` and `node docs/scripts/prose-check.mjs <files>` before reporting.
+Run `pwsh -NoProfile -File eng/check-docs.ps1` and `node docs/scripts/prose-check.mjs --base <ref> <files>` before
+reporting. `--base` shows each page's reading words before and after the edit; a page that grows needs a reason.

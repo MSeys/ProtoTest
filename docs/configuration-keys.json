@@ -50,6 +50,10 @@
       "reason": "the shared default section of the HTTP response options when a protocol names none"
     },
     {
+      "key": "ProtoTest:Sample:Drills",
+      "reason": "the Northstar sample's opt-in switch read by FailureDrills.RequireDrills; sample-side, not a package option"
+    },
+    {
       "key": "ProtoTest:TargetUrl",
       "reason": "the demo's published-target switch; sample-side, not a package option"
     },

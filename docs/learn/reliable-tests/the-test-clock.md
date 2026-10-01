@@ -16,8 +16,8 @@ import Checkpoint from '@site/src/components/Checkpoint';
   step="Lesson 1 of 3"
   minutes={7}
   outcomes={[
-    'Move a test clock instead of waiting on real time',
-    'Explain how the in-process application reads the same clock',
+    'Move a test clock past a billing boundary',
+    'Explain how an in-process request reads the test clock',
     'Find the clock event and the period close in the trace',
   ]}
   needs={['The sample cloned, or the trace archive linked below']}
@@ -25,39 +25,33 @@ import Checkpoint from '@site/src/components/Checkpoint';
 
 ## The problem
 
-A subscription renews at the end of its billing period. To test the renewal, you have to be past that moment.
-The usual answer is a test that waits.
+Northstar issues an invoice when a request finds that a subscription's billing period has ended. Testing that boundary requires the application to read a later time.
 
 ```csharp
-// A flaky version: it shortens the period and sleeps through it.
+// Waiting on real time does not move this sample's test clock.
 await Task.Delay(TimeSpan.FromSeconds(2));
 ```
 
-This test is slow on a good day. On a loaded machine the two seconds are not enough, and the test fails for no
-reason you can see. A real billing period of a month cannot be waited out at all.
+This delay waits two real seconds, but the sample's test clock stays where it was. Increasing the delay would not cross the billing boundary.
 
-The fix is to stop waiting. The test owns a clock, the application reads that clock, and the test moves it.
+Instead, the test moves its clock past the period end and sends a request. The application reads that time and issues the invoice.
 
 ## Do it
 
 ### 1. Let the application read the test's clock
 
-The sample starts its API inside the test process. That in-process server is what hands the test clock to the
-application:
+Use the sample's default local configuration for this lesson. Follow `ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock` in `samples/Northstar.ProtoTest/ClockJourney.cs`, or inspect the linked recording.
+
+The setup class starts the API inside the test process. Inside its `AddApplication` registration, this excerpt adds the in-process server:
 
 ```csharp
-builder.AddApplication(NorthstarTargets.Api, app =>
-{
-    if (run.RunsLocalApplications)
-    {
-        // The in-process server is what carries the test clock into the application.
-        app.AddAspNetCoreServer<NorthstarProgram>(configureWebHost: webHost =>
-            ConfigureHostedApplication(webHost, run));
-    }
+app.AddAspNetCoreServer<NorthstarProgram>(configureWebHost: webHost =>
+    ConfigureHostedApplication(webHost, run));
 ```
 
-The server replaces the application's time provider with the run's clock. Every stamp and period the application
-computes now comes from the test clock. This code is in `samples/Northstar.ProtoTest/Setup.cs`.
+This code is in `samples/Northstar.ProtoTest/Setup.cs`. The sample already configures it. The server supplies a `TimeProvider` that reads the current test's clock while handling its requests.
+
+Northstar's billing code uses that provider. Code that reads `DateTimeOffset.UtcNow` directly would still see real time.
 
 ### 2. Ask the application where the period ends
 
@@ -68,8 +62,7 @@ var current = subscription
     .ReadRequired<SubscriptionResponse>();
 ```
 
-The test reads the period end from the application. It does not assume a month length, so the test keeps working
-if the billing rule changes.
+The response supplies `CurrentPeriodEndUtc`. The test uses that boundary rather than assuming how many days the month contains.
 
 ### 3. Move the clock just past that moment
 
@@ -79,8 +72,7 @@ Proto.Context.Clock.Advance(
     current.CurrentPeriodEndUtc - Proto.Context.Clock.GetUtcNow() + TimeSpan.FromSeconds(1));
 ```
 
-The delta is the time left in the period plus one second, so the clock lands just past the boundary. The call
-returns at once.
+The delta is the time left in the period plus one second, so the clock lands beyond the boundary. `Advance` updates the clock without waiting for that duration to pass.
 
 ### 4. Read what the application did
 
@@ -94,13 +86,24 @@ var invoice = invoices
     .Single();
 ```
 
-The application issued the invoice when the period closed. The test reads the open one and asserts on its stamp
-and line with ordinary NUnit assertions. The steps come from `samples/Northstar.ProtoTest/ClockJourney.cs`.
+This request makes Northstar evaluate the period boundary and issue the invoice. Advancing the clock alone did not execute that billing logic.
+
+The test expects exactly one open invoice. It then checks `IssuedAtUtc` against `current.CurrentPeriodEndUtc`, rather than the advanced time one second later. It also checks the open status and a line description containing `Growth`.
+
+These NUnit assertions are in `samples/Northstar.ProtoTest/ClockJourney.cs`.
 
 ### 5. Open the trace
 
-Download [l3-clock-window.prototrace](pathname:///lessons/l3-clock-window.prototrace) and open it in the
-[viewer](https://trace.prototest.dev). Select the test. You should see:
+To run the journey yourself, use this command from the repository root:
+
+```bash
+dotnet test samples/Northstar.ProtoTest --filter "FullyQualifiedName~ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock"
+```
+
+Expect one passed test in the default local configuration. Its trace appears under `samples/Northstar.ProtoTest/bin/Debug/net8.0/TestResults/`.
+
+Or download [l3-clock-window.prototrace](pathname:///lessons/l3-clock-window.prototrace) and open it in the
+[viewer](https://trace.prototest.dev). Select `ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock`. The supplied recording contains:
 
 | Entry | What it shows |
 | --- | --- |
@@ -108,21 +111,23 @@ Download [l3-clock-window.prototrace](pathname:///lessons/l3-clock-window.protot
 | `http.request` REST `GET /api/v1/subscription`, 141.9 ms, HTTP 200 | the period the test read |
 | `Northstar.Domain` `invoice.issue`, reported by the application | the application closed the period |
 | `http.request` REST `GET /api/v1/invoices`, 68.4 ms, HTTP 200 | the invoice the test read |
-| `test.execution`, 233.7 ms | the whole journey |
+| `test.execution`, 233.7 ms | the test body, excluding setup and teardown |
 
-The whole month took 233.7 ms.
+The recorded test body took 233.7 ms while advancing its clock by a month and one second. Your run's timings can differ.
 
 ## What happened
 
-The clock advance is an event on the test execution, not a request. Nothing was sent anywhere to move time. The
-test holds the clock, and the in-process application reads it.
+The trace records the clock advance as an event on `test.execution`. The test updates an in-memory clock. The next request lets the application observe the new time.
 
-That is why the test is reliable. Real time is not part of the test, so a slow machine cannot change the result.
-A sleep changes nothing the application can see, because the application only reads its clock.
+Each test gets a new clock seeded from the run clock. Advancing one test's clock does not advance another's. The in-process server uses the request's test id to find that clock in its owning host.
 
-One limit matters. A loopback, container, AppHost or deployed application resolves its own time provider, and the
-run cannot move it. A journey that needs the clock is an in-process journey. The sample runs the API in-process for
-these tests and points the browser journey at a loopback instance.
+The billing check no longer depends on how much real time elapsed. Requests and database work still take real time, so this does not eliminate every possible timeout or failure.
+
+The clock only changes `TimeProvider.GetUtcNow()`. Timers and ordinary delays still use real time. Code outside the test or request flow reads the run clock instead.
+
+The bridge follows the async flow. A background task that captures the request flow can retain its clock, so do not assume all background work uses run time.
+
+This sample's loopback browser application runs separately and does not receive the in-process clock bridge. Container and deployed applications likewise need their own way to control time.
 
 ## Check yourself
 
@@ -130,17 +135,17 @@ these tests and points the browser journey at a loopback instance.
   question="The clock advance in the trace reads 30:0:00:01. Why does the test compute the delta from the period end instead of advancing a fixed number of days?"
   verify={<>Select the test in the archive and find the <code>clock.advance</code> event on the test execution.</>}>
 
-The period end belongs to the application's billing logic, so the test reads it instead of assuming a month
-length. One second past that instant closes the period. The assertion that follows compares the invoice stamp with
-the same moment the application computed.
+The application supplies the period end, so the test does not assume a month length. Moving one second past it makes the next invoice request cross the boundary.
+
+That request issues the invoice. The assertion compares `IssuedAtUtc` with the original period end, not with the advanced clock value.
 
 </Checkpoint>
 
 ## Remember
 
-- The test owns the clock. The in-process application reads it through its time provider.
-- Moving the clock is instant, and the trace records the delta.
-- Waiting on real time changes nothing the application can see.
+- Each test has its own clock. The in-process request reads it through `TimeProvider`.
+- Advancing the clock does not wait for the requested duration. The trace records the delta.
+- The next request triggers Northstar's billing logic. Sleeping does not move this test clock.
 
 ## Go deeper
 

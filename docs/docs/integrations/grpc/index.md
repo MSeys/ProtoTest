@@ -201,7 +201,7 @@ The client is state, not history. It appears once with `client.name`, `client.pr
 
 | Limit | Matters when |
 | --- | --- |
-| A missed deadline can report the transport's abort in-process | asserting `DeadlineExceeded` against both socket and in-process endpoints. Assert it against socket endpoints only, or accept either status. |
+| `Open*` calls report a missed in-process deadline as the transport's abort | asserting `DeadlineExceeded` on a raw call in-process. The awaited helpers report `DeadlineExceeded` on every transport. |
 | Streaming capture keeps the first 10 messages | reading full streams from attachments. The cap is a private constant and not configurable. |
 | Raw helpers are untraced and uncaptured | driving `Blocking` or `Open*` calls. Only `[Auth]` metadata is applied. |
 | Address-dependent authenticators stay HTTP-only | applying `ApiKeyAuthenticator` with `ApiKeyLocation.Query` to gRPC. Metadata has no URI, so use a header-location key or `ConfigureMetadata`. |

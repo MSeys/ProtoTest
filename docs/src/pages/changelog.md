@@ -305,6 +305,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the built-in test user's metadata is redacted by default (`prototest-user`). [gRPC](https://prototest.dev/docs/integrations/grpc/)
 - a transport with no base address fails naming `AddClient` and the application's keys. [gRPC](https://prototest.dev/docs/integrations/grpc/)
 - client options are per named client; the shared section binds over each callback. [gRPC](https://prototest.dev/docs/integrations/grpc/#options-and-keys)
+- a call that misses its deadline in-process reports `DeadlineExceeded`, as over a socket, instead of the transport's abort. [gRPC](https://prototest.dev/docs/integrations/grpc/#limits)
 
 #### Messaging
 

@@ -98,10 +98,11 @@ public sealed partial class ProtoGrpcClient : IDisposable
             operation.AddSection(new ProtoTraceSection("Request", ProtoTraceSectionKind.Code, Content: body, Language: "protobuf"));
         }
 
+        var callOptions = BuildCallOptions(callMetadata, deadline, cancellationToken);
         try
         {
             var response = await (await GetInvokerAsync(cancellationToken))
-                .AsyncUnaryCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken), request)
+                .AsyncUnaryCall(method, null, callOptions, request)
                 .ConfigureAwait(false);
             CompleteCall(
                 operation,
@@ -116,8 +117,14 @@ public sealed partial class ProtoGrpcClient : IDisposable
         }
         catch (Exception exception)
         {
-            Fail(operation, method, exception, stopwatch, cancellationToken);
-            throw;
+            var reported = DeadlineAware(exception, callOptions.Deadline, cancellationToken);
+            Fail(operation, method, reported, stopwatch, cancellationToken);
+            if (ReferenceEquals(reported, exception))
+            {
+                throw;
+            }
+
+            throw reported;
         }
     }
 
@@ -155,10 +162,11 @@ public sealed partial class ProtoGrpcClient : IDisposable
             operation.AddSection(new ProtoTraceSection("Request", ProtoTraceSectionKind.Code, Content: body, Language: "protobuf"));
         }
 
+        var callOptions = BuildCallOptions(callMetadata, deadline, cancellationToken);
         try
         {
             using var call = (await GetInvokerAsync(cancellationToken))
-                .AsyncClientStreamingCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken));
+                .AsyncClientStreamingCall(method, null, callOptions);
             foreach (var request in requestList)
             {
                 await call.RequestStream.WriteAsync(request).ConfigureAwait(false);
@@ -179,8 +187,14 @@ public sealed partial class ProtoGrpcClient : IDisposable
         }
         catch (Exception exception)
         {
-            Fail(operation, method, exception, stopwatch, cancellationToken);
-            throw;
+            var reported = DeadlineAware(exception, callOptions.Deadline, cancellationToken);
+            Fail(operation, method, reported, stopwatch, cancellationToken);
+            if (ReferenceEquals(reported, exception))
+            {
+                throw;
+            }
+
+            throw reported;
         }
     }
 
@@ -216,10 +230,11 @@ public sealed partial class ProtoGrpcClient : IDisposable
         }
 
         var responses = new List<TResponse>();
+        var callOptions = BuildCallOptions(callMetadata, deadline, cancellationToken);
         try
         {
             using var call = (await GetInvokerAsync(cancellationToken))
-                .AsyncServerStreamingCall(method, null, BuildCallOptions(callMetadata, deadline, cancellationToken), request);
+                .AsyncServerStreamingCall(method, null, callOptions, request);
             await foreach (var response in call.ResponseStream.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
                 responses.Add(response);
@@ -238,8 +253,14 @@ public sealed partial class ProtoGrpcClient : IDisposable
         }
         catch (Exception exception)
         {
-            Fail(operation, method, exception, stopwatch, cancellationToken);
-            throw;
+            var reported = DeadlineAware(exception, callOptions.Deadline, cancellationToken);
+            Fail(operation, method, reported, stopwatch, cancellationToken);
+            if (ReferenceEquals(reported, exception))
+            {
+                throw;
+            }
+
+            throw reported;
         }
     }
 
@@ -375,6 +396,24 @@ public sealed partial class ProtoGrpcClient : IDisposable
                 ? DateTime.UtcNow + defaultDeadline
                 : null),
             cancellationToken: cancellationToken);
+
+    // In-process, the server's deadline enforcement aborts the request (the test server cannot reset a
+    // stream), and the abort can reach the client before its own deadline timer: a socket client reports
+    // DeadlineExceeded either way. A transport abort after the call's deadline passed is reported as that.
+    private static Exception DeadlineAware(Exception exception, DateTime? deadline, CancellationToken cancellationToken)
+    {
+        if (exception is not RpcException { StatusCode: StatusCode.Cancelled or StatusCode.Unknown or StatusCode.Internal } rpc ||
+            deadline is not { } due ||
+            cancellationToken.IsCancellationRequested ||
+            DateTime.UtcNow < due.ToUniversalTime())
+        {
+            return exception;
+        }
+
+        return new RpcException(
+            new Status(StatusCode.DeadlineExceeded, "Deadline Exceeded", rpc),
+            rpc.Trailers);
+    }
 
     private void Fail(
         ProtoTraceOperation operation,

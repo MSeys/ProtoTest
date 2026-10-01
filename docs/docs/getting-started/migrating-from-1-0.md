@@ -6,7 +6,7 @@ description: "What a 1.0 suite changes for 1.1: the renamed package and options 
 
 # Migrating from 1.0 to 1.1
 
-A 1.0 suite moves to 1.1 in three moves: fix what no longer compiles, replace what warns, and verify what changed behavior.
+Moving a 1.0 suite to 1.1 takes three steps: fix what no longer compiles, replace what now warns, and check what changed behavior. Most suites need only the first step.
 
 | Action | What | Count |
 | --- | --- | --- |
@@ -14,11 +14,11 @@ A 1.0 suite moves to 1.1 in three moves: fix what no longer compiles, replace wh
 | SHOULD | [deprecated shims](#deprecated-in-11) that keep compiling with a warning | 4 groups |
 | NOTHING | [renamed surface](#renamed-or-replaced) with a fallback, and [behavior changes](#also-changed) to verify | 3 renames, 5 behavior changes |
 
-The changelog's Breaking section lists the calls that must change; the rest of a 1.0 suite runs as it is. This page covers the renames and the deprecated surface. The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) is the complete record, including the changes this page does not repeat.
+The changelog's Breaking section lists the calls that must change. The rest of a 1.0 suite runs as it is. This page covers the removed members, the renames and the deprecated surface. The [changelog](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md) is the complete record, including the changes this page does not repeat.
 
 ## Removed in 1.1
 
-These members existed in 1.0.1 and are gone. The changelog's Breaking section carries the same list.
+These members existed in 1.0.1 and no longer exist. Your suite does not compile until you replace them. The changelog's Breaking section has the same list.
 
 | Removed member | Replacement | Docs |
 | --- | --- | --- |
@@ -35,7 +35,7 @@ These members existed in 1.0.1 and are gone. The changelog's Breaking section ca
 
 ## Deprecated in 1.1
 
-Each item below keeps compiling and keeps its records for 1.x. New tests use the replacement.
+Each item below still compiles, still records its data, and stays available for all of 1.x. It produces a warning. Use the replacement in new tests.
 
 ### Assertions
 
@@ -50,17 +50,19 @@ The facade and the polarity rules are on [Assertions](../foundation/assertions.m
 
 ### Shape
 
-The old `ShouldMatchShape` spellings are obsolete shims on REST and GraphQL responses, consumed messages and gRPC replies. Use the facade form, which chains after another assertion:
+The old `ShouldMatchShape` methods are obsolete on REST and GraphQL responses, consumed messages and gRPC replies. Use the `Should` form instead. It chains after another assertion:
 
 ```csharp
 response.Should.HaveHttpStatus(HttpStatusCode.OK).Should.MatchShape(shape);
 ```
 
-`Should.MatchShape(shape, exact: true)` is the exhaustive form on every shape surface: a field present in the response that the shape does not mention is a mismatch naming its path. A Sheets model row keeps `row.ShouldMatchShape(shape)`, because a record is a user type and C# cannot give it a `Should` property; a table row uses `row.Should.MatchShape(shape)`. See [Shape matching](../foundation/shape-matching.md).
+`Should.MatchShape(shape, exact: true)` is the strict form on every shape surface. A field in the response that the shape does not mention counts as a mismatch, and the failure names its path.
+
+A Sheets model row keeps `row.ShouldMatchShape(shape)`. A model row is your own type, and C# cannot give it a `Should` property. A table row uses `row.Should.MatchShape(shape)`. See [Shape matching](../foundation/shape-matching.md).
 
 ### Skip-key infrastructure
 
-`AddInfrastructure(piece, keys)` is obsolete. It keeps its rule for 1.x: a piece whose every declared key is configured is skipped, and `AddInfrastructureAlways` keeps the opt-out. The replacement is the provider chain:
+`AddInfrastructure(piece, keys)` is obsolete. It keeps its rule for all of 1.x: the host skips a piece when every key it declares is configured. `AddInfrastructureAlways` still lets you opt out of that skip. The replacement is a provider chain:
 
 ```csharp
 builder.AddInfrastructure(
@@ -71,7 +73,7 @@ builder.AddInfrastructure(
     RabbitMqOptions.ConnectionStringSetting);
 ```
 
-`UseConfigured()` is the configured-environment provider, and `Use(provider)` takes any `IProtoTargetProvider`. See [Infrastructure](../foundation/infrastructure.md).
+`UseConfigured()` is the provider that uses the configured environment. `Use(provider)` accepts any `IProtoTargetProvider`. See [Infrastructure](../foundation/infrastructure.md).
 
 ### The gRPC options constant
 
@@ -81,15 +83,15 @@ builder.AddInfrastructure(
 
 ### The MassTransit package
 
-One package changes its name: `ProtoTest.MassTransit` is `ProtoTest.Messaging.MassTransit`, matching the messaging family's nesting (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`). It was never released, so nothing you installed changes. Update the `PackageReference`; the public type names (`MassTransitEnvelope`, `UseMassTransit`) are unchanged.
+`ProtoTest.MassTransit` is now `ProtoTest.Messaging.MassTransit`, to match the other messaging packages (`ProtoTest.Messaging`, `ProtoTest.Messaging.RabbitMq`). The old package was never released, so nothing you installed changes. If you use it from a branch build, update the `PackageReference`. The public type names (`MassTransitEnvelope`, `UseMassTransit`) are the same.
 
 ### The gRPC options section
 
-gRPC client options bind `ProtoTest:Grpc:Client`. The 1.0 section `ProtoTest:Grpc` still binds as a deprecated fallback, so an existing `appsettings.json` keeps working. A value under the current section wins, and list-valued options accumulate the fallback and current entries. See [Options and keys](../integrations/grpc/index.md#options-and-keys).
+gRPC client options now bind from `ProtoTest:Grpc:Client`. The 1.0 section `ProtoTest:Grpc` still binds as a deprecated fallback, so an existing `appsettings.json` keeps working. A value under the new section wins. For options that hold a list, the entries from both sections are added together. See [Options and keys](../integrations/grpc/index.md#options-and-keys).
 
 ### The OpenTelemetry bridge
 
-The `ProtoTest.OpenTelemetry` package retired. The `ProtoTest` `ActivitySource` always exists, so subscribing is one line in your own OpenTelemetry setup:
+The `ProtoTest.OpenTelemetry` package is retired. The `ProtoTest` `ActivitySource` always exists, so you subscribe with one line in your own OpenTelemetry setup:
 
 ```csharp
 .AddSource("ProtoTest")
@@ -99,13 +101,20 @@ No package replaces the bridge, because the source was always there. See [OpenTe
 
 ## Also changed
 
-A few 1.1 changes are not deprecations, and they can affect a suite that asserts or filters on the old behavior.
+These 1.1 changes are not deprecations. They can affect a suite that asserts or filters on the old behavior.
 
-- **Shape failures throw the protocol exception.** A REST mismatch throws `RestAssertionException`, GraphQL `GraphQLAssertionException`, gRPC `GrpcAssertionException`, messaging `MessagingAssertionException` and a Sheets row `SpreadsheetAssertionException`, each naming its subject. `JsonShapeMismatchException`, with the mismatch list, stays reachable as the `InnerException`. Code that caught it directly catches the protocol exception or `ProtoAssertionException`.
+- **Shape failures throw the protocol's own exception.** Each exception names its subject:
+  - REST throws `RestAssertionException`.
+  - GraphQL throws `GraphQLAssertionException`.
+  - gRPC throws `GrpcAssertionException`.
+  - Messaging throws `MessagingAssertionException`.
+  - A Sheets row throws `SpreadsheetAssertionException`.
+
+  `JsonShapeMismatchException`, with the list of mismatches, is still available as the `InnerException`. Code that caught it directly must catch the protocol exception or `ProtoAssertionException` instead.
 - **REST object request bodies serialize camelCase by default**, matching GraphQL variables. Pass explicit `JsonSerializerOptions` to keep another naming policy.
 - **gRPC client options are per named client.** Each `AddClient` callback applies to that client only, and the shared `ProtoTest:Grpc:Client` section binds over every client.
 - **A per-run WireMock fake keeps its stubs and request log for the whole run.** Call `Reset()` when a test must start from a clean fake.
-- **The publish observation is `messaging.published`.** The operation stays `messaging.publish`; a collector that filtered the old observation kind updates.
+- **The publish observation is `messaging.published`.** The operation is still `messaging.publish`. A collector that filtered on the old observation kind must be updated.
 
 ## Next
 

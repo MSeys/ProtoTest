@@ -1,0 +1,9 @@
+{
+  "label": "Reliable tests",
+  "position": 5,
+  "customProps": {
+    "outcome": "Replace sleeps and shared state: move the test clock, wait until a service is ready, and run tests in parallel safely.",
+    "time": "About 30 minutes",
+    "needs": "Write good integration tests"
+  }
+}

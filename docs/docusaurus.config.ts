@@ -88,7 +88,6 @@ export default async function createConfig(): Promise<Config> {
         sidebarPath: './sidebars-learn.ts',
         editUrl: 'https://github.com/MSeys/ProtoTest/tree/main/docs/',
         showLastUpdateTime: true,
-        remarkPlugins: [require('./plugins/remark-learn-outline.cjs')],
         rehypePlugins: [require('./plugins/rehype-table-labels.cjs')],
       },
     ],
@@ -101,6 +100,8 @@ export default async function createConfig(): Promise<Config> {
           {from: '/docs/benchmarks', to: '/docs/project/benchmarks'},
           {from: '/docs/faq', to: '/docs/project/faq'},
           {from: '/docs/roadmap', to: '/docs/project/roadmap'},
+          // The Learn track was regrouped into tracks; every lesson keeps its old address.
+          ...Object.entries(require('./scripts/learn-moves.json') as Record<string, string>).map(([from, to]) => ({from, to})),
         ],
       },
     ],

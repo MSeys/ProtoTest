@@ -1,0 +1,9 @@
+{
+  "label": "Extend ProtoTest",
+  "position": 8,
+  "customProps": {
+    "outcome": "Write your own attributes, provisioners, page objects and integrations, and work through a failure with a coding agent.",
+    "time": "About 45 minutes",
+    "needs": "Write good integration tests"
+  }
+}

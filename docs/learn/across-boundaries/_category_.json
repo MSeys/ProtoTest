@@ -1,0 +1,9 @@
+{
+  "label": "Across boundaries",
+  "position": 4,
+  "customProps": {
+    "outcome": "Test an API, a database, a browser, messages and generated files, each from the same kind of test.",
+    "time": "About 45 minutes",
+    "needs": "Start"
+  }
+}

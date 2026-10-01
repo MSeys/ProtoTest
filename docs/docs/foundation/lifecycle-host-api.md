@@ -52,6 +52,8 @@ public sealed class ProtoHost : IAsyncDisposable
 }
 ```
 
+`ProtoTestAssembly.Host` is the static host that a `[ProtoTest]` test uses. It belongs to the closed generic setup type, so two runner adapter assemblies in one process each own their own host. When the run ends, stopping the host clears it. A later lookup reports that the host was not initialized, with the runner's hint (see [Troubleshooting](../getting-started/troubleshooting.md)). The next run in the same process starts a fresh host.
+
 | You need | Overload |
 | --- | --- |
 | the usual start | `StartTestAsync(testName, testMethod)` |

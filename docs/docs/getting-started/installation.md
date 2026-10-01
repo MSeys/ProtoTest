@@ -43,11 +43,11 @@ export const installTabs = [
 
 # Installation
 
-Create a small API and a working integration test suite with the template. Run the commands in order:
+You can start from a template that gives you a working API and test suite, or add ProtoTest packages to a test project you already have. The template is the faster way to see ProtoTest work.
 
 ## Start from the template
 
-The template creates a small ASP.NET Core API and a suite for it. The default starter needs the .NET 10 SDK.
+The template creates a small ASP.NET Core API and a test suite for it. The default template needs the .NET 10 SDK.
 
 ```bash
 dotnet new install ProtoTest.Templates
@@ -56,15 +56,23 @@ cd Shop
 dotnet test
 ```
 
-The run passes. The test project leaves `Shop.Tests/bin/Debug/net10.0/TestResults/prototest-{runId}.prototrace` and `Shop.html`. Each run writes its own trace, so a rerun never overwrites the previous one. Open the report for the run's verdict and the routes it covered, or drop the trace on [trace.prototest.dev](https://trace.prototest.dev).
+When it works, the tests pass. The run also leaves two files next to the test build output: `Shop.Tests/bin/Debug/net10.0/TestResults/prototest-{runId}.prototrace` and `Shop.html`. The first is the run's **trace**, the record of everything the run did. The second is the HTML report. Each run writes its own trace, so a rerun never overwrites the previous one.
 
-ProtoTest ships as small NuGet packages: your runner package, `ProtoTest.Core`, and one package per integration you use. The runner and integration packages target .NET 8, 9 and 10. `ProtoTest.Cli` targets .NET 8 only. `ProtoTest.Analyzers` and `ProtoTest.Templates` are netstandard2.0.
+To look at the results, open the report. It shows the verdict and the API routes the run covered. You can also drop the trace on [trace.prototest.dev](https://trace.prototest.dev), the viewer for traces.
 
-The suite is written for NUnit. Pass `--runner xunit`, `--runner xunit3`, `--runner tunit` or `--runner mstest` to generate it for another runner, and `--framework net8.0` or `--framework net9.0` to target an older framework.
+The suite is written for NUnit. Two flags change that:
 
-### What the template creates
+| Flag | Values | Default |
+| --- | --- | --- |
+| `--runner` | `nunit`, `xunit`, `xunit3`, `tunit`, `mstest` | `nunit` |
+| `--framework` | `net10.0`, `net9.0`, `net8.0` | `net10.0` |
 
-Two projects, one setup file picked by the runner, and four order scenarios against a tiny API:
+Next, [Your first test](./first-test.md) builds the same suite one step at a time and ends with a failure and its trace.
+
+<details>
+<summary>What the template creates</summary>
+
+Two projects, one setup file for the runner you picked, and four order tests against a tiny API:
 
 ```text
 Shop/
@@ -81,24 +89,13 @@ Shop/
     └── OrderTests.cs              # four tests: create, read back, validation, not found
 ```
 
-`Setup.cs` starts as `Setup.{runner}.cs` and is renamed for the runner you picked. The test project always adds `ProtoTest.AspNetCore`, `ProtoTest.Rest` and `ProtoTest.Reporting` next to the runner package; TUnit also sets `OutputType` to `Exe`, as TUnit requires.
+`Setup.cs` starts as `Setup.{runner}.cs` and is renamed for the runner you picked. The test project always adds `ProtoTest.AspNetCore`, `ProtoTest.Rest` and `ProtoTest.Reporting` next to the runner package. TUnit also sets `OutputType` to `Exe`, because TUnit requires it.
 
-| Flag | Values | Default |
-| --- | --- | --- |
-| `--runner` | `nunit`, `xunit`, `xunit3`, `tunit`, `mstest` | `nunit` |
-| `--framework` | `net10.0`, `net9.0`, `net8.0` | `net10.0` |
-
-Next: [Your first test](./first-test.md) walks the same path one step at a time and ends at a failure and its trace.
+</details>
 
 ## Add ProtoTest to your own project
 
-| | Template (fastest) | Your own project (control) |
-| --- | --- | --- |
-| Start with | `dotnet new prototest -n Shop` | the `dotnet add package` lines below |
-| You get | a working API, suite, trace and report | ProtoTest inside a project you already have |
-| Pick the other when | you already have an application or a suite | you want the composed example to copy from |
-
-A suite is one runner package, `ProtoTest.Core`, and one package per integration. Infrastructure hangs off the integration it serves:
+Use this path when you already have an application or a test project. A ProtoTest suite is one runner package, `ProtoTest.Core`, and one package for each kind of system you test.
 
 ```text
 your suite = runner (1 of 5) + Core + 1 package per integration
@@ -108,19 +105,25 @@ your suite = runner (1 of 5) + Core + 1 package per integration
                   next to the Sql or Messaging integration they serve
 ```
 
-Pick one package per integration you use, plus infrastructure and extras where you need them:
+An **integration** is a package for one kind of system, such as REST, SQL or a browser. **Infrastructure** is something the run starts for you, such as a database container. Pick the packages you need from the tabs:
 
 <TabbedCode tabs={installTabs} label="ProtoTest packages by group" />
 
-The NUnit adapter needs **NUnit 4.6.1 or newer**; the standard `dotnet new nunit` template pins an older version, so update it first:
+The NUnit package needs **NUnit 4.6.1 or newer**. The standard `dotnet new nunit` template pins an older version, so update it first:
 
 ```bash
 dotnet add package NUnit --version 4.6.1
 ```
 
+After the packages are in, each runner needs a small setup class. [Your first test](./first-test.md#2-configure-the-host) shows it for NUnit, and [Test runners](../runners/overview.md) covers the others.
+
+## Browsers for Playwright
+
+Set `InstallBrowsers` to make the run download the browser before the first launch. A clean machine or CI runner then needs no extra install step. To choose between Playwright and Selenium, see [Which backend](../integrations/web/index.md#which-backend).
+
 ## Preview packages
 
-The preview set works but its surface can change before the next minor release: Sheets, WireMock, the devices family, Aspire, the MassTransit bridge, the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli) and Analyzers. Add one per need the same way:
+Some packages work but may change their API before the next minor release. These are Sheets, WireMock, the devices family, Aspire, the MassTransit bridge, the agent layer (Mcp, Diagnosis, Verification, Feedback, Cli) and Analyzers. You install them the same way:
 
 ```bash
 dotnet add package ProtoTest.Sheets
@@ -128,7 +131,14 @@ dotnet add package ProtoTest.WireMock
 dotnet add package ProtoTest.Aspire
 ```
 
-## What comes along
+## Target frameworks
+
+The runner and integration packages target .NET 8, 9 and 10. `ProtoTest.Cli` targets .NET 8 only. `ProtoTest.Analyzers` and `ProtoTest.Templates` target netstandard2.0.
+
+<details>
+<summary>Which packages come along automatically</summary>
+
+Adding a package also adds the shared layer it builds on. Add that layer yourself only when your own code uses its types.
 
 | You add | You also get | Add it directly when you |
 | --- | --- | --- |
@@ -143,11 +153,9 @@ dotnet add package ProtoTest.Aspire
 
 `ProtoTest.Http` is the shared HTTP client and authentication layer behind REST, GraphQL and gRPC. Application suites reference the integration, not the layer.
 
-## Browsers for Playwright
-
-Set `InstallBrowsers` to download the browser before the first launch. A clean machine or CI runner then needs no extra install step. Which backend to pick is on [Which backend](../integrations/web/index.md#which-backend).
+</details>
 
 ## Where to next
 
 - [Your first test](./first-test.md): the first test, the first failure and the trace.
-- [The Learn track](/learn/one-test-one-journey/install-and-run): the same start with a real sample and recorded traces.
+- [The Learn track](/learn/start/install-and-run): the same start with a real sample and recorded traces.

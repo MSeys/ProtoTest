@@ -6,9 +6,10 @@ export interface CheckpointContent {
   /** The question to answer before anything is revealed. */
   question: ReactNode;
   /** The step that lets the reader judge the answer: a trace to open, a run to make, a value to check. */
-  verify: ReactNode;
-  /** The answer, kept behind the reveal. */
-  reveal: ReactNode;
+  verify?: ReactNode;
+  /** The answer, kept behind the reveal. A lesson in Markdown passes it as the children instead. */
+  reveal?: ReactNode;
+  children?: ReactNode;
 }
 
 /*
@@ -16,7 +17,7 @@ export interface CheckpointContent {
  * answer is a button toggle rather than a details element, so it stays out of the tab order until the
  * reader asks for it.
  */
-export default function Checkpoint({question, verify, reveal}: CheckpointContent): ReactNode {
+export default function Checkpoint({question, verify, reveal, children}: CheckpointContent): ReactNode {
   const [shown, setShown] = useState(false);
   const answerId = useId();
 
@@ -24,10 +25,12 @@ export default function Checkpoint({question, verify, reveal}: CheckpointContent
     <div className={styles.checkpoint}>
       <p className={styles.question}>{question}</p>
 
-      <div className={styles.verify}>
-        <span className={styles.verifyLabel}>Verify</span>
-        <div className={styles.verifyBody}>{verify}</div>
-      </div>
+      {verify && (
+        <div className={styles.verify}>
+          <span className={styles.verifyLabel}>Verify</span>
+          <div className={styles.verifyBody}>{verify}</div>
+        </div>
+      )}
 
       <div className={styles.answer}>
         <button
@@ -39,7 +42,7 @@ export default function Checkpoint({question, verify, reveal}: CheckpointContent
           {shown ? 'Hide the answer' : 'Show the answer'}
         </button>
         <div id={answerId} hidden={!shown} className={styles.answerBody}>
-          {reveal}
+          {children ?? reveal}
         </div>
       </div>
     </div>

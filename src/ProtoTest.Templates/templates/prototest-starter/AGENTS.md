@@ -20,12 +20,17 @@ A failing test has a trace. Read it before changing code:
 - with MCP: `list_runs`, then `get_failure`, then `get_diagnosis` with `detail=context`;
 - without MCP: `dotnet prototest summary <path-to.prototrace>`.
 
-Fix from what the trace shows: the request, the response, the mismatching field, the source line.
+Fix from what the trace shows: the request, the response, the mismatching field, the source line. A fix
+is done when `check_fix` (or `dotnet prototest prove <before> <after>`) says proven.
+
+The MCP server offers three prompts that run a whole job: `fix_failure`, `cover_change` and
+`improve_tests`.
 
 ## Write a test
 
 Before writing one, call `get_suite_map`: it lists the clients, data provisioners, attributes, page
-objects and example tests the suite already has. Reuse them. The skills in `.claude/skills` describe
+objects and example tests the suite already has. Reuse them. `get_coverage` names the test to extend
+or copy for each uncovered endpoint, and `review_tests` must read the new test clean. The skills in `.claude/skills` describe
 both workflows step by step (`prototest-evidence-loop`, `prototest-write-test`).
 
 ## Conventions

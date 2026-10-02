@@ -45,11 +45,17 @@ Every tool is read-only and returns a compact JSON document.
 | `list_runs` | optional `folder`, `limit` (default 10) | the newest runs first: run id, trace file, start/completion, outcome counts and the failing test ids, plus the archives it had to skip |
 | `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the recorded shape mismatches and the test's evidence artifacts. Defaults to the newest run's first non-succeeded test |
 | `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary`/`context`) | the deterministic diagnosis: the digest with each failure's rule and mismatches, the run gates, findings and coverage; `detail=context` returns the failing test's context package (ancestors, call, section previews, source snippet, artifacts, state, report rows) |
-| `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | the coverage totals and the uncovered units from the JSON report a `ProtoTest.Reporting` sink embedded; states a missing report instead of inventing numbers |
+| `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | the coverage totals and the uncovered units from the JSON report a `ProtoTest.Reporting` sink embedded, with one suggestion per endpoint (extend the test that calls it, or copy the named one); states a missing report instead of inventing numbers |
 | `compare_runs` | optional `baselineRunId`, `currentRunId`, `baselineTrace` | each test that broke, was fixed, still fails, is new or was removed, with the first operation where the two runs part; defaults to the newest run against the one before it |
 | `check_fix` | optional `tests`, `baselineRunId`, `currentRunIds`, `baselineTrace` | the fix receipt: proven only when the baseline recorded each claimed test failing, every current run recorded it succeeded, nothing broke and the embedded reports verify; every unmet condition is a named reason |
 | `review_tests` | optional `runId`, `tests` | what each test proves: a body with no check, a call no check looked at, an untraced gap, each with the next step; clean tests are counted |
 | `get_suite_map` | optional `runId` | what a new test reuses, as the run recorded it: capabilities and infrastructure, clients, data provisioners, attributes (the suite's own marked), page objects with keyed elements normalised to `[key]`, devices, one passed example test per kind of work with its file, and the open coverage gaps |
+
+## Prompts
+
+`fix_failure`, `cover_change` and `improve_tests` run a whole job and end with the tool that judges it:
+`check_fix`, `get_coverage` with `review_tests`, and `review_tests` with `compare_runs`. Each starts
+from `get_suite_map`, so the agent writes in the suite's style.
 
 ## Limits
 

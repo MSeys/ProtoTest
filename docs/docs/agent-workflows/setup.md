@@ -187,7 +187,7 @@ The run id, file paths and timestamps above stand in for any run. A real call re
 | `list_runs` | optional `folder`, `limit` (default 10) | the newest runs first: run id, trace file, start and completion, outcome counts, failing test ids, and the archives it had to skip | 50 runs |
 | `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the shape mismatches and the test's artifacts | 10 failed operations, 25 mismatches |
 | `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary` or `context`) | the run's diagnosis, or one failing test's context package | the [diagnosis caps](./diagnosis.md#limits) |
-| `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | coverage totals and uncovered units from the report the run embedded | 200 uncovered units |
+| `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | coverage totals and uncovered units from the report the run embedded, with one suggestion per endpoint: extend the test that already calls it, or write a new test shaped like the named one | 200 uncovered units, 20 suggestions |
 | `compare_runs` | optional `baselineRunId`, `currentRunId`, `baselineTrace` | each test that broke, was fixed, still fails, is new or was removed, with the first operation where the two runs part. Defaults to the newest run against the run before it | 50 tests |
 | `check_fix` | optional `tests`, `baselineRunId`, `currentRunIds`, `baselineTrace` | the fix receipt: proven or not, each claimed test with its reasons and where it changed, the tests that broke, and the failing report findings. Defaults to the newest run against the run before it | 20 tests, 20 broken tests |
 | `review_tests` | optional `runId`, `tests` | each test with findings: no check, an unchecked call or an untraced gap, each with its next step and source location; clean tests are counted | 30 tests, 10 findings per test |
@@ -196,6 +196,18 @@ The run id, file paths and timestamps above stand in for any run. A real call re
 [Diagnosis](./diagnosis.md) explains what `get_failure` and `get_diagnosis` return and what the agent can do with it.
 
 `get_suite_map` lists what the run recorded, not the whole test project: a provisioner or page object no test used in that run is not in it. A keyed element lists its shape, `OrdersPage.Order[key].Status`, not the key one run found it by.
+
+## The job prompts
+
+The server offers three prompts. A client that shows prompts (a slash command or a prompt picker) starts a whole job from one, and each job ends with the tool that judges it, so the agent does not decide on its own that it is done:
+
+| Prompt | Arguments | The job | Done when |
+| --- | --- | --- | --- |
+| `fix_failure` | optional `test` | read the failure, compare with the last green run, fix code or test, rerun | `check_fix` says proven |
+| `cover_change` | `change`, optional `target` | read the suite map and the coverage suggestions, write or extend the test, make it fail once on purpose | the units read covered and `review_tests` reads the test clean |
+| `improve_tests` | optional `test` | apply each review finding's next step in the suite's style | `review_tests` reads clean and `compare_runs` shows nothing broken |
+
+Every prompt starts with `get_suite_map`, so the agent writes in the suite's own style: its clients, data provisioners, attributes and page objects, not new setup.
 
 ## Limits
 

@@ -8,7 +8,7 @@ All ProtoTest packages share one version; breaking API changes are called out be
 ## [1.1.0] - 2026-09-30
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
-CLI), the devices family (WebSocket, MQTT, TCP and serial), the topology integrations (Aspire, WireMock,
+CLI, with compare, prove and review judging what a coding agent changed), the devices family (WebSocket, MQTT, TCP and serial), the topology integrations (Aspire, WireMock,
 Testcontainers), the extended runner surface, and a rewritten documentation site with the Learn track.
 It ships 46 packages: 19 new, listed first below, and `ProtoTest.OpenTelemetry` removed. The breaking changes are listed at the end.
 See [Migrating from 1.0](https://prototest.dev/docs/getting-started/migrating-from-1-0) for the renames
@@ -20,7 +20,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 - `ProtoTest.Analyzers`: compile-time rules for what the framework cannot catch at run time.
 - `ProtoTest.Aspire`: runs an Aspire AppHost with the suite and publishes its resources as targets.
-- `ProtoTest.Cli`: the `prototest` command that summarizes, indexes and verifies traces.
+- `ProtoTest.Cli`: the `prototest` command that summarizes, indexes, compares, proves, reviews and verifies traces.
 - `ProtoTest.Devices`: typed devices, one per test, with every exchange in the trace.
 - `ProtoTest.Devices.WebSocket` and `ProtoTest.Devices.WebSocket.AspNetCore`: devices over WebSocket, or in-process without a socket.
 - `ProtoTest.Devices.Mqtt` and `ProtoTest.Devices.Mqtt.Testcontainers`: devices over MQTT, with a Mosquitto broker for the run.
@@ -28,7 +28,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `ProtoTest.Diagnosis`: names a failure's cause from the recorded evidence.
 - `ProtoTest.Feedback`: posts a run's digest to a pull request, check annotations or a webhook.
 - `ProtoTest.Hosting`: hosts background workers in the test process.
-- `ProtoTest.Mcp`: an MCP server that lets a coding agent read runs.
+- `ProtoTest.Mcp`: an MCP server that lets a coding agent read runs, with the tools and prompts that judge its fixes and tests.
 - `ProtoTest.Messaging.MassTransit`: uses the application's MassTransit test harness as the broker.
 - `ProtoTest.Traces`: reads `.prototrace` archives for the CLI, MCP and tools.
 - `ProtoTest.Verification`: compares a run with a baseline, by report and by trace.
@@ -259,6 +259,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - Start here opens with one paragraph and four starting points (try it, learn it, weigh it, use it) in two columns, and the sidebar narrows between tablet and wide screens so the text keeps its measure. [Docs](https://prototest.dev/docs/)
 - the READMEs follow one shape per kind, from the root to the package pages. [Docs](https://prototest.dev/docs/)
 - Northstar with the Learning demo suite is the in-repo sample. [Learn](https://prototest.dev/learn)
+- the coding agents page, the evidence loop lesson and the README describe ProtoTest as the judge above a coding agent: three jobs, each ending with the tool that decides it is done. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents)
 - a message-to-fix table in troubleshooting, a where-your-evidence-goes map and a which-runner chooser. [Troubleshooting](https://prototest.dev/docs/getting-started/troubleshooting)
 
 #### Packaging

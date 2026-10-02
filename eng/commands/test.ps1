@@ -151,6 +151,19 @@ $serialProjects = @($vstestProjects | Where-Object { (& $projectName $_) -notin 
 $logRoot = Join-Path $repository "artifacts/test-logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 
+# A benchmark measures wall-clock time, so it must not share the machine: the pool and the serial suites
+# run beside each other, and a timing bound then fails on contention instead of on a regression. The pool
+# leaves the benchmark category out, and each project that has one runs it alone once everything else is
+# done. A project is found by its [Category("Benchmark")] attribute, so there is no list to keep.
+$hasBenchmarks = {
+    param($project)
+    $found = Get-ChildItem -LiteralPath (Split-Path -Parent $project) -Filter *.cs -Recurse -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
+        Select-String -Pattern 'Category\("Benchmark"\)' -List
+    @($found).Count -gt 0
+}
+$benchmarkProjects = @($parallelProjects | Where-Object { & $hasBenchmarks $_ })
+
 $pool = $null
 if ($parallelProjects.Count -gt 0 -and (Get-Command Start-Job -ErrorAction SilentlyContinue)) {
     $pool = Start-Job -ArgumentList ($parallelProjects -join "`n"), $Configuration -ScriptBlock {
@@ -158,7 +171,7 @@ if ($parallelProjects.Count -gt 0 -and (Get-Command Start-Job -ErrorAction Silen
 
         ($ProjectList -split "`n") | ForEach-Object -Parallel {
             $project = $_
-            $output = & dotnet test $project --configuration $using:Configuration --no-build --no-restore --verbosity minimal 2>&1
+            $output = & dotnet test $project --configuration $using:Configuration --no-build --no-restore --verbosity minimal --filter "Category!=Benchmark" 2>&1
             [pscustomobject]@{
                 Project  = $project
                 ExitCode = $LASTEXITCODE
@@ -201,6 +214,12 @@ if ($null -ne $pool) {
 
         Write-Host "dotnet test $name passed (full output: $log)."
     }
+}
+
+foreach ($project in $benchmarkProjects) {
+    $name = Split-Path -Leaf (Split-Path -Parent $project)
+    Invoke-ProtoNative -Name "dotnet test $name benchmarks" -FilePath "dotnet" -Log (Join-Path $logRoot "$name.benchmarks.log") `
+        -ArgumentList @("test", $project, "--configuration", $Configuration, "--no-build", "--no-restore", "--verbosity", "minimal", "--filter", "Category=Benchmark") | Out-Null
 }
 
 foreach ($mtpProject in $mtpProjects) {

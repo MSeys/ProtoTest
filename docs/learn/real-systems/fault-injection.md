@@ -97,7 +97,7 @@ One fault was not injected. Billing used to read the tariff when the worker proc
 The failing trace is kept at `docs/static/traces/opencsms-showpiece.prototrace`. It recorded two assertions that failed together:
 
 ```text
-FAILED OpenCsms.Suite.Journeys.IdleFeeAfterTariffChange.TheIdleFeeStillAppliesAfterAReprice (496 ms)
+FAILED OpenCsms.Suite.Journeys.IdleFeeAfterTariffChange.TheIdleFeeStillAppliesAfterAReprice (486 ms)
   the idle fee the session started under still applies
   Assert.That(stored.IdleFeeAmount, Is.EqualTo(10.00m))
     Expected: 10m

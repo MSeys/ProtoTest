@@ -126,6 +126,30 @@ Anything else is reported as **unexplained**, with the run and test ids and a po
 - the state changes the failing operation caused.
 - the report rows for the test: findings, run gates and the coverage row the operation touched.
 
+## Review what a test proves
+
+A green test can still prove little. `prototest review` and the `review_tests` tool read what each test recorded and name three things:
+
+| Rule | What was recorded | Next step |
+| --- | --- | --- |
+| `no-check` | the test body ran operations and no check | assert on the answer: `Should.HaveStatus`, `Should.MatchShape`, a message await |
+| `unchecked-call` | a call that no check looked at before the next call | check what it returned, or move it into setup if only its side effect matters |
+| `untraced-gap` | 250 ms or more of the test body with no operation | replace the sleep with a wait that records what it waits for, or call through a ProtoTest client |
+
+A check is an `assert.*` operation or an await for a message, so it fails the test when the answer is wrong. Only the test body (the execution phase) is reviewed; setup may call without checking. The gap uses the viewer's rule for an untraced gap, and a review reports it only from 250 ms, so scheduling noise never becomes a finding.
+
+```text
+ProtoTest review: run d7b73deb...
+1 tests · 0 clean · 1 untraced-gap
+
+FailureDrills.ARealWaitDoesNotCloseTheDueWindow (failed, 2 checks, 1 calls)
+  untraced-gap: 1.0 s of the test body recorded no operation, starting 154 ms in, before 'REST · GET /api/v1/organization'.
+    at samples/Northstar.ProtoTest/FailureDrills.cs:35
+    next: Replace a sleep with a wait that records what it waits for (ProtoPolling, a message await, the test clock), or call through a ProtoTest client so the call is traced.
+```
+
+A review cannot see a path a test never ran. A missing failure path is a coverage question: read `get_coverage`.
+
 ## Limits
 
 - Deterministic and offline: one archive and one report in, one JSON document out. No model runs inside ProtoTest, no network call is made, and nothing is written. The same archive produces byte-identical JSON.

@@ -177,4 +177,37 @@ public sealed class TraceCliTests
             Assert.That(error.ToString(), Does.Contain("usage: prototest summary"));
         }
     }
+
+    [Test]
+    public async Task Review_ShouldPrintFindingsAndReturnZero()
+    {
+        using var trace = new TemporaryTrace("cli-review");
+        await WriteAsync(trace.Path, new RecordedTest("orders are listed", Call("List orders", "GET /orders")));
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exit = CliHost.Run(["review", trace.Path], output, error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exit, Is.EqualTo(0), "a review advises; it is not a gate");
+            Assert.That(output.ToString(), Does.Contain("no-check:"));
+            Assert.That(error.ToString(), Is.Empty);
+        }
+    }
+
+    [Test]
+    public void Review_ShouldNameAMissingTrace()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exit = CliHost.Run(["review", "missing.prototrace", "--test", "x"], output, error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exit, Is.EqualTo(1));
+            Assert.That(error.ToString(), Does.Contain("Trace file not found: missing.prototrace"));
+        }
+    }
 }

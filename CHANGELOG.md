@@ -201,6 +201,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `ProtoTest.Verification` compares a baseline and a candidate report. [Verification](https://prototest.dev/docs/agent-workflows/verification)
 - `prototest compare` and the `compare_runs` tool compare two runs test by test and name the operation where each broken, fixed or still-failing test left the baseline. [CLI](https://prototest.dev/docs/agent-workflows/cli#compare)
 - `prototest prove` and the `check_fix` tool return a fix receipt: proven only when the baseline failed, every rerun passes, nothing broke and the reports verify, with a named reason for each unmet condition. [CLI](https://prototest.dev/docs/agent-workflows/cli#prove)
+- `prototest review` and the `review_tests` tool say what each test proves: a body with no check, a call no check looked at, or an untraced gap, each with the next step. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis#review-what-a-test-proves)
 - `ProtoReport.ReadJson(Stream)` reads a report from a stream, such as the one a trace embeds. [Verification](https://prototest.dev/docs/agent-workflows/verification)
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. [Loop](https://prototest.dev/docs/agent-workflows/loop)
 - the ProtoTest Feedback GitHub Action uploads the trace and posts the digest. [CI](https://prototest.dev/docs/continuous-integration/#the-feedback-action)

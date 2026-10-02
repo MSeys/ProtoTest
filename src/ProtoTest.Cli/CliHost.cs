@@ -49,6 +49,11 @@ public static class CliHost
             return Prove(args, output, error);
         }
 
+        if (args.Length >= 2 && string.Equals(args[0], "review", StringComparison.Ordinal))
+        {
+            return Review(args, output, error);
+        }
+
         WriteUsage(error);
         return 1;
     }
@@ -318,6 +323,40 @@ public static class CliHost
         return receipt.Proven ? 0 : 1;
     }
 
+    private static int Review(string[] args, TextWriter output, TextWriter error)
+    {
+        var tests = new List<string>();
+        for (var index = 2; index < args.Length; index++)
+        {
+            if (string.Equals(args[index], "--test", StringComparison.Ordinal) && index + 1 < args.Length)
+            {
+                tests.Add(args[++index]);
+                continue;
+            }
+
+            WriteUsage(error);
+            return 1;
+        }
+
+        var path = args[1];
+        if (!File.Exists(path))
+        {
+            error.WriteLine($"Trace file not found: {path}");
+            return 1;
+        }
+
+        try
+        {
+            ProtoReviewText.Write(ProtoDiagnosis.Review(path, tests), output);
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            error.WriteLine($"Could not review '{path}': {exception.Message}");
+            return 1;
+        }
+    }
+
     private static ProtoFeedbackTarget Target()
         => new()
         {
@@ -389,6 +428,7 @@ public static class CliHost
                    prototest verify <baseline-report.json> <current-report.json>
                    prototest compare <baseline.prototrace> <current.prototrace>
                    prototest prove <baseline.prototrace> <current.prototrace>... [--test <name>]...
+                   prototest review <file.prototrace> [--test <name>]...
             """);
 
     private static string Runs(int count)

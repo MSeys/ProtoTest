@@ -88,6 +88,19 @@ public static class ProtoDiagnosis
         return ProtoTestReviewer.Review(archive, testNames);
     }
 
+    /// <summary>
+    /// Suggests where each uncovered unit of the run's embedded report should be covered: extend the test
+    /// that already calls its endpoint, or write a new test shaped like the closest recorded call. The
+    /// suggestions follow the report's depth-first order; a run without an embedded report has none.
+    /// </summary>
+    public static IReadOnlyList<ProtoCoverageSuggestion> SuggestCoverage(ProtoTraceArchive archive)
+    {
+        ArgumentNullException.ThrowIfNull(archive);
+        return ProtoTraceReport.TryRead(archive, out var report, out _)
+            ? ProtoCoverageSuggester.Suggest(archive, report)
+            : [];
+    }
+
     /// <summary>Reads one run's diagnosis from an opened archive.</summary>
     public static ProtoDiagnosisDocument Read(ProtoTraceArchive archive)
     {

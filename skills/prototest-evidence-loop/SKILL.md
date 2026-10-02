@@ -14,7 +14,7 @@ guessing.
 
 ## The MCP tools
 
-With the ProtoTest MCP server registered (`prototest-mcp`), five read-only tools return compact JSON:
+With the ProtoTest MCP server registered (`prototest-mcp`), eight read-only tools return compact JSON:
 
 | Tool | Use it to |
 | --- | --- |
@@ -23,6 +23,13 @@ With the ProtoTest MCP server registered (`prototest-mcp`), five read-only tools
 | `get_diagnosis` | read the run's diagnosis, or with `detail=context` the package needed to fix one failure |
 | `get_coverage` | read coverage totals and uncovered units from the run's report |
 | `get_suite_map` | read what the suite composes and reuses before writing a new test; the `prototest-write-test` skill covers that work |
+| `compare_runs` | see where a run left an earlier one: each broken, fixed or still-failing test with the operation that changed |
+| `check_fix` | prove a fix: the receipt says proven only when the baseline failed, the rerun passes and nothing broke |
+| `review_tests` | see what each test proves: a body with no check, an unchecked call, an untraced gap, with the next step |
+
+The server also offers three prompts that run a whole job and end with its judge: `fix_failure` (ends
+with `check_fix`), `cover_change` (ends with `get_coverage` and `review_tests`) and `improve_tests` (ends
+with `review_tests` and `compare_runs`). Start a job from its prompt when the client shows prompts.
 
 Start with `list_runs`, then `get_failure` for the short entry, then `get_diagnosis` with
 `detail=context` once you are fixing. Call `get_coverage` when the change touches what the run covers.
@@ -39,9 +46,10 @@ A pull request has one failing integration test.
    the source snippet, the artifacts, the state changes and the report rows.
 3. **Fix.** Edit the file and line the context named. The subject (the route, the operation, the row)
    tells you what the failure is about.
-4. **Verify.** Rerun the suite, then run `prototest verify baseline.json current.json` over the two
-   JSON reports. The verdict lists coverage regressions, units the current run leaves uncovered, a
-   changed specification and failed run gates.
+4. **Verify.** Rerun the suite, then call `check_fix` (or `prototest prove before.prototrace
+   after.prototrace`). The fix is done only when the receipt says proven: the baseline failed, every
+   rerun passed, no other test broke and the embedded reports verify. `compare_runs` shows what the
+   rerun changed when the receipt is not proven.
 5. **Report.** Run `prototest feedback run.prototrace` to post the digest, or let the ProtoTest
    Feedback action do it in CI. The digest is the document `prototest summary` prints as text.
 
@@ -50,6 +58,9 @@ Without an MCP client, the CLI reads the same evidence:
 - `prototest summary <trace>` prints the digest of one run.
 - `prototest index <folder>` writes a static page over a folder of runs, with one digest per run.
 - `prototest verify <baseline> <current>` returns the pull request verdict.
+- `prototest compare <baseline> <current>` names where each changed test left the baseline.
+- `prototest prove <baseline> <current>...` returns the fix receipt.
+- `prototest review <trace>` says what each test proves.
 - `prototest feedback <trace>` posts the digest, the annotations or a webhook.
 
 ## Rules

@@ -26,6 +26,7 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
     private const int MaxErrorMessageCharacters = 4000;
     private const int DefaultUncoveredLimit = 50;
     private const int MaxUncoveredLimit = 200;
+    private const int MaxSuggestions = 20;
 
     private static readonly JsonSerializerOptions s_json = new()
     {
@@ -183,7 +184,9 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
         OpenWorld = false)]
     [Description(
         "Reads the coverage totals and the uncovered units from the JSON report a ProtoTest.Reporting " +
-        "sink embedded in the run. States a missing report instead of inventing numbers. Read-only.")]
+        "sink embedded in the run, with one suggestion per endpoint on the page: extend the test that already " +
+        "calls it, or write a new test shaped like the named one. States a missing report " +
+        "instead of inventing numbers. Read-only.")]
     public string GetCoverage(
         [Description("Run id to read; defaults to the newest discovered run.")]
         string? runId = null,
@@ -224,24 +227,26 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
             throw new McpException(exception.Message);
         }
 
+        // The suggestions walk the report in the same depth-first order, so they pair with the units by position.
+        var suggestions = ProtoDiagnosis.SuggestCoverage(run.Archive);
         var units = report.Flatten()
-            .Where(item => string.Equals(item.Kind, "coverage", StringComparison.OrdinalIgnoreCase) && item.IsCovered is false);
+            .Where(item => string.Equals(item.Kind, "coverage", StringComparison.OrdinalIgnoreCase) && item.IsCovered is false)
+            .Select((item, index) => (Item: item, Suggestion: index < suggestions.Count ? suggestions[index] : null));
         if (!string.IsNullOrWhiteSpace(target))
         {
-            units = units.Where(item => string.Equals(item.TargetName, target, StringComparison.OrdinalIgnoreCase));
+            units = units.Where(unit => string.Equals(unit.Item.TargetName, target, StringComparison.OrdinalIgnoreCase));
         }
 
         if (!string.IsNullOrWhiteSpace(category))
         {
-            units = units.Where(item => string.Equals(item.Category, category, StringComparison.OrdinalIgnoreCase));
+            units = units.Where(unit => string.Equals(unit.Item.Category, category, StringComparison.OrdinalIgnoreCase));
         }
 
         var uncovered = units.ToArray();
         var start = Math.Max(0, offset);
-        IEnumerable<ProtoTraceReportItem> page = includeUncovered
-            ? uncovered.Skip(start).Take(Math.Clamp(limit, 1, MaxUncoveredLimit))
+        var pageArray = includeUncovered
+            ? uncovered.Skip(start).Take(Math.Clamp(limit, 1, MaxUncoveredLimit)).ToArray()
             : [];
-        var pageArray = page.ToArray();
         return Json(new
         {
             runId = run.Archive.RunId,
@@ -260,15 +265,31 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
                 report.Summary.Uncovered,
                 report.Summary.CoveragePercentage
             },
-            uncovered = pageArray.Select(item => new
+            uncovered = pageArray.Select(unit => new
             {
-                target = item.TargetName,
-                category = item.Category,
-                identifier = item.Identifier,
-                displayName = item.DisplayName,
-                count = item.Count,
-                message = item.Message
+                target = unit.Item.TargetName,
+                category = unit.Item.Category,
+                identifier = unit.Item.Identifier,
+                displayName = unit.Item.DisplayName,
+                count = unit.Item.Count,
+                message = unit.Item.Message,
+                endpoint = unit.Suggestion?.Endpoint
             }),
+            // One suggestion per endpoint on the page: its units share the test to start from.
+            suggestions = pageArray
+                .Where(unit => unit.Suggestion is not null)
+                .Select(unit => unit.Suggestion!)
+                .DistinctBy(suggestion => (suggestion.Target, suggestion.Endpoint ?? suggestion.Identifier))
+                .Take(MaxSuggestions)
+                .Select(suggestion => new
+                {
+                    target = suggestion.Target,
+                    endpoint = suggestion.Endpoint ?? suggestion.Identifier,
+                    action = suggestion.Action,
+                    test = suggestion.Test,
+                    sourceFile = suggestion.SourceFile,
+                    reason = suggestion.Reason
+                }),
             uncoveredTotal = uncovered.Length,
             truncated = includeUncovered && start + pageArray.Length < uncovered.Length
         });

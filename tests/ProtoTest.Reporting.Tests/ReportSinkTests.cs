@@ -249,13 +249,17 @@ public sealed class ReportSinkTests
                 html,
                 Does.Contain("aria-label=\"Search report\""),
                 "the search input has an accessible name");
-            Assert.That(html, Does.Contain("data-filter=\"uncovered\""));
-            Assert.That(html, Does.Contain("data-filter=\"partial\""));
+            // The report reads like the viewer's run view: a headline, a strip, one tab per kind.
+            Assert.That(html, Does.Contain("role=\"tablist\""));
+            Assert.That(html, Does.Contain("data-view=\"coverage\""));
+            Assert.That(html, Does.Contain("class=\"strip\""));
+            Assert.That(html, Does.Contain("class=\"coverage-meter\""));
+            Assert.That(html, Does.Not.Contain("coverage-ring"), "coverage is one section, not the page's headline");
+            Assert.That(html, Does.Not.Contain("data-filter="), "kinds are tabs, not coverage filters");
             Assert.That(html, Does.Contain("id=\"themeToggle\""));
-            Assert.That(html, Does.Contain("class=\"coverage-ring\""));
             Assert.That(html, Does.Contain("data-search=\"get /orders"));
             Assert.That(html, Does.Contain("localStorage.getItem('prototest-report-theme')"));
-            Assert.That(html, Does.Contain("REPORTING BLUEPRINT"));
+            Assert.That(html, Does.Contain("<small>Report</small>"));
             Assert.That(html, Does.Contain("<path fill=\"#123B58\" d=\"M301 263V300H383"));
             Assert.That(html, Does.Contain("data:image/svg+xml;base64,"));
             // The report carries the shared design tokens rather than a palette of its own, so the
@@ -519,7 +523,7 @@ public sealed class ReportSinkTests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(html, Does.Contain("<title>Nightly &lt;suite&gt;</title>"));
-                Assert.That(html, Does.Contain("<h1>Nightly &lt;suite&gt;</h1>"));
+                Assert.That(html, Does.Contain("<strong>Nightly &lt;suite&gt;</strong>"));
             }
         }
         finally { Directory.Delete(directory, recursive: true); }
@@ -553,6 +557,126 @@ public sealed class ReportSinkTests
                 "Add the report script's hash to the viewer's Content-Security-Policy, or the report preview renders without JavaScript.");
         }
         finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public async Task HtmlSink_ShouldLeadWithWhatNeedsAttentionAcrossEveryKind()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+            await sink.ExportAsync(
+            [
+                new("Shop", "Gate", "coverage-threshold", ProtoReportItemKinds.Gate, ProtoReportStatus.Error, Message: "Coverage 50% is below 80%."),
+                new("Shop", "Assertion quality", "unasserted-fields", ProtoReportItemKinds.Finding, ProtoReportStatus.Warning),
+                new("Shop:Api", "OpenAPI", "DELETE /orders/{id}", ProtoReportItemKinds.Coverage, IsCovered: false),
+                new("Shop:Api", "OpenAPI", "GET /orders", ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, 1, true),
+                new("Shop", "Resources", "database", ProtoReportItemKinds.Resource, ProtoReportStatus.Success)
+            ]);
+
+            var html = await File.ReadAllTextAsync(path);
+            var attention = html[html.IndexOf("data-attention", StringComparison.Ordinal)..html.IndexOf("data-report-section", StringComparison.Ordinal)];
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("<span class=\"danger\">1 gate failed</span>"));
+                Assert.That(html, Does.Contain("<span class=\"danger\">1 uncovered</span>"));
+                Assert.That(html, Does.Contain("<span class=\"warning\">1 finding</span>"));
+                Assert.That(html, Does.Contain("<span class=\"muted\">1 of 2 units covered</span>"));
+                Assert.That(html, Does.Contain("data-view=\"attention\""));
+                Assert.That(attention, Does.Contain("Failed gate"));
+                Assert.That(attention, Does.Contain("Coverage 50% is below 80%."));
+                Assert.That(attention, Does.Contain("Warning finding"));
+                Assert.That(attention, Does.Contain(">Uncovered<"));
+                Assert.That(attention, Does.Not.Contain("GET /orders"), "a covered unit does not need attention");
+                Assert.That(attention, Does.Not.Contain("database"), "a resource that succeeded does not need attention");
+                Assert.That(html.IndexOf("data-view=\"gate\"", StringComparison.Ordinal),
+                    Is.LessThan(html.IndexOf("data-view=\"coverage\"", StringComparison.Ordinal)), "gates and findings come before coverage");
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public async Task HtmlSink_ShouldSayNothingNeedsAttentionWithoutACoverageHeadline()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.html");
+        try
+        {
+            var sink = new HtmlReportSink(new HtmlReportSinkOptions { OutputPath = path });
+            await sink.ExportAsync(
+            [
+                new("Shop", "Observations", "order.created", ProtoReportItemKinds.Observation, ProtoReportStatus.Success, 3),
+                new("Shop", "Resources", "database", ProtoReportItemKinds.Resource, ProtoReportStatus.Success)
+            ]);
+
+            var html = await File.ReadAllTextAsync(path);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(html, Does.Contain("<span class=\"success\">Nothing needs attention</span>"));
+                Assert.That(html, Does.Not.Contain("data-view=\"attention\""), "no attention tab when nothing needs it");
+                Assert.That(html, Does.Not.Contain("units covered"), "a run without coverage does not talk about coverage");
+                Assert.That(html, Does.Contain("data-view=\"observation\""));
+                Assert.That(html, Does.Contain("3 observed occurrences"));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public void Report_ShouldCountEveryKindInTheSummary()
+    {
+        var report = ProtoReport.Create(
+        [
+            new("Shop", "Observations", "order.created", ProtoReportItemKinds.Observation, ProtoReportStatus.Success, 3),
+            new("Shop", "Observations", "order.paid", "Observation", ProtoReportStatus.Success, 1),
+            new("Shop:Api", "OpenAPI", "GET /orders", ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, 1, true),
+            new("Shop", "Gate", "threshold", ProtoReportItemKinds.Gate, ProtoReportStatus.Success)
+        ]);
+
+        Assert.That(report.Summary.Kinds, Is.EquivalentTo(new Dictionary<string, int>
+        {
+            ["coverage"] = 1,
+            ["gate"] = 1,
+            ["observation"] = 2
+        }));
+    }
+
+    [Test]
+    public async Task JsonSink_ShouldWriteAndReadThePerKindCounts()
+    {
+        var directory = CreateTempDirectory();
+        var path = Path.Combine(directory, "report.json");
+        try
+        {
+            var sink = new JsonReportSink { OutputPath = path };
+            await sink.ExportAsync(SampleItems());
+
+            var json = await File.ReadAllTextAsync(path);
+            var report = ProtoReport.ReadJson(path);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(json, Does.Contain("\"Kinds\""));
+                Assert.That(report.Summary.Kinds["coverage"], Is.EqualTo(3));
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Test]
+    public void ReadJson_ShouldReadAnOlderReportWithoutKindCounts()
+    {
+        const string older = """{"generatedAtUtc":"2026-09-20T00:00:00+00:00","summary":{"total":0,"totalOccurrences":0,"coverageTotal":0,"covered":0,"uncovered":0,"coveragePercentage":0,"warnings":0,"errors":0,"findings":0,"gates":0,"resources":0},"items":[]}""";
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(older));
+
+        var report = ProtoReport.ReadJson(stream);
+
+        Assert.That(report.Summary.Kinds, Is.Empty);
     }
 
     private static string FindRepositoryRoot()

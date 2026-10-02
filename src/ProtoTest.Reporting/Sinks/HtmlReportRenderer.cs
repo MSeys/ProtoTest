@@ -8,7 +8,8 @@ using ProtoTest.Core;
 /// <summary>
 /// Builds the self-contained report document. One instance renders one report: it owns the markup
 /// builder and the projected item views, so the methods below read as the document they write. The
-/// markup, the sections and the client assets live here and in <see cref="HtmlReportAssets"/>.
+/// page follows the ProtoTrace viewer's run view: a headline that says what needs attention, a strip of
+/// every entry, one tab per kind of result, and rows. Coverage is one kind among the others.
 /// </summary>
 internal sealed partial class HtmlReportRenderer
 {
@@ -17,8 +18,28 @@ internal sealed partial class HtmlReportRenderer
     public static string Render(ProtoReport report, string title)
         => new HtmlReportRenderer().Build(report, title);
 
+    /// <summary>
+    /// Report items are different things, so the report keeps them in different kinds rather than one
+    /// undifferentiated list, problems first. Integrations can add kinds; an unknown kind still gets a
+    /// tab and a section, titled after the kind, rather than disappearing.
+    /// </summary>
+    private static readonly (string Kind, string Title, string Tab)[] Sections =
+    [
+        (ProtoReportItemKinds.Gate, "Run gates", "Gates"),
+        (ProtoReportItemKinds.Finding, "Findings", "Findings"),
+        (ProtoReportItemKinds.Coverage, "Coverage", "Coverage"),
+        (ProtoReportItemKinds.Traffic, "Traffic (observed but unasserted)", "Traffic"),
+        (ProtoReportItemKinds.Observation, "Observations", "Observations"),
+        (ProtoReportItemKinds.Metric, "Metrics", "Metrics"),
+        (ProtoReportItemKinds.Resource, "Resources", "Resources")
+    ];
+
     private string Build(ProtoReport report, string title)
     {
+        var groups = Group(ReportViews.Project(report.Items));
+        var entries = groups.SelectMany(group => group.Entries).ToArray();
+        var attention = entries.Where(entry => entry.Attention is not null).ToArray();
+
         _html.Append("""
             <!doctype html>
             <html lang="en" data-theme="dark">
@@ -42,82 +63,33 @@ internal sealed partial class HtmlReportRenderer
         _html.Append(HtmlReportAssets.Mark);
         _html.Append("""
                 </span>
-                <span><strong>ProtoTest</strong><small>REPORTING BLUEPRINT</small></span>
+                <span><strong>ProtoTest</strong><small>Report</small></span>
               </div>
-              <div class="run-state">
-            """);
-
-        var stateClass = report.Summary.Errors > 0 || report.Summary.Uncovered > 0 || report.Summary.Warnings > 0
-            ? "attention"
-            : "healthy";
-        var stateText = report.Summary.Errors > 0
-            ? ReportText.Count(report.Summary.Errors, "error")
-            : report.Summary.Uncovered > 0
-                ? $"{report.Summary.Uncovered} uncovered"
-                : report.Summary.Warnings > 0
-                    ? ReportText.Count(report.Summary.Warnings, "warning")
-                    : report.Summary.CoverageTotal > 0
-                        ? "All covered"
-                        : "Clean run";
-        _html.Append("<span class=\"state-pill ").Append(stateClass).Append("\"><i></i>")
-            .Append(Encode(stateText)).Append("</span></div>");
-        _html.Append("""
               <div class="top-actions">
                 <label class="search"><span aria-hidden="true">⌕</span><input id="reportSearch" type="search" placeholder="Search report…" aria-label="Search report" autocomplete="off"><kbd>/</kbd></label>
                 <button class="icon-button" id="themeToggle" type="button" aria-label="Toggle color theme" title="Toggle color theme"><svg class="icon-sun" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><svg class="icon-moon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 10.2A5.5 5.5 0 0 1 5.8 2.8a5.5 5.5 0 1 0 7.4 7.4Z"/></svg></button>
               </div>
             </header>
             <main>
-              <section class="hero">
-                <div>
-                  <p class="eyebrow">RUN REPORT</p>
             """);
-        _html.Append("<h1>").Append(Encode(title)).Append("</h1>");
-        _html.Append("<p class=\"generated\">Generated <time datetime=\"")
-            .Append(report.GeneratedAtUtc.ToString("O", CultureInfo.InvariantCulture)).Append("\">")
-            .Append(Encode(report.GeneratedAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture)))
-            .Append("</time></p></div>");
 
-        if (report.Summary.CoverageTotal > 0)
+        RenderSummary(report, title, entries);
+        RenderTabs(groups, attention.Length);
+
+        _html.Append("""
+            <section class="report-panel">
+              <div class="panel-toolbar"><h2 id="viewTitle">All entries</h2><span id="resultCount" aria-live="polite"></span></div>
+              <div class="report-list" id="reportList" role="tabpanel">
+            """);
+        RenderAttention(attention);
+        foreach (var group in groups)
         {
-            _html.Append("<div class=\"coverage-ring\" style=\"--coverage:")
-                .Append(report.Summary.CoveragePercentage.ToString("0.##", CultureInfo.InvariantCulture))
-                .Append("\"><span>")
-                .Append(report.Summary.CoveragePercentage.ToString("0.##", CultureInfo.InvariantCulture))
-                .Append("<small>%</small></span><em>coverage</em></div>");
+            RenderSection(group, report.Summary);
         }
 
-        _html.Append("</section><section class=\"metrics\">");
-        SummaryCard("Covered", report.Summary.Covered,
-            $"of {ReportText.Count(report.Summary.CoverageTotal, "entry", "entries")}", "success");
-        SummaryCard("Uncovered", report.Summary.Uncovered, "Coverage gaps", "danger");
-        SummaryCard("Occurrences", report.Summary.TotalOccurrences, "Observed hits", "accent");
-        SummaryCard("Findings", report.Summary.Findings, "Recorded by tests", "warning");
-        SummaryCard("Run gates", report.Summary.Gates, "Run verdicts", GateTone(report.Items));
-        SummaryCard("Resources", report.Summary.Resources, "Owned by tests", "accent");
-        SummaryCard("Errors", report.Summary.Errors, "Failed entries", "danger");
-        _html.Append("""
-            </section>
-            <section class="report-panel">
-              <div class="panel-toolbar">
-                <div><h2>Report details</h2><span id="resultCount" aria-live="polite"></span></div>
-                <div class="filters" role="group" aria-label="Filter report">
-                  <button class="filter active" type="button" data-filter="all">All</button>
-                  <button class="filter" type="button" data-filter="covered">Covered</button>
-                  <button class="filter" type="button" data-filter="partial">Partial</button>
-                  <button class="filter" type="button" data-filter="uncovered">Uncovered</button>
-                  <button class="filter" type="button" data-filter="warning">Warnings</button>
-                  <button class="filter" type="button" data-filter="error">Errors</button>
-                </div>
-              </div>
-              <div class="report-list" id="reportList">
-            """);
-
-        RenderSections(ReportViews.Project(report.Items));
-
         _html.Append("""
               </div>
-              <div class="empty-state" id="emptyState" hidden><strong>No matching entries</strong><span>Try another search or filter.</span></div>
+              <div class="empty-state" id="emptyState" hidden><strong>No matching entries</strong><span>Try another search or tab.</span></div>
             </section>
             </main>
             <footer class="report-footer"><span>For the full trace, drop the run&apos;s <code>.prototrace</code> file at <a href="https://trace.prototest.dev">trace.prototest.dev</a>.</span></footer>
@@ -127,59 +99,230 @@ internal sealed partial class HtmlReportRenderer
         return _html.ToString();
     }
 
-    /// <summary>
-    /// Report items are different things, so the report keeps them in different categories rather than
-    /// one undifferentiated list. Integrations can add kinds; unknown kinds still get a section, titled
-    /// after the kind, rather than disappearing.
-    /// </summary>
-    private static readonly (string Kind, string Title)[] Sections =
-    [
-        (ProtoReportItemKinds.Coverage, "Coverage"),
-        (ProtoReportItemKinds.Traffic, "Traffic (observed but unasserted)"),
-        (ProtoReportItemKinds.Finding, "Findings"),
-        (ProtoReportItemKinds.Gate, "Run gates"),
-        (ProtoReportItemKinds.Resource, "Resources"),
-        (ProtoReportItemKinds.Metric, "Metrics"),
-        (ProtoReportItemKinds.Observation, "Observations")
-    ];
-
-    private void RenderSections(IReadOnlyList<ReportItemView> views)
+    /// <summary>The viewer's run header: one sentence that says what needs attention, then the facts.</summary>
+    private void RenderSummary(ProtoReport report, string title, IReadOnlyList<ReportEntry> entries)
     {
-        foreach (var (kind, title) in Sections)
+        _html.Append("<section class=\"summary\"><div class=\"headline\"><h1>");
+        var parts = Headline(report, entries);
+        for (var index = 0; index < parts.Count; index++)
         {
-            RenderSection(
-                [.. views.Where(view => string.Equals(view.Item.Kind, kind, StringComparison.OrdinalIgnoreCase))],
-                kind,
-                title);
+            if (index > 0) _html.Append("<span class=\"sep\">, </span>");
+            _html.Append("<span class=\"").Append(parts[index].Tone).Append("\">").Append(Encode(parts[index].Text)).Append("</span>");
+        }
+
+        _html.Append("</h1><p class=\"meta\"><strong>").Append(Encode(title)).Append("</strong>")
+            .Append("<span>Generated <time datetime=\"")
+            .Append(report.GeneratedAtUtc.ToString("O", CultureInfo.InvariantCulture)).Append("\">")
+            .Append(Encode(report.GeneratedAtUtc.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture)))
+            .Append("</time></span><span>").Append(ReportText.Count(entries.Count, "entry", "entries")).Append("</span>");
+        if (report.Summary.TotalOccurrences > 0)
+        {
+            _html.Append("<span>").Append(ReportText.Count(report.Summary.TotalOccurrences, "observed occurrence")).Append("</span>");
+        }
+
+        _html.Append("</p></div>");
+        if (entries.Count > 0)
+        {
+            _html.Append("<div class=\"strip\" role=\"group\" aria-label=\"")
+                .Append(ReportText.Count(entries.Count, "entry", "entries")).Append(", by kind\">");
+            foreach (var entry in entries)
+            {
+                _html.Append("<button type=\"button\" class=\"tick ").Append(entry.Tone).Append("\" data-goto=\"").Append(entry.Id)
+                    .Append("\" title=\"").Append(Encode(entry.View.DisplayIdentifier)).Append("\" aria-label=\"")
+                    .Append(Encode(entry.View.DisplayIdentifier)).Append("\"></button>");
+            }
+
+            _html.Append("</div>");
+        }
+
+        _html.Append("</section>");
+    }
+
+    private static List<(string Text, string Tone)> Headline(ProtoReport report, IReadOnlyList<ReportEntry> entries)
+    {
+        var flattened = report.Items.Flatten().ToArray();
+        var failedGates = flattened.Count(item => item.IsKind(ProtoReportItemKinds.Gate) && item.Status == ProtoReportStatus.Error);
+        var findings = flattened.Count(item => item.IsKind(ProtoReportItemKinds.Finding));
+        bool Other(ProtoReportItem item) => !item.IsKind(ProtoReportItemKinds.Gate) && !item.IsKind(ProtoReportItemKinds.Finding);
+        var errors = flattened.Count(item => Other(item) && item.Status == ProtoReportStatus.Error);
+        var warnings = flattened.Count(item => Other(item) && item.Status == ProtoReportStatus.Warning);
+
+        var parts = new List<(string Text, string Tone)>();
+        if (failedGates > 0) parts.Add(($"{ReportText.Count(failedGates, "gate")} failed", "danger"));
+        if (errors > 0) parts.Add((ReportText.Count(errors, "error"), "danger"));
+        if (report.Summary.Uncovered > 0) parts.Add(($"{report.Summary.Uncovered.ToString(CultureInfo.InvariantCulture)} uncovered", "danger"));
+        if (findings > 0) parts.Add((ReportText.Count(findings, "finding"), "warning"));
+        if (warnings > 0) parts.Add((ReportText.Count(warnings, "warning"), "warning"));
+        if (parts.Count == 0)
+        {
+            parts.Add((entries.Count == 0 ? "Nothing recorded" : "Nothing needs attention", "success"));
+        }
+
+        if (report.Summary.CoverageTotal > 0)
+        {
+            parts.Add((
+                $"{report.Summary.Covered.ToString(CultureInfo.InvariantCulture)} of {ReportText.Count(report.Summary.CoverageTotal, "unit")} covered",
+                "muted"));
+        }
+
+        return parts;
+    }
+
+    /// <summary>The viewer's view tabs: what needs attention first, then one tab per kind, then everything.</summary>
+    private void RenderTabs(IReadOnlyList<ReportGroup> groups, int attention)
+    {
+        _html.Append("<nav class=\"views\" aria-label=\"Report views\"><div class=\"tabs\" role=\"tablist\" aria-label=\"Report views\">");
+        if (attention > 0)
+        {
+            Tab("attention", "Needs attention", attention, "danger");
+        }
+
+        foreach (var group in groups)
+        {
+            Tab(group.Kind, group.Tab, group.Entries.Count, null);
+        }
+
+        Tab("all", "All", groups.Sum(group => group.Entries.Count), null);
+        _html.Append("</div></nav>");
+    }
+
+    private void Tab(string view, string label, int count, string? tone)
+    {
+        _html.Append("<button type=\"button\" role=\"tab\" class=\"tab\" aria-selected=\"false\" aria-controls=\"reportList\" data-view=\"")
+            .Append(Encode(view)).Append("\" data-title=\"").Append(Encode(label)).Append("\">").Append(Encode(label))
+            .Append("<span class=\"tab-count").Append(tone is null ? string.Empty : $" {tone}").Append("\">")
+            .Append(count.ToString(CultureInfo.InvariantCulture)).Append("</span></button>");
+    }
+
+    /// <summary>The viewer's attention list: one row per entry that failed, warned or left a gap.</summary>
+    private void RenderAttention(IReadOnlyList<ReportEntry> attention)
+    {
+        if (attention.Count == 0) return;
+
+        _html.Append("<section class=\"attention\" data-attention>");
+        foreach (var entry in attention)
+        {
+            var (label, tone) = entry.Attention!.Value;
+            _html.Append("<button type=\"button\" class=\"issue ").Append(tone).Append("\" data-goto=\"").Append(entry.Id)
+                .Append("\" data-search=\"").Append(Encode(entry.Search)).Append("\">")
+                .Append("<span class=\"issue-main\"><strong>").Append(Encode(entry.View.DisplayIdentifier)).Append("</strong>")
+                .Append("<span class=\"issue-line\"><span class=\"issue-kind\">").Append(Encode(label)).Append("</span>")
+                .Append("<span class=\"issue-reason\">").Append(Encode(entry.View.ContextLabel)).Append("</span></span>");
+            if (FirstLine(entry.View.Item.Message) is { Length: > 0 } detail)
+            {
+                _html.Append("<span class=\"issue-detail\">").Append(Encode(detail)).Append("</span>");
+            }
+
+            _html.Append("</span></button>");
+        }
+
+        _html.Append("</section>");
+    }
+
+    private void RenderSection(ReportGroup group, ProtoReportSummary summary)
+    {
+        _html.Append("<section class=\"report-section\" data-report-section data-kind=\"")
+            .Append(Encode(group.Kind))
+            .Append("\"><header class=\"section-head\"><i aria-hidden=\"true\"></i><h3>")
+            .Append(Encode(group.Title)).Append("</h3>");
+        if (string.Equals(group.Kind, ProtoReportItemKinds.Coverage, StringComparison.Ordinal) && summary.CoverageTotal > 0)
+        {
+            var percentage = summary.CoveragePercentage.ToString("0.##", CultureInfo.InvariantCulture);
+            _html.Append("<span class=\"coverage-meter\" title=\"").Append(percentage).Append("% covered\"><i style=\"width:")
+                .Append(percentage).Append("%\"></i></span><span class=\"coverage-figure\">")
+                .Append(summary.Covered.ToString(CultureInfo.InvariantCulture)).Append(" of ")
+                .Append(summary.CoverageTotal.ToString(CultureInfo.InvariantCulture)).Append(" covered · ")
+                .Append(percentage).Append("%</span>");
+        }
+
+        _html.Append("<span class=\"section-count\" data-section-count data-total=\"")
+            .Append(group.Entries.Count.ToString(CultureInfo.InvariantCulture)).Append("\">")
+            .Append(ReportText.Count(group.Entries.Count, "entry", "entries"))
+            .Append("</span></header>");
+
+        foreach (var entry in group.Entries)
+        {
+            RenderItem(entry.View, isRoot: true, depth: 0, entry.Id, entry.Search);
+        }
+
+        _html.Append("</section>");
+    }
+
+    private static List<ReportGroup> Group(IReadOnlyList<ReportItemView> views)
+    {
+        var groups = new List<ReportGroup>();
+        var number = 0;
+        void Add(string kind, string title, string tab, IEnumerable<ReportItemView> members)
+        {
+            var entries = members.Select(view => new ReportEntry(view, $"item-{++number}", Search(view), Attention(view), Tone(view))).ToArray();
+            if (entries.Length > 0) groups.Add(new ReportGroup(kind, title, tab, entries));
+        }
+
+        foreach (var (kind, title, tab) in Sections)
+        {
+            Add(kind, title, tab, views.Where(view => string.Equals(view.Item.Kind, kind, StringComparison.OrdinalIgnoreCase)));
         }
 
         var known = new HashSet<string>(Sections.Select(section => section.Kind), StringComparer.OrdinalIgnoreCase);
         foreach (var group in views
             .Where(view => !known.Contains(view.Item.Kind))
-            .GroupBy(view => view.Item.Kind, StringComparer.OrdinalIgnoreCase))
+            .GroupBy(view => view.Item.Kind.ToLowerInvariant(), StringComparer.Ordinal))
         {
-            RenderSection([.. group], group.Key, PrettifyKind(group.Key));
+            var title = PrettifyKind(group.Key);
+            Add(group.Key, title, title, group);
         }
+
+        return groups;
     }
 
-    private void RenderSection(IReadOnlyList<ReportItemView> roots, string kind, string title)
+    private static (string Label, string Tone)? Attention(ReportItemView view)
     {
-        if (roots.Count == 0) return;
-
-        _html.Append("<section class=\"report-section\" data-report-section data-kind=\"")
-            .Append(Encode(kind.ToLowerInvariant()))
-            .Append("\"><header class=\"section-head\"><i aria-hidden=\"true\"></i><h3>")
-            .Append(Encode(title)).Append("</h3><span class=\"section-count\" data-section-count data-total=\"")
-            .Append(roots.Count.ToString(CultureInfo.InvariantCulture)).Append("\">")
-            .Append(ReportText.Count(roots.Count, "entry", "entries"))
-            .Append("</span></header>");
-
-        foreach (var item in roots)
+        var item = view.Item;
+        var statuses = item.Flatten().Select(entry => entry.Status).ToArray();
+        var error = statuses.Contains(ProtoReportStatus.Error);
+        var warning = statuses.Contains(ProtoReportStatus.Warning);
+        if (item.IsKind(ProtoReportItemKinds.Gate))
         {
-            RenderItem(item, isRoot: true, depth: 0);
+            return error ? ("Failed gate", "danger") : warning ? ("Gate warning", "warning") : null;
         }
 
-        _html.Append("</section>");
+        if (item.IsKind(ProtoReportItemKinds.Finding))
+        {
+            return ($"{item.Status} finding", error ? "danger" : "warning");
+        }
+
+        return view.Coverage switch
+        {
+            ReportCoverageState.Uncovered => ("Uncovered", "danger"),
+            ReportCoverageState.Partial => ("Partly covered", "warning"),
+            _ => error ? ("Error", "danger") : warning ? ("Warning", "warning") : null
+        };
+    }
+
+    private static string Tone(ReportItemView view)
+    {
+        var statuses = view.Item.Flatten().Select(entry => entry.Status).ToArray();
+        if (statuses.Contains(ProtoReportStatus.Error) || view.Coverage == ReportCoverageState.Uncovered) return "danger";
+        if (statuses.Contains(ProtoReportStatus.Warning) || view.Coverage == ReportCoverageState.Partial) return "warning";
+        return view.Coverage == ReportCoverageState.Covered || view.Item.Status == ProtoReportStatus.Success ? "success" : "neutral";
+    }
+
+    private static string Search(ReportItemView view)
+        => string.Join(' ', view.Item.Flatten().SelectMany(entry => new[]
+        {
+            entry.Identifier,
+            entry.TargetName,
+            entry.Category,
+            entry.Kind,
+            entry.Message ?? string.Empty,
+            entry.Tags is null ? string.Empty : string.Join(' ', entry.Tags)
+        })).ToLowerInvariant();
+
+    private static string? FirstLine(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var line = text.Split('\n', 2)[0].TrimEnd('\r');
+        return line.Length <= 200 ? line : string.Concat(line.AsSpan(0, 200), "…");
     }
 
     private static string PrettifyKind(string kind)
@@ -188,25 +331,16 @@ internal sealed partial class HtmlReportRenderer
         return words.Length == 0 ? kind : char.ToUpperInvariant(words[0]) + words[1..];
     }
 
-    private static string GateTone(IEnumerable<ProtoReportItem> items)
-    {
-        var gates = items.Flatten().Where(item => item.IsKind(ProtoReportItemKinds.Gate)).ToArray();
-        if (gates.Length == 0) return "neutral";
-        if (gates.Any(item => item.Status == ProtoReportStatus.Error)) return "danger";
-        if (gates.Any(item => item.Status == ProtoReportStatus.Warning)) return "warning";
-        return "success";
-    }
-
-    private void SummaryCard(
-        string label,
-        int value,
-        string description,
-        string tone)
-    {
-        _html.Append("<article class=\"metric ").Append(tone).Append("\"><span>").Append(Encode(label))
-            .Append(value == 0 ? "</span><strong data-zero>" : "</span><strong>").Append(value.ToString(CultureInfo.InvariantCulture))
-            .Append("</strong><small>").Append(Encode(description)).Append("</small></article>");
-    }
-
     private static string Encode(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
+
+    /// <summary>One root entry: its view, its anchor, its search text, why it needs attention and its tone.</summary>
+    private sealed record ReportEntry(
+        ReportItemView View,
+        string Id,
+        string Search,
+        (string Label, string Tone)? Attention,
+        string Tone);
+
+    /// <summary>The entries of one kind, with the section title and the shorter tab label.</summary>
+    private sealed record ReportGroup(string Kind, string Title, string Tab, IReadOnlyList<ReportEntry> Entries);
 }

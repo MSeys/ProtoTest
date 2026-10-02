@@ -43,35 +43,39 @@ Items arrive sorted by target, category and identifier. Only top-level items are
 
 ### The HTML report
 
-The HTML report is one self-contained page. It shows a summary and every report item. Covered, partial and uncovered paths are marked.
+The HTML report is one self-contained page, laid out like the run view of the [ProtoTrace viewer](./prototrace.md):
 
 ```text
-Summary: totals · covered/uncovered · occurrences · findings · gates · resources
-├── Coverage      endpoint → response → property (covered / partial / uncovered)
-├── Findings      what tests recorded with AddFinding, plus what integrations reported
-├── Run gates     verdicts: passed, warning, failed, skipped
-├── Resources     what tests owned and released
-└── Run metadata  the CI facts the run recorded about itself
-search and filters apply across every section; an empty section hides itself
+1 gate failed, 1 uncovered, 2 findings, 151 of 198 units covered     the headline: what needs attention
+Shop · Generated 2026-10-02 07:12 UTC · 214 entries                  the meta line
+▂▂█▂▂▂█▂▂▂▂                                                          the strip: one tick per entry
+Needs attention · Gates · Findings · Coverage · Traffic · … · All     one tab per kind
 ```
 
-The report groups items into sections:
+The headline names failed gates, errors, uncovered units, findings and warnings, then the coverage figure when the run measured coverage. A run where nothing needs attention says so. Each tick in the strip is one entry; the ones that failed or warned stand up, and a click opens that entry.
 
-| Section | What it holds |
+**Needs attention** lists every entry that failed, warned or left a coverage gap, across all kinds, with its first message line. A row opens the entry in its own tab. The other tabs hold one kind each:
+
+| Tab | What it holds |
 | --- | --- |
-| **Coverage** | What the contract exercised |
+| **Gates** | Run gate verdicts, labelled passed, warning, failed or skipped |
 | **Findings** | What tests recorded with `AddFinding`, plus what integrations reported |
-| **Run gates** | Verdicts, labelled passed, warning, failed or skipped |
+| **Coverage** | What the contract exercised, endpoint to response to property, with the covered figure and a bar |
+| **Traffic** | What was observed but not asserted |
+| **Observations** | What tests and integrations observed, with counts |
+| **Metrics** | Measured values |
 | **Resources** | What tests owned and released |
 | **Run metadata** | The CI facts a run [recorded about itself](./prototrace-archive.md#correlating-a-trace-with-the-run-that-produced-it) |
 
-An integration's own kind gets a section too, titled after the kind. Searching and filtering apply across all sections, and a section that filters to nothing disappears.
+An integration's own kind gets a tab too, titled after the kind. A kind with no entries has no tab. Search (`/`) looks through every kind at once.
+
+The report uses the viewer's tokens, type and colours, in a dark and a light theme.
 
 A quiet footer points at the ProtoTrace viewer: drop the run's `.prototrace` file at `https://trace.prototest.dev` for the full trace.
 
 ### Occurrences
 
-Every coverage and observation row carries its own occurrence count. The summary's **Occurrences** card adds those per branch. Each top-level coverage unit contributes its hit count once, and observations contribute their counts. Units nested under another unit (an OpenAPI response and its properties under the endpoint) are that unit's breakdown of the same calls, so they add nothing again. An aggregate row (a GraphQL type, `IsCovered` null) contributes nothing itself and does not hide the units below it. Findings and gate verdicts are recorded once rather than observed repeatedly, so they never inflate the count.
+Every coverage and observation row carries its own occurrence count. The meta line's **observed occurrences** adds those per branch. Each top-level coverage unit contributes its hit count once, and observations contribute their counts. Units nested under another unit (an OpenAPI response and its properties under the endpoint) are that unit's breakdown of the same calls, so they add nothing again. An aggregate row (a GraphQL type, `IsCovered` null) contributes nothing itself and does not hide the units below it. Findings and gate verdicts are recorded once rather than observed repeatedly, so they never inflate the count.
 
 Worked through with numbers:
 
@@ -104,7 +108,8 @@ The same data, for tooling:
     "Errors": 0,
     "Findings": 2,
     "Gates": 1,
-    "Resources": 37
+    "Resources": 37,
+    "Kinds": { "coverage": 198, "finding": 2, "gate": 1, "observation": 0, "resource": 37 }
   },
   "Items": [
     {
@@ -130,7 +135,7 @@ The same data, for tooling:
 
 Every property of `ProtoReportItem` is written, so an unset one is present with a `null` value. The responses and properties of that endpoint are nested under `Children`. The row above is the endpoint and its `200` response, abridged to the fields the example is about.
 
-Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. `Total` counts nested items too. `TotalOccurrences` uses the per-branch rule above. It adds coverage hit counts and observation counts, with no double-counted nested breakdowns and no findings or gates. `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items. Coverage totals count units only. An item whose `IsCovered` is `null` is an aggregate row, not a unit, so it stays out of `CoverageTotal`, `Covered`, `Uncovered` and `CoveragePercentage`. A run gate's `CoverageSummaries` leaves it out too.
+Property names match the .NET types (`ProtoReport`, `ProtoReportSummary`, `ProtoReportItem`) and enums are written as strings. `Total` counts nested items too. `TotalOccurrences` uses the per-branch rule above. It adds coverage hit counts and observation counts, with no double-counted nested breakdowns and no findings or gates. `Kinds` counts the items of each kind, nested ones included, keyed by the lower-case kind; a report written before 1.1 reads with an empty `Kinds`. `CoveragePercentage` is rounded to two decimals and is `0` when there are no coverage items. Coverage totals count units only. An item whose `IsCovered` is `null` is an aggregate row, not a unit, so it stays out of `CoverageTotal`, `Covered`, `Uncovered` and `CoveragePercentage`. A run gate's `CoverageSummaries` leaves it out too.
 
 ## The artifact
 

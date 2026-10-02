@@ -43,7 +43,13 @@ public sealed record ProtoReport(
                 Errors: flattened.Count(item => item.Status == ProtoReportStatus.Error),
                 Findings: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Finding)),
                 Gates: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Gate)),
-                Resources: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Resource))),
+                Resources: flattened.Count(item => item.IsKind(ProtoReportItemKinds.Resource)))
+            {
+                Kinds = flattened
+                    .GroupBy(item => item.Kind.ToLowerInvariant(), StringComparer.Ordinal)
+                    .OrderBy(group => group.Key, StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal)
+            },
             roots);
     }
 
@@ -136,4 +142,12 @@ public sealed record ProtoReportSummary(
     int Errors,
     int Findings,
     int Gates,
-    int Resources);
+    int Resources)
+{
+    /// <summary>
+    /// How many items of each kind the report holds, keyed by the lower-case kind: coverage, traffic,
+    /// observation, finding, gate, resource, metric and any kind an integration adds. Coverage is one
+    /// kind among them; a report read from an older file has no counts here.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> Kinds { get; init; } = new Dictionary<string, int>(StringComparer.Ordinal);
+}

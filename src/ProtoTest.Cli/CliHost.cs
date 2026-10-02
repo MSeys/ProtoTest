@@ -427,6 +427,7 @@ public static class CliHost
             Token = Value("GITHUB_TOKEN"),
             Repository = Value("GITHUB_REPOSITORY"),
             PullRequestNumber = PullRequestNumber(),
+            FromFork = FromFork(),
             ApiUrl = AbsoluteUrl("GITHUB_API_URL"),
             TraceLink = Value("PROTOTEST_FEEDBACK_TRACE_URL"),
             WebhookUrl = AbsoluteUrl("PROTOTEST_FEEDBACK_WEBHOOK_URL"),
@@ -474,6 +475,40 @@ public static class CliHost
             return null;
         }
     }
+
+    // A pull request from a fork names a head repository other than its base repository.
+    private static bool FromFork()
+    {
+        var path = Value("GITHUB_EVENT_PATH");
+        if (path is null || !File.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            return document.RootElement.TryGetProperty("pull_request", out var pullRequest)
+                && pullRequest.ValueKind == JsonValueKind.Object
+                && RepositoryName(pullRequest, "head") is { } head
+                && RepositoryName(pullRequest, "base") is { } baseRepository
+                && !string.Equals(head, baseRepository, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception) when (exception is JsonException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private static string? RepositoryName(JsonElement pullRequest, string side)
+        => pullRequest.TryGetProperty(side, out var reference)
+            && reference.ValueKind == JsonValueKind.Object
+            && reference.TryGetProperty("repo", out var repository)
+            && repository.ValueKind == JsonValueKind.Object
+            && repository.TryGetProperty("full_name", out var name)
+            && name.ValueKind == JsonValueKind.String
+                ? name.GetString()
+                : null;
 
     private static int? SectionNumber(JsonElement root, string name)
         => root.TryGetProperty(name, out var section)

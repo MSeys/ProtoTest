@@ -148,6 +148,7 @@ jobs:
 - `if: always()` matters, because the step must run when the test step failed. That is when the evidence is needed.
 - The workflow runs on pushes to `main` too. Each green run there keeps the trace the next pull request compares with.
 - `actions: read` lets the action download the base branch's trace. `pull-requests: write` lets it comment.
+- A pull request from a fork runs with a token that cannot comment, so the action skips the comment there and says why. The annotations, the job summary and the gates still run.
 - The verdict needs both runs to embed a JSON report, so keep the `JsonReportSink` from [the wiring above](#put-every-artifact-in-one-place). Without it the comparison still runs and the verdict is skipped.
 - Pin a release tag or a commit SHA for a stable pipeline.
 

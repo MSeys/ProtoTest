@@ -164,6 +164,11 @@ public static class ProtoFeedbackComment
             return Skipped("No pull request number: set GITHUB_EVENT_PATH to the event payload of a pull request run.");
         }
 
+        if (target.FromFork)
+        {
+            return Skipped("The pull request comes from a fork, whose workflow token cannot comment. The annotations and the job summary carry the evidence.");
+        }
+
         var api = (target.ApiUrl ?? new Uri("https://api.github.com")).AbsoluteUri.TrimEnd('/');
         var root = $"{api}/repos/{target.Repository}";
         var hasNews = HasReport(digest) || HasChanges(target.Comparison) || HasCoverageNews(target.Coverage);
@@ -191,7 +196,9 @@ public static class ProtoFeedbackComment
                 : new ProtoFeedbackChannelResult(
                     ProtoFeedbackChannels.GithubPrComment,
                     ProtoFeedbackStatuses.Failed,
-                    $"GitHub answered {Status(response)}.");
+                    response.StatusCode == System.Net.HttpStatusCode.Forbidden
+                        ? $"GitHub answered {Status(response)}. Give the workflow 'pull-requests: write' (or 'issues: write')."
+                        : $"GitHub answered {Status(response)}.");
         }
         catch (HttpRequestException exception)
         {

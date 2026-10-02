@@ -13,6 +13,36 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.1
+
+<p className="changelog-date">2 October 2026</p>
+
+ProtoTest 1.1.1 fixes `ProtoTest.OpenApi`, which in 1.1.0 replaced the OpenAPI library of the application a
+suite hosts in-process. Its one breaking change is the exception to the additive 1.x surface: a constructor
+that exposed `Microsoft.OpenApi`'s own type, the dependency that caused the failure.
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+#### OpenAPI
+
+- An application that documents itself with Swashbuckle, NSwag or `Microsoft.AspNetCore.OpenApi` keeps running next to OpenAPI coverage: the package reads the document itself instead of depending on `Microsoft.OpenApi`. <span className="changelog-ref">[OpenAPI](/docs/integrations/openapi)</span>
+
+
+</div>
+
+<div className="changelog-group changelog-group--breaking">
+
+### Breaking changes
+
+#### OpenAPI
+
+- `OpenApiCoverageCollector(string, OpenApiDocument)` is removed with the `Microsoft.OpenApi` dependency.
+  - Pass the document's file path, URL or text instead: `new OpenApiCoverageCollector(target, source)` ([OpenAPI](/docs/integrations/openapi#the-specification-source)).
+
+</div>
+
 ## 1.1.0
 
 <p className="changelog-date">2 October 2026</p>

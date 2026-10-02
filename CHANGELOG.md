@@ -7,6 +7,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-02
+
 ProtoTest 1.1.1 fixes `ProtoTest.OpenApi`, which in 1.1.0 replaced the OpenAPI library of the application a
 suite hosts in-process. Its one breaking change is the exception to the additive 1.x surface: a constructor
 that exposed `Microsoft.OpenApi`'s own type, the dependency that caused the failure.

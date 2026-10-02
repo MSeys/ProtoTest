@@ -6,9 +6,6 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <IsPackable>true</IsPackable>
-    <!-- New in 1.1: no baseline package exists yet; enable once 1.1 ships. -->
-    <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <Description>Cross-run verification over ProtoTest reports and traces: coverage deltas, specification identity, run comparison and a verdict a PR gate can use.</Description>
     <PackageTags>testing;integration-testing;verification;coverage;ci;agent;dotnet</PackageTags>
   </PropertyGroup>

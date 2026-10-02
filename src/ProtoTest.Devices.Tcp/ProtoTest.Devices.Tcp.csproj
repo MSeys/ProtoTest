@@ -6,10 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
 
-    <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
     <IsPackable>true</IsPackable>
-    <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <Description>TCP transport for ProtoTest.Devices: talk to devices over a raw socket, connecting out or listening, with framing for line, delimited and length-prefixed protocols.</Description>
     <PackageTags>testing;integration-testing;devices;tcp;iot;dotnet</PackageTags>
   </PropertyGroup>

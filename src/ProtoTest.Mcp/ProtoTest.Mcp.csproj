@@ -3,9 +3,6 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <IsPackable>true</IsPackable>
-    <!-- New in 1.1: no baseline package exists yet; enable once 1.1 ships. -->
-    <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>prototest-mcp</ToolCommandName>
     <PackageId>ProtoTest.Mcp</PackageId>

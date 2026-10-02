@@ -97,7 +97,7 @@ The comment a reviewer reads, illustrative, with values from a committed fixture
 - **FAILED `orders are listed`** (2.01 s)
   - `http.request` `List orders` · failed
   - The API did not answer within 2 seconds.
-  - at `samples/Northstar.ProtoTest/FailureDrills.cs:35`
+  - at `samples/Northstar.ProtoTest/FailureDrills.cs:38`
 
 Coverage: 1/2 (50%)
 

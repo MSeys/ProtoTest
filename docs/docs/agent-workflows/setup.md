@@ -98,16 +98,16 @@ Three steps, none of which needs a suite of your own.
    ```
 
    ```text
-   ProtoTest trace 2.0 · run bb2dd8b330924038894c161efda1e5f4 · 2026-09-29 18:36:55Z - 2026-09-29 18:36:58Z
+   ProtoTest trace 2.0 · run 354e988ba0bd451ab5ac652b44fdaaea · 2026-10-02 08:10:55Z - 2026-10-02 08:10:58Z
    1 tests · 1 failed
 
-   FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.60 s)
+   FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.57 s)
      ConnectionError reaching http://127.0.0.1:5099: connection refused.
      test.execution Test execution · failed
      cause: runner-reported failure
    ```
 
-   That is the drill file's own output, so it matches what you downloaded. Your own runs print different ids and times. `prototest summary` prints the same diagnosis the MCP tools return, which makes it the quickest way to check that the file an agent would read says what you expect. The [CLI reference](./cli.md) documents all four verbs, their arguments and their exit codes.
+   That is the drill file's own output, so it matches what you downloaded. Your own runs print different ids and times. `prototest summary` prints the same diagnosis the MCP tools return, which makes it the quickest way to check that the file an agent would read says what you expect. The [CLI reference](./cli.md) documents all seven verbs, their arguments and their exit codes.
 
 2. Point the server at one file with `--trace`, or at a folder of runs with `--project`. For one archive, `--trace` works wherever the file was written.
 

@@ -74,6 +74,29 @@ public sealed class StartupFailureTests
         });
     }
 
+    [Test]
+    public async Task AddAspNetCoreServer_WhenTheFactoryReportsAnotherFailure_ShouldSurfaceTheExceptionTheHostFailedWith()
+    {
+        // The application's host fails to start and then fails to dispose, so the factory reports the disposal
+        // failure. The test must still see the startup exception the host reported, as it must when the factory
+        // reaches an already disposed host.
+        var startup = new SwitchableStartupFilter { ResolveFailingDisposable = true };
+        var builder = new ProtoHostBuilder();
+        builder.AddApplication("Api", app => app
+            .AddAspNetCoreServer<SampleApi.Program>(
+                configureWebHost: webHost => webHost.ConfigureTestServices(services => services
+                    .AddSingleton<IStartupFilter>(startup)
+                    .AddSingleton<FailingDisposable>()))
+            .AddRest(rest => rest.AddClient("Api")));
+        await using var host = builder.Build();
+        await host.StartAsync();
+
+        var caught = await CaptureAsync(() =>
+            host.StartTestAsync("startup and dispose throw", "00001", TestMethods.Placeholder, [new ApplicationAttribute("Api")]));
+
+        Assert.That(caught, Is.TypeOf<ApplicationStartupException>(), caught?.ToString());
+    }
+
     private static async Task<Exception?> CaptureAsync(Func<Task> action)
     {
         try
@@ -85,6 +108,12 @@ public sealed class StartupFailureTests
         {
             return exception;
         }
+    }
+
+    /// <summary>A service whose disposal fails, so the host's disposal after a failed start throws too.</summary>
+    private sealed class FailingDisposable : IDisposable
+    {
+        public void Dispose() => throw new InvalidOperationException("the host failed to dispose after its failed start");
     }
 
     /// <summary>The application exception; the test asserts this exact instance identity by type.</summary>
@@ -103,8 +132,15 @@ public sealed class StartupFailureTests
     {
         public bool Fail { get; set; } = true;
 
+        public bool ResolveFailingDisposable { get; init; }
+
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
+            if (ResolveFailingDisposable)
+            {
+                _ = app.ApplicationServices.GetRequiredService<FailingDisposable>();
+            }
+
             if (Fail)
             {
                 throw new ApplicationStartupException();

@@ -1,11 +1,13 @@
 namespace ProtoTest.AspNetCore.Internal;
 
+using System.Runtime.ExceptionServices;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using ProtoTest.Core;
 using ProtoTest.Web.Pages;
 
@@ -420,11 +422,16 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
 internal sealed class AspNetCoreServer<TProgram> : IAsyncDisposable where TProgram : class
 {
     private readonly WebApplicationFactory<TProgram> _root;
+    private readonly StartupFailureCapture _startupFailure;
 
-    private AspNetCoreServer(WebApplicationFactory<TProgram> root, WebApplicationFactory<TProgram> factory)
+    private AspNetCoreServer(
+        WebApplicationFactory<TProgram> root,
+        WebApplicationFactory<TProgram> factory,
+        StartupFailureCapture startupFailure)
     {
         _root = root;
         Factory = factory;
+        _startupFailure = startupFailure;
     }
 
     public WebApplicationFactory<TProgram> Factory { get; }
@@ -441,8 +448,13 @@ internal sealed class AspNetCoreServer<TProgram> : IAsyncDisposable where TProgr
         var root = new WebApplicationFactory<TProgram>();
         try
         {
-            var factory = configureWebHost is null ? root : root.WithWebHostBuilder(configureWebHost);
-            return new AspNetCoreServer<TProgram>(root, factory);
+            var startupFailure = new StartupFailureCapture();
+            var factory = root.WithWebHostBuilder(webHost =>
+            {
+                configureWebHost?.Invoke(webHost);
+                webHost.ConfigureTestServices(services => services.AddSingleton<ILoggerProvider>(startupFailure));
+            });
+            return new AspNetCoreServer<TProgram>(root, factory, startupFailure);
         }
         catch
         {
@@ -454,7 +466,15 @@ internal sealed class AspNetCoreServer<TProgram> : IAsyncDisposable where TProgr
     /// <summary>Starts the created host eagerly, so concurrent tests never race WebApplicationFactory's lazy startup.</summary>
     public void Start()
     {
-        _ = Factory.Services;
+        try
+        {
+            _ = Factory.Services;
+        }
+        catch (Exception exception) when (_startupFailure.Failure is { } failure && !ReferenceEquals(failure, exception))
+        {
+            // The host reported why it failed; the factory may only have seen the host it disposed.
+            ExceptionDispatchInfo.Throw(failure);
+        }
     }
 
     public static AspNetCoreServer<TProgram> Start(Action<IWebHostBuilder>? configureWebHost)

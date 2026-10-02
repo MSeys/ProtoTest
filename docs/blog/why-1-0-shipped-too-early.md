@@ -1,6 +1,6 @@
 ---
 slug: why-1-0-shipped-too-early
-date: 2026-10-02T09:00
+date: 2026-10-02T18:35
 image: /img/blog/why-1-0-shipped-too-early.png
 title: Why ProtoTest 1.0 shipped too early
 description: What was wrong with 1.0, what I changed for 1.1, and the rules I follow now.

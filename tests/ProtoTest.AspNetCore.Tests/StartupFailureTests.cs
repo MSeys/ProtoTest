@@ -33,8 +33,10 @@ public sealed class StartupFailureTests
 
         // Act: the application's pipeline build throws while the test's clients initialize.
         var application = new ApplicationAttribute("Api");
-        var exception = Assert.ThrowsAsync<ApplicationStartupException>(async () =>
-            await host.StartTestAsync("startup throw", "00001", TestMethods.Placeholder, [application]));
+        var caught = await CaptureAsync(() =>
+            host.StartTestAsync("startup throw", "00001", TestMethods.Placeholder, [application]));
+        Assert.That(caught, Is.TypeOf<ApplicationStartupException>(), caught?.ToString());
+        var exception = (ApplicationStartupException)caught!;
 
         // Assert: the original exception surfaced, the rollback left no ambient context, and the run
         // did not remember the failed start as a started server.
@@ -70,6 +72,19 @@ public sealed class StartupFailureTests
             Assert.That(tests.Single(test => test.TestId == "00002").Outcome,
                 Is.EqualTo(ProtoTraceOutcome.Succeeded));
         });
+    }
+
+    private static async Task<Exception?> CaptureAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
     }
 
     /// <summary>The application exception; the test asserts this exact instance identity by type.</summary>

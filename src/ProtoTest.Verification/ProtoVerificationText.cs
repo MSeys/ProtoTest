@@ -102,6 +102,55 @@ public static class ProtoVerificationText
         }
     }
 
+    /// <summary>
+    /// Writes a fix receipt: the verdict line, each claimed test with its reasons or where it changed,
+    /// the tests that broke, and the report verdict's failing findings.
+    /// </summary>
+    public static void Write(ProtoFixReceipt receipt, TextWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        ArgumentNullException.ThrowIfNull(writer);
+
+        var runs = receipt.CurrentRunIds.Count == 1 ? "run" : "runs";
+        writer.WriteLine(
+            $"ProtoTest fix {(receipt.Proven ? "proven" : "not proven")}: baseline run {receipt.BaselineRunId} -> {runs} {string.Join(", ", receipt.CurrentRunIds)}");
+        if (receipt.Tests.Count == 0)
+        {
+            writer.WriteLine("  no claimed test: the baseline recorded no failing test and none was named");
+        }
+
+        foreach (var test in receipt.Tests)
+        {
+            writer.WriteLine($"  {(test.Proven ? "PROVEN" : "NOT PROVEN")} {test.Name}");
+            foreach (var reason in test.Reasons)
+            {
+                writer.WriteLine($"    {reason.Code}: {reason.Message}");
+            }
+
+            if (test.Divergence is { } divergence)
+            {
+                writer.WriteLine($"    changed at: {Operation(divergence.Current ?? divergence.Baseline!)} ({divergence.Reason})");
+            }
+        }
+
+        foreach (var name in receipt.BrokenTests)
+        {
+            writer.WriteLine($"  BROKEN {name}: succeeded in the baseline and fails now");
+        }
+
+        if (receipt.ReportVerdict is { } verdict)
+        {
+            foreach (var finding in verdict.Findings.Where(finding => finding.Severity == ProtoVerificationSeverities.Fail))
+            {
+                writer.WriteLine($"  REPORT {finding.Class}: {finding.Message}");
+            }
+        }
+        else if (receipt.ReportNote is { Length: > 0 } note)
+        {
+            writer.WriteLine($"  note: {note}");
+        }
+    }
+
     private static string Operation(ProtoComparedOperation operation)
         => operation.Subject is { Length: > 0 } subject
             ? $"{operation.Kind} {operation.Name} [{subject}]"

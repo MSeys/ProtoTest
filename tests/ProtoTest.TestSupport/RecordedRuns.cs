@@ -31,10 +31,14 @@ public static class RecordedRuns
     public static RecordedStep FailedCheck(string name, Exception failure) => new("assert.json.shape", name, null, failure);
 
     /// <summary>Records the tests as one run in the trace at <paramref name="path"/>.</summary>
-    public static async Task WriteAsync(string path, params RecordedTest[] tests)
+    public static Task WriteAsync(string path, params RecordedTest[] tests) => WriteAsync(path, null, tests);
+
+    /// <summary>Records the tests as one run, with <paramref name="configure"/> adding sinks or services.</summary>
+    public static async Task WriteAsync(string path, Action<ProtoHostBuilder>? configure, params RecordedTest[] tests)
     {
         var builder = new ProtoHostBuilder();
         builder.ConfigureTracing(options => options.OutputPath = path);
+        configure?.Invoke(builder);
         await using var host = builder.Build();
         await host.StartAsync();
         var number = 0;

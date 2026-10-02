@@ -212,6 +212,8 @@ and the deprecated surface; the [docs](/docs/) cover the rest.
 - `ProtoDiagnosis.Read` builds a deterministic digest; `ReadContext` adds one test's context. <span className="changelog-ref">[Diagnosis](/docs/agent-workflows/diagnosis)</span>
 - `ProtoTest.Verification` compares a baseline and a candidate report. <span className="changelog-ref">[Verification](/docs/agent-workflows/verification)</span>
 - `prototest compare` and the `compare_runs` tool compare two runs test by test and name the operation where each broken, fixed or still-failing test left the baseline. <span className="changelog-ref">[CLI](/docs/agent-workflows/cli#compare)</span>
+- `prototest prove` and the `check_fix` tool return a fix receipt: proven only when the baseline failed, every rerun passes, nothing broke and the reports verify, with a named reason for each unmet condition. <span className="changelog-ref">[CLI](/docs/agent-workflows/cli#prove)</span>
+- `ProtoReport.ReadJson(Stream)` reads a report from a stream, such as the one a trace embeds. <span className="changelog-ref">[Verification](/docs/agent-workflows/verification)</span>
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. <span className="changelog-ref">[Loop](/docs/agent-workflows/loop)</span>
 - The ProtoTest Feedback GitHub Action uploads the trace and posts the digest. <span className="changelog-ref">[CI](/docs/continuous-integration/#the-feedback-action)</span>
 

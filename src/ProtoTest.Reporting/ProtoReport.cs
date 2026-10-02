@@ -61,20 +61,35 @@ public sealed record ProtoReport(
                 $"No report file exists at '{path}'. Write one with a ProtoTest.Reporting sink first.");
         }
 
+        using var stream = File.OpenRead(path);
+        return ReadJson(stream, $"'{path}'");
+    }
+
+    /// <summary>
+    /// Reads a JSON report from a stream, for example the report a run embedded in its trace, with the
+    /// same options <see cref="ReadJson(string)"/> uses.
+    /// </summary>
+    public static ProtoReport ReadJson(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        return ReadJson(stream, "The stream");
+    }
+
+    private static ProtoReport ReadJson(Stream stream, string source)
+    {
         ProtoReport? report = null;
         try
         {
-            using var stream = File.OpenRead(path);
             report = JsonSerializer.Deserialize<ProtoReport>(stream, JsonReadOptions);
         }
         catch (JsonException exception)
         {
-            throw new InvalidOperationException($"'{path}' is not a ProtoTest report: {exception.Message}", exception);
+            throw new InvalidOperationException($"{source} is not a ProtoTest report: {exception.Message}", exception);
         }
 
         if (report?.Summary is null || report.Items is null)
         {
-            throw new InvalidOperationException($"'{path}' is not a ProtoTest report: it has no summary and items.");
+            throw new InvalidOperationException($"{source} is not a ProtoTest report: it has no summary and items.");
         }
 
         return report;

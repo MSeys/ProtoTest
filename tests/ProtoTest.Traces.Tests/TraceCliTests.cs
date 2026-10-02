@@ -119,4 +119,62 @@ public sealed class TraceCliTests
             Assert.That(error.ToString(), Does.Contain("Trace file not found: baseline.prototrace"));
         }
     }
+
+    [Test]
+    public async Task Prove_ShouldReturnZeroForAProvenFix()
+    {
+        using var baseline = new TemporaryTrace("cli-prove-baseline");
+        using var current = new TemporaryTrace("cli-prove-current");
+        await WriteAsync(
+            baseline.Path,
+            new RecordedTest("orders are listed", FailedCall("List orders", "GET /orders", new TimeoutException("No answer."))));
+        await WriteAsync(current.Path, new RecordedTest("orders are listed", Call("List orders", "GET /orders")));
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exit = CliHost.Run(["prove", baseline.Path, current.Path, "--test", "orders are listed"], output, error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exit, Is.EqualTo(0));
+            Assert.That(output.ToString(), Does.Contain("ProtoTest fix proven"));
+            Assert.That(output.ToString(), Does.Contain("PROVEN orders are listed"));
+        }
+    }
+
+    [Test]
+    public async Task Prove_ShouldReturnOneAndAnnotateAnUnprovenTest()
+    {
+        using var baseline = new TemporaryTrace("cli-prove-baseline");
+        using var current = new TemporaryTrace("cli-prove-current");
+        var failing = new RecordedTest("orders are listed", FailedCall("List orders", "GET /orders", new TimeoutException("No answer.")));
+        await WriteAsync(baseline.Path, failing);
+        await WriteAsync(current.Path, failing);
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exit = CliHost.Run(["prove", baseline.Path, current.Path], output, error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exit, Is.EqualTo(1));
+            Assert.That(output.ToString(), Does.Contain("::error::not proven: orders are listed"));
+            Assert.That(output.ToString(), Does.Contain("still-failing"));
+        }
+    }
+
+    [Test]
+    public void Prove_ShouldPrintUsageWithoutACurrentTrace()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exit = CliHost.Run(["prove", "baseline.prototrace", "--test", "x"], output, error);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exit, Is.EqualTo(1));
+            Assert.That(error.ToString(), Does.Contain("usage: prototest summary"));
+        }
+    }
 }

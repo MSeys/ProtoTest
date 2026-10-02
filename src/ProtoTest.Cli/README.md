@@ -25,8 +25,9 @@ prototest review TestResults/Shop.prototrace
   shared without a server.
 - `feedback` builds the same digest and posts it through the `ProtoTest.Feedback` channels. The
   annotations go to stdout; the per-channel outcomes go to stderr. `--digest <path>` writes the digest
-  JSON as well.
-- `verify` compares two JSON reports a `ProtoTest.Reporting` sink wrote and returns the
+  JSON as well; `--baseline <trace>` adds which tests the run broke or fixed against that trace.
+- `verify` compares two JSON reports a `ProtoTest.Reporting` sink wrote, as files or embedded in two
+  traces, and returns the
   `ProtoTest.Verification` verdict: exit 0 when nothing fails, exit 1 when a finding is `fail`, with
   one `::error` annotation per failing finding on stdout.
 - `compare` compares two traces test by test: which tests broke, were fixed or still fail, and for
@@ -44,14 +45,14 @@ artifact link the comment carries. A missing target skips its channel with the r
 
 ## Limits
 
-- Seven commands: `summary <file>`, `index <folder>`, `feedback <file> [--digest <path>]`,
-  `verify <baseline.json> <current.json>`, `compare <baseline.prototrace> <current.prototrace>` and
+- Seven commands: `summary <file>`, `index <folder>`, `feedback <file> [--digest <path>] [--baseline <trace>]`,
+  `verify <baseline> <current>`, `compare <baseline.prototrace> <current.prototrace>`,
   `prove <baseline.prototrace> <current.prototrace>... [--test <name>]...` and
   `review <file.prototrace> [--test <name>]...`. The models underneath (`ProtoTest.Diagnosis`,
   `ProtoTest.Traces`, `ProtoTest.Feedback`, `ProtoTest.Verification`) are the same ones the MCP tools
   use, so the surfaces cannot drift apart.
 - `index` writes only: `index.html` in the named folder and one digest beside each run's archive. It
   never renames, moves or deletes an archive, and it carries no JavaScript.
-- `verify` reads report files, not traces; write them with a `ProtoTest.Reporting` sink. Spec
+- `verify` reads reports, as files or embedded in traces; a run embeds one with a `ProtoTest.Reporting` sink. Spec
   candidate files are a library capability today, not a verb option.
 - The tool targets net8.0; a newer runtime runs it with `DOTNET_ROLL_FORWARD=LatestMajor`.

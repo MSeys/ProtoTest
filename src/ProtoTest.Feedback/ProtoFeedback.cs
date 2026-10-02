@@ -2,6 +2,7 @@ namespace ProtoTest.Feedback;
 
 using ProtoTest.Diagnosis;
 using ProtoTest.Traces;
+using ProtoTest.Verification;
 
 /// <summary>The channel names a feedback post reports its outcome under.</summary>
 public static class ProtoFeedbackChannels
@@ -72,6 +73,12 @@ public sealed record ProtoFeedbackTarget
 
     /// <summary>The shared-secret header name; defaults to <c>X-ProtoTest-Secret</c>.</summary>
     public string? WebhookSecretHeader { get; init; }
+
+    /// <summary>
+    /// The run compared with the base branch's last green run. The comment then says which tests the
+    /// change broke or fixed and where each one left the baseline; null leaves that section out.
+    /// </summary>
+    public ProtoTraceComparison? Comparison { get; init; }
 }
 
 /// <summary>

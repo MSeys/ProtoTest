@@ -117,27 +117,14 @@ internal static class ProtoFixProver
 
     private static (ProtoVerificationVerdict? Verdict, string? Note) VerifyReports(ProtoTraceArchive baseline, ProtoTraceArchive current)
     {
-        var baselineReport = EmbeddedReport(baseline);
-        var currentReport = EmbeddedReport(current);
-        if (baselineReport is null || currentReport is null)
+        var baselineRun = ProtoVerificationRun.FromArchive(baseline);
+        var currentRun = ProtoVerificationRun.FromArchive(current);
+        if (baselineRun is null || currentRun is null)
         {
-            var missing = baselineReport is null ? $"baseline run {baseline.RunId}" : $"run {current.RunId}";
+            var missing = baselineRun is null ? $"baseline run {baseline.RunId}" : $"run {current.RunId}";
             return (null, $"No JSON report is embedded in {missing}, so coverage and run gates were not compared.");
         }
 
-        return (ProtoVerification.Verify(
-            new ProtoVerificationRun(baselineReport, baseline.RunId),
-            new ProtoVerificationRun(currentReport, current.RunId)), null);
-    }
-
-    private static ProtoReport? EmbeddedReport(ProtoTraceArchive archive)
-    {
-        if (!ProtoTraceReport.TryRead(archive, out var report, out _))
-        {
-            return null;
-        }
-
-        using var stream = new MemoryStream(archive.ReadArtifact(report.Artifact));
-        return ProtoReport.ReadJson(stream);
+        return (ProtoVerification.Verify(baselineRun, currentRun), null);
     }
 }

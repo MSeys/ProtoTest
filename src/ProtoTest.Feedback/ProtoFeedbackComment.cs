@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using ProtoTest.Diagnosis;
+using ProtoTest.Verification;
 
 /// <summary>
 /// The github-pr-comment channel: the Markdown rendering of the digest plus the composed trace link,
@@ -15,6 +16,13 @@ public static class ProtoFeedbackComment
 {
     /// <summary>Renders the comment body. One digest, so the comment cannot disagree with the CLI.</summary>
     public static string Markdown(ProtoDiagnosisDocument digest, string? traceLink = null)
+        => Markdown(digest, traceLink, comparison: null);
+
+    /// <summary>
+    /// Renders the comment body with the comparison against the base branch: the tests the change broke
+    /// first, then the ones it fixed, each with the operation where it left the baseline.
+    /// </summary>
+    public static string Markdown(ProtoDiagnosisDocument digest, string? traceLink, ProtoTraceComparison? comparison)
     {
         ArgumentNullException.ThrowIfNull(digest);
 
@@ -22,6 +30,7 @@ public static class ProtoFeedbackComment
         writer.WriteLine($"## ProtoTest run `{digest.RunId}`");
         writer.WriteLine();
         writer.WriteLine($"**{CountsLine(digest)}**");
+        WriteComparison(writer, comparison);
 
         foreach (var test in digest.Failures)
         {
@@ -143,9 +152,9 @@ public static class ProtoFeedbackComment
             return Skipped("No pull request number: set GITHUB_EVENT_PATH to the event payload of a pull request run.");
         }
 
-        if (!HasReport(digest))
+        if (!HasReport(digest) && !HasChanges(target.Comparison))
         {
-            return Skipped("The run has no failures to report.");
+            return Skipped("The run has no failures to report and changed no test's outcome.");
         }
 
         var api = target.ApiUrl ?? new Uri("https://api.github.com");
@@ -153,7 +162,7 @@ public static class ProtoFeedbackComment
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(
-                JsonSerializer.Serialize(new { body = Markdown(digest, target.TraceLink) }),
+                JsonSerializer.Serialize(new { body = Markdown(digest, target.TraceLink, target.Comparison) }),
                 Encoding.UTF8,
                 "application/json")
         };
@@ -194,6 +203,46 @@ public static class ProtoFeedbackComment
         return digest.Failures.Any(test => !string.Equals(test.Outcome, "skipped", StringComparison.Ordinal))
             || digest.Gates.Any(gate => string.Equals(gate.Verdict, "failed", StringComparison.Ordinal));
     }
+
+    private static bool HasChanges(ProtoTraceComparison? comparison)
+        => comparison is not null && comparison.Tests.Any(test => test.Change is ProtoTestChanges.Broken or ProtoTestChanges.Fixed);
+
+    private static void WriteComparison(StringWriter writer, ProtoTraceComparison? comparison)
+    {
+        if (comparison is null)
+        {
+            return;
+        }
+
+        var changed = comparison.Tests
+            .Where(test => test.Change is ProtoTestChanges.Broken or ProtoTestChanges.Fixed)
+            .ToArray();
+        writer.WriteLine();
+        if (changed.Length == 0)
+        {
+            writer.WriteLine($"Compared with the base branch (run `{comparison.BaselineRunId}`): no test changed outcome.");
+            return;
+        }
+
+        writer.WriteLine($"**Compared with the base branch** (run `{comparison.BaselineRunId}`)");
+        foreach (var test in changed.Take(MaxComparedTests))
+        {
+            var where = test.Divergence?.Current ?? test.Divergence?.Baseline;
+            var at = where is null
+                ? string.Empty
+                : where.Subject is { Length: > 0 } subject
+                    ? $" at `{where.Kind}` `{subject}`"
+                    : $" at `{where.Kind}` `{where.Name}`";
+            writer.WriteLine($"- {(test.Change == ProtoTestChanges.Broken ? "broke" : "fixed")} `{test.Name}`{at}");
+        }
+
+        if (changed.Length > MaxComparedTests)
+        {
+            writer.WriteLine($"- ... {changed.Length - MaxComparedTests} more");
+        }
+    }
+
+    private const int MaxComparedTests = 20;
 
     private static ProtoFeedbackChannelResult Skipped(string reason)
         => new(ProtoFeedbackChannels.GithubPrComment, ProtoFeedbackStatuses.Skipped, reason);

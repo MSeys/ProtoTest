@@ -1,6 +1,6 @@
 ---
 slug: why-nobody-trusts-their-integration-tests
-date: 2026-10-02T10:00
+date: 2026-10-02T18:30
 image: /img/blog/why-nobody-trusts-their-integration-tests.png
 title: Why nobody trusts their integration tests
 description: Integration tests catch the bugs that matter, and still end up ignored. Three complaints explain why, and what changes when the framework owns the hard parts.

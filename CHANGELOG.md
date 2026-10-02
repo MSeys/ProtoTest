@@ -294,6 +294,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### ASP.NET Core
 
+- an application that fails to start reports its own exception, also when WebApplicationFactory reaches its host after the application disposed it. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
 - the in-process HTTP client is owned by its test, fixing a teardown crash. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
 - a repeated `AddAspNetCoreServer` name with another program throws naming both. [ASP.NET Core](https://prototest.dev/docs/integrations/aspnetcore)
 

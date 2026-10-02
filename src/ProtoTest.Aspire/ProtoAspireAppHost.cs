@@ -235,8 +235,9 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
 
     /// <summary>
     /// Whether the failure means the Aspire orchestration runtime is unavailable: the DCP executable
-    /// or the dashboard binaries the AppHost starts with could not be found. Suites catch the typed
-    /// exception this maps to and skip instead of failing.
+    /// or the dashboard binaries the AppHost starts with could not be found, or DCP started but its own
+    /// API server never answered (a constrained CI machine). Suites catch the typed exception this maps
+    /// to and skip instead of failing.
     /// </summary>
     internal static bool IsRuntimeMissing(Exception exception)
     {
@@ -251,6 +252,12 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
                     || validation.Failures.Any(failure =>
                         failure.Contains("CliPath", StringComparison.Ordinal)
                         || failure.Contains("DashboardPath", StringComparison.Ordinal))))
+            {
+                return true;
+            }
+
+            // DCP's API server never came up: Aspire's own wait for it timed out before any resource ran.
+            if (current.StackTrace?.Contains("Aspire.Hosting.Dcp.KubernetesService.EnsureKubernetesAsync", StringComparison.Ordinal) == true)
             {
                 return true;
             }

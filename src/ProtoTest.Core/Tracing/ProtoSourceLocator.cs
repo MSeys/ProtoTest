@@ -66,10 +66,37 @@ internal static class ProtoSourceLocator
     // machine and in CI, and it does not put the local directory layout into a trace that gets shared.
     private static string Record(string file)
     {
+        file = Unmapped(file);
         var root = RepositoryRoots.GetOrAdd(Path.GetDirectoryName(file) ?? string.Empty, FindRepositoryRoot);
         var recorded = root is null ? file : Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
         Recorded.TryAdd(recorded, file);
         return recorded;
+    }
+
+    // A deterministic build (ContinuousIntegrationBuild, as CI sets it) maps each source root to /_/ (or
+    // /_1/, ...) in the PDB, so the recorded file does not exist. The suite runs from its build output
+    // inside the repository, so the mapped path is resolved against that repository's root.
+    internal static string Unmapped(string file)
+    {
+        if (File.Exists(file) || !file.StartsWith("/_", StringComparison.Ordinal))
+        {
+            return file;
+        }
+
+        var slash = file.IndexOf('/', 2);
+        if (slash < 0 || !file[2..slash].All(char.IsDigit))
+        {
+            return file;
+        }
+
+        var root = RepositoryRoots.GetOrAdd(AppContext.BaseDirectory, FindRepositoryRoot);
+        if (root is null)
+        {
+            return file;
+        }
+
+        var candidate = Path.Combine(root, file[(slash + 1)..].Replace('/', Path.DirectorySeparatorChar));
+        return File.Exists(candidate) ? candidate : file;
     }
 
     private static string? FindRepositoryRoot(string directory)

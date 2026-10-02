@@ -306,4 +306,28 @@ public sealed class AspireCompositionTests
                 "an application failure is not a missing runtime");
         }
     }
+
+    [Test]
+    public void IsRuntimeMissing_ShouldRecognizeADcpApiServerThatNeverAnswered()
+    {
+        // What a constrained runner records: Aspire's wait for DCP's API server times out.
+        var timeout = new TimeoutException(
+            "The operation didn't complete within the allowed timeout of '00:00:20'.",
+            new DcpWaitCancelled());
+        var resourceTimeout = new TimeoutException("The 'api' resource did not become healthy in time.");
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(ProtoAspireAppHost<TestAppHostAnchor>.IsRuntimeMissing(timeout), Is.True,
+                "DCP never came up, so the runtime is unavailable on this machine");
+            Assert.That(ProtoAspireAppHost<TestAppHostAnchor>.IsRuntimeMissing(resourceTimeout), Is.False,
+                "a resource that times out is the application's failure");
+        }
+    }
+
+    private sealed class DcpWaitCancelled() : OperationCanceledException("The operation was canceled.")
+    {
+        public override string StackTrace =>
+            "   at Aspire.Hosting.Dcp.KubernetesService.EnsureKubernetesAsync(CancellationToken cancellationToken)";
+    }
 }

@@ -11,10 +11,6 @@ using ProtoTest.Web.Playwright;
 [TestFixture]
 public sealed class PlaywrightConformanceTests
 {
-    // Setup content loads outside the short action timeout these tests use to fail fast, so a slow
-    // runner's page load does not fail the test before its assertion runs.
-    private static readonly PageSetContentOptions SetupContent = new() { Timeout = 30_000 };
-
     [Test]
     public async Task SharedWebModel_ShouldRunAgainstARealBrowser()
     {
@@ -31,7 +27,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("Playwright conformance", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.Html);
+        await backend.Page.LoadMarkupAsync(ConformanceMarkup.Html);
         var page = web.Page<ConformancePage>();
 
         await page.Name.FillAsync("Matthias");
@@ -71,7 +67,7 @@ public sealed class PlaywrightConformanceTests
         await host.StartAsync();
         var context = await host.StartTestAsync("playwright trace cap", TestMethods.Placeholder);
         var backend = await OpenBrowserAsync(context.Web());
-        await backend.Page.SetContentAsync("<!doctype html><html><body><div>ready</div></body></html>");
+        await backend.Page.LoadMarkupAsync("<!doctype html><html><body><div>ready</div></body></html>");
 
         await host.CompleteTestAsync(ProtoTestResult.Passed);
 
@@ -113,7 +109,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("Playwright select semantics", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.Html, SetupContent);
+        await backend.Page.LoadMarkupAsync(ConformanceMarkup.Html);
         var page = web.Page<ConformancePage>();
 
         await page.Language.SelectOptionAsync("nl");
@@ -142,7 +138,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright disabled controls", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.DisabledInteractionsHtml, SetupContent);
+        await backend.Page.LoadMarkupAsync(ConformanceMarkup.DisabledInteractionsHtml);
         var page = web.Page<DisabledInteractionsPage>();
 
         var check = Assert.ThrowsAsync<WebActionabilityException>(async () =>
@@ -179,7 +175,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("Playwright escape hatches", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.EscapeHatchHtml);
+        await backend.Page.LoadMarkupAsync(ConformanceMarkup.EscapeHatchHtml);
         var page = web.Page<EscapeHatchPage>();
 
         await page.Search.FillAsync("invoice");
@@ -227,7 +223,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("Playwright namespaced attribute", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.NamespacedAttributeHtml);
+        await backend.Page.LoadMarkupAsync(ConformanceMarkup.NamespacedAttributeHtml);
         var page = web.Page<NamespacedAttributePage>();
 
         await page.Greeting.Should.HaveTextAsync("Hello");
@@ -254,7 +250,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright page-scoped header cell", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.Html);
+        await backend.Page.LoadMarkupAsync(ConformanceMarkup.Html);
         var page = web.Page<ConformancePage>();
 
         // The cell locator is not inside a row component here: the page itself is the search context,
@@ -280,7 +276,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright strict read", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(
+        await backend.Page.LoadMarkupAsync(
             "<!doctype html><html><body><p class=\"dup\">one</p><p class=\"dup\">two</p></body></html>");
         var page = web.Page<DuplicatePage>();
 
@@ -317,7 +313,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright missing element", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync("<!doctype html><html><body><p class=\"dup\">one</p></body></html>", SetupContent);
+        await backend.Page.LoadMarkupAsync("<!doctype html><html><body><p class=\"dup\">one</p></body></html>");
         var page = web.Page<DuplicatePage>();
 
         // A direct read reports the documented resolution failure instead of a raw Playwright timeout.
@@ -389,7 +385,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright nested wait", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync("""
+        await backend.Page.LoadMarkupAsync("""
             <!doctype html>
             <html><body>
               <div role="status">pending</div>
@@ -436,8 +432,8 @@ public sealed class PlaywrightConformanceTests
         var web = context.Web();
         var other = context.Web("Other");
         const string markup = "<!doctype html><html><body><div role=\"status\">ready</div></body></html>";
-        await (await OpenBrowserAsync(web)).Page.SetContentAsync(markup);
-        await (await other.GetBackendAsync<PlaywrightWebBackend>()).Page.SetContentAsync(markup);
+        await (await OpenBrowserAsync(web)).Page.LoadMarkupAsync(markup);
+        await (await other.GetBackendAsync<PlaywrightWebBackend>()).Page.LoadMarkupAsync(markup);
         var page = web.Page<ConformancePage>();
         var otherPage = other.Page<ConformancePage>();
 
@@ -486,7 +482,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright nested wait in wait", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync("<!doctype html><html><body><div role=\"status\">ready</div></body></html>");
+        await backend.Page.LoadMarkupAsync("<!doctype html><html><body><div role=\"status\">ready</div></body></html>");
         var page = web.Page<ConformancePage>();
 
         // A wait inside a wait predicate: the inner wait is nested under the outer one, and the read in
@@ -537,7 +533,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright negated nested wait", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync("""
+        await backend.Page.LoadMarkupAsync("""
             <!doctype html>
             <html><body>
               <div role="status">pending</div>
@@ -703,7 +699,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright download", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.DownloadHtml);
+        await backend.Page.LoadMarkupAsync(ConformanceMarkup.DownloadHtml);
         var page = web.Page<DownloadPage>();
 
         // The trigger is a real semantic click, so the download operation has to nest it: on

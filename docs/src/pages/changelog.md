@@ -218,7 +218,8 @@ and the deprecated surface; the [docs](/docs/) cover the rest.
 - The MCP server offers three job prompts, `fix_failure`, `cover_change` and `improve_tests`, each ending with the tool that judges it; the skills and the starter's `AGENTS.md` point at them. <span className="changelog-ref">[Setup](/docs/agent-workflows/setup#the-job-prompts)</span>
 - `ProtoReport.ReadJson(Stream)` reads a report from a stream, such as the one a trace embeds. <span className="changelog-ref">[Verification](/docs/agent-workflows/verification)</span>
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. <span className="changelog-ref">[Loop](/docs/agent-workflows/loop)</span>
-- The ProtoTest Feedback GitHub Action uploads the trace and posts the digest. <span className="changelog-ref">[CI](/docs/continuous-integration/#the-feedback-action)</span>
+- The ProtoTest Evidence action (`MSeys/prototest-action`) compares a pull request's run with the base branch's last green run, posts what broke and what was fixed, runs the verdict over the embedded reports and keeps the trace. <span className="changelog-ref">[CI](/docs/continuous-integration/#the-evidence-action)</span>
+- `prototest feedback --baseline <trace>` adds the comparison to the comment, and `prototest verify` reads the reports two traces embedded (`ProtoVerificationRun.FromTrace`). <span className="changelog-ref">[CLI](/docs/agent-workflows/cli#feedback)</span>
 
 #### Traces and reporting
 

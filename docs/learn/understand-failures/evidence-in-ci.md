@@ -77,19 +77,17 @@ The `if: always()` line is the one that matters. Without it the upload is skippe
 
 ### 3. Post the digest
 
-The feedback action installs the CLI, uploads the trace and posts the digest, a short summary of what failed and why:
+The evidence action uploads the trace, compares the run with the base branch's last green run, and posts what changed:
 
 ```yaml
-- name: Post the evidence
+- name: ProtoTest evidence
   if: always()
-  uses: MSeys/ProtoTest/.github/actions/feedback@main
+  uses: MSeys/prototest-action@v1
   with:
     trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
 ```
 
-The comment carries the failing tests, the cause and the artifact link. It also puts one check annotation on each failing test's source location. A green run posts no comment. The workflow needs `issues: write` permission for the comment. A channel it cannot reach skips with its reason instead of failing the job. The [CI page](/docs/continuous-integration/) shows the output of a real run.
-
-Give the action a `baseline-report` and a `current-report` as well, and the step also fails the pull request when the run is worse than the baseline.
+The comment names each test the change broke or fixed and the operation where it changed, then the failing tests with their cause and the artifact link. Each failing test also gets a check annotation at its source location. The step fails when a test that passed on the base branch fails now. The workflow needs `actions: read` to fetch the base branch's trace and `pull-requests: write` to comment. The [CI page](/docs/continuous-integration/#the-evidence-action) shows the whole workflow.
 
 ### 4. Name the build in the trace
 
@@ -115,7 +113,7 @@ The same wiring works in every job you split the pipeline into: pull request, ni
 
 <Checkpoint
   question="The test step failed. Which steps still run, and what does the reviewer open from the comment?"
-  verify={<>Read <Link to="/docs/continuous-integration/#put-every-artifact-in-one-place">Put every artifact in one place</Link> and <Link to="/docs/continuous-integration/#the-feedback-action">The feedback action</Link> on the CI page, then the two steps above that carry <code>if: always()</code>.</>}>
+  verify={<>Read <Link to="/docs/continuous-integration/#put-every-artifact-in-one-place">Put every artifact in one place</Link> and <Link to="/docs/continuous-integration/#the-evidence-action">The evidence action</Link> on the CI page, then the two steps above that carry <code>if: always()</code>.</>}>
 
 The upload and the post run with `if: always()`, so the failed run keeps its evidence and gets its comment. The comment names the tests that did not pass and links the trace artifact. The reviewer opens it in the viewer without rerunning the job.
 

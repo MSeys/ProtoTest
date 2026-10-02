@@ -134,11 +134,18 @@ public static class CliHost
     private static int Feedback(string[] args, TextWriter output, TextWriter error)
     {
         string? digestPath = null;
+        string? baselinePath = null;
         for (var index = 2; index < args.Length; index++)
         {
             if (string.Equals(args[index], "--digest", StringComparison.Ordinal) && index + 1 < args.Length)
             {
                 digestPath = args[++index];
+                continue;
+            }
+
+            if (string.Equals(args[index], "--baseline", StringComparison.Ordinal) && index + 1 < args.Length)
+            {
+                baselinePath = args[++index];
                 continue;
             }
 
@@ -177,11 +184,31 @@ public static class CliHost
             }
         }
 
+        ProtoTraceComparison? comparison = null;
+        if (baselinePath is { Length: > 0 })
+        {
+            if (!File.Exists(baselinePath))
+            {
+                error.WriteLine($"Baseline trace not found: {baselinePath}");
+                return 1;
+            }
+
+            try
+            {
+                comparison = ProtoVerification.Compare(baselinePath, path);
+            }
+            catch (Exception exception)
+            {
+                error.WriteLine($"Could not compare with '{baselinePath}': {exception.Message}");
+                return 1;
+            }
+        }
+
         ProtoFeedbackReport report;
         using var client = new HttpClient();
         try
         {
-            report = ProtoFeedback.PostAsync(digest, Target(), client, output).GetAwaiter().GetResult();
+            report = ProtoFeedback.PostAsync(digest, Target() with { Comparison = comparison }, client, output).GetAwaiter().GetResult();
         }
         catch (Exception exception)
         {
@@ -204,7 +231,7 @@ public static class CliHost
         {
             if (!File.Exists(path))
             {
-                error.WriteLine($"Report file not found: {path}");
+                error.WriteLine($"Report or trace file not found: {path}");
                 return 1;
             }
         }
@@ -212,9 +239,7 @@ public static class CliHost
         ProtoVerificationVerdict verdict;
         try
         {
-            verdict = ProtoVerification.Verify(
-                ProtoVerificationRun.FromReportFile(baselinePath),
-                ProtoVerificationRun.FromReportFile(currentPath));
+            verdict = ProtoVerification.Verify(Run(baselinePath), Run(currentPath));
         }
         catch (Exception exception)
         {
@@ -230,6 +255,12 @@ public static class CliHost
         ProtoVerificationText.Write(verdict, output);
         return verdict.Failed ? 1 : 0;
     }
+
+    // A trace carries the report its run embedded, so verify reads either file.
+    private static ProtoVerificationRun Run(string path)
+        => path.EndsWith(".prototrace", StringComparison.OrdinalIgnoreCase)
+            ? ProtoVerificationRun.FromTrace(path)
+            : ProtoVerificationRun.FromReportFile(path);
 
     private static int Compare(string baselinePath, string currentPath, TextWriter output, TextWriter error)
     {
@@ -424,8 +455,8 @@ public static class CliHost
             """
             usage: prototest summary <file.prototrace>
                    prototest index <folder>
-                   prototest feedback <file.prototrace> [--digest <path>]
-                   prototest verify <baseline-report.json> <current-report.json>
+                   prototest feedback <file.prototrace> [--digest <path>] [--baseline <file.prototrace>]
+                   prototest verify <baseline> <current>   (report.json or .prototrace)
                    prototest compare <baseline.prototrace> <current.prototrace>
                    prototest prove <baseline.prototrace> <current.prototrace>... [--test <name>]...
                    prototest review <file.prototrace> [--test <name>]...

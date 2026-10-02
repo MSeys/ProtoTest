@@ -6,7 +6,7 @@ description: "The prototest CLI: the four verbs, their arguments, the environmen
 
 # CLI reference
 
-`prototest` reads ProtoTest evidence from a terminal. It prints a run summary, builds a page over a folder of runs, checks two reports, and posts the feedback digest. It needs no agent and no browser. The [feedback action](../continuous-integration/index.md#the-feedback-action) installs it and calls the same commands in CI, so a local run and a CI step read the same archive the same way.
+`prototest` reads ProtoTest evidence from a terminal. It prints a run summary, builds a page over a folder of runs, checks two reports, and posts the feedback digest. It needs no agent and no browser. The [evidence action](../continuous-integration/index.md#the-evidence-action) installs it and calls the same commands in CI, so a local run and a CI step read the same archive the same way.
 
 ## Install
 
@@ -21,8 +21,8 @@ The tool command is `prototest`. The package targets .NET 8. On a machine with o
 ```text
 usage: prototest summary <file.prototrace>
        prototest index <folder>
-       prototest feedback <file.prototrace> [--digest <path>]
-       prototest verify <baseline-report.json> <current-report.json>
+       prototest feedback <file.prototrace> [--digest <path>] [--baseline <file.prototrace>]
+       prototest verify <baseline> <current>   (report.json or .prototrace)
        prototest compare <baseline.prototrace> <current.prototrace>
        prototest prove <baseline.prototrace> <current.prototrace>... [--test <name>]...
        prototest review <file.prototrace> [--test <name>]...
@@ -36,7 +36,7 @@ usage: prototest summary <file.prototrace>
 | see what changed between two runs | `compare <baseline.prototrace> <current.prototrace>` | nothing |
 | prove a fix | `prove <baseline.prototrace> <current.prototrace>... [--test <name>]...` | nothing |
 | see what each test proves | `review <file.prototrace> [--test <name>]...` | nothing |
-| post the digest | `feedback <file.prototrace> [--digest <path>]` | the `--digest` file, and the posts |
+| post the digest | `feedback <file.prototrace> [--digest <path>] [--baseline <file.prototrace>]` | the `--digest` file, and the posts |
 
 An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`. There is no `--help` verb: `prototest --help` prints the same usage to stderr and exits `1`.
 
@@ -102,10 +102,11 @@ Exit `0` when the page is written. Exit `1` when the folder is missing, holds no
 
 ### verify
 
-Compares two JSON reports from a `ProtoTest.Reporting` sink:
+Compares two JSON reports from a `ProtoTest.Reporting` sink, as files or as the reports two traces embedded:
 
 ```bash
 prototest verify baseline.json TestResults/ProtoTest/report.json
+prototest verify main.prototrace TestResults/ProtoTest/run.prototrace
 ```
 
 The baseline is the default branch report. The current report is the run under review. The failing findings print one `::error` workflow command each, which a GitHub runner turns into an annotation. The verdict then lists the findings and the coverage deltas. The default severities make the verb a pull request gate: `regressed`, `stale-spec` and `gate-failed` fail, and `added-uncovered` warns.
@@ -123,7 +124,7 @@ coverage deltas:
 Exit `0` when no finding is a fail and `1` when one is. Exit `1` also when a report file is missing or cannot be read:
 
 ```text
-Report file not found: baseline.json
+Report or trace file not found: baseline.json
 ```
 
 ### compare
@@ -195,6 +196,8 @@ Reads one run's digest and posts it:
 prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
 ```
 
+With `--baseline <file.prototrace>`, the comment also says which tests the run broke or fixed against that trace, and where each one changed. A run with no failures still posts when it fixed a test.
+
 Two streams, and the split is the point:
 
 | Stream | What carries |
@@ -230,7 +233,7 @@ Every channel reports its outcome on stderr. A channel with no target, or nothin
 | `PROTOTEST_FEEDBACK_WEBHOOK_SECRET` | webhook | the shared-secret header value. No header is sent without it. |
 | `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER` | webhook | the shared-secret header name, by default `X-ProtoTest-Secret` |
 
-The [feedback action](../continuous-integration/index.md#action-inputs) maps its inputs to these names, so a local command and the action take the same path.
+The [evidence action](../continuous-integration/index.md#action-inputs) maps its inputs to these names, so a local command and the action take the same path.
 
 ## Webhook payload
 

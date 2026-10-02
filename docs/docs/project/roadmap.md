@@ -26,7 +26,7 @@ The current release made ProtoTest a platform proven on a real product. The sect
 - **Topology under test:** container topology, published mode, fault injection and the nightly reference run.
 - **A second device protocol:** MQTT, after OCPP proved the transport model.
 - **Devices that send data strings:** TCP (connecting out or listening) and serial transports over shared stream framing, and typed messages that write and read a device's data strings.
-- **Agent and evidence layer:** `ProtoTest.Mcp`, the `prototest` CLI, `ProtoTest.Diagnosis`, `ProtoTest.Verification`, `ProtoTest.Feedback`, the feedback action, the static trace index, and the docs and skills pages.
+- **Agent and evidence layer:** `ProtoTest.Mcp`, the `prototest` CLI, `ProtoTest.Diagnosis`, `ProtoTest.Verification`, `ProtoTest.Feedback`, the [ProtoTest Evidence action](https://github.com/MSeys/prototest-action), the static trace index, and the docs and skills pages.
 - **Showcase:** the benchmark republished on the reference demo and the trace showpiece.
 
 The reference demo is the proof. It is a separate open-source EV-charging platform with a REST API, PostgreSQL, a billing worker, browser journeys and containers.

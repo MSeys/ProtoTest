@@ -123,7 +123,7 @@ public sealed class VerificationCliTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(exit, Is.EqualTo(1));
-            Assert.That(error.ToString(), Does.Contain("prototest verify <baseline-report.json>"));
+            Assert.That(error.ToString(), Does.Contain("prototest verify <baseline> <current>"));
         }
     }
 }

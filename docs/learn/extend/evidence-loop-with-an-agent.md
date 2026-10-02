@@ -124,7 +124,7 @@ Then post the digest, locally or from CI:
 prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
 ```
 
-The command prints one annotation per failure, for the pull request, on stdout. On stderr it says how each channel went, such as the comment or a webhook. With no target configured, those channels skip with their reason, so a local run is safe. In CI, the feedback action uploads the trace, posts the comment and runs the verdict with the two reports. The [loop page](/docs/agent-workflows/loop) carries the workflow.
+The command prints one annotation per failure, for the pull request, on stdout. On stderr it says how each channel went, such as the comment or a webhook. With no target configured, those channels skip with their reason, so a local run is safe. In CI, the evidence action uploads the trace, compares it with the base branch's last green run, posts the comment and runs the verdict. The [loop page](/docs/agent-workflows/loop) carries the workflow.
 
 ## What happened
 

@@ -12,7 +12,7 @@ A green run shows your tests still pass. It does not show your covered contract 
 prototest verify baseline.json current.json
 ```
 
-The **baseline** is the report from the default branch. The **current** report is the pull request's run. Both are the plain JSON files a `ProtoTest.Reporting` sink wrote, so CI can keep the baseline as an artifact and download it into the pull request job. [Reporting](../observability/reporting.md) covers the sink and its options, and the [CI page](../continuous-integration/index.md#add-the-verdict) shows the workflow that produces both.
+The **baseline** is the report from the default branch. The **current** report is the pull request's run. Both are the JSON reports a `ProtoTest.Reporting` sink wrote, as files or embedded in the runs' traces, so the base branch's kept trace is the baseline. [Reporting](../observability/reporting.md) covers the sink and its options, and the [CI page](../continuous-integration/index.md#compare-with-the-base-branch) shows the workflow that produces both.
 
 A regression prints this. The example comes from a real run of the command over two report files, where the current report has one unit uncovered that the baseline covered.
 
@@ -69,11 +69,11 @@ A remote specification source is recorded, not fetched. Without a candidate, the
 
 ## Gate the pull request
 
-Give the [ProtoTest Feedback action](../continuous-integration/index.md#add-the-verdict) the two reports as `baseline-report` and `current-report`, and its verdict step fails the pull request step, which fails the job. The feedback channel has already annotated each failing test at its source location, so the reviewer sees the failure where it happened.
+The [ProtoTest Evidence action](../continuous-integration/index.md#compare-with-the-base-branch) runs this verdict over the reports the base branch's trace and the pull request's trace embedded, and fails the step on a failing finding. `prototest verify` reads a `.prototrace` as well as a `report.json`, so the same check runs locally over two traces. The feedback channel has already annotated each failing test at its source location, so the reviewer sees the failure where it happened.
 
 ## Limits
 
-- The comparison reads reports, not traces. No trace is re-read and no coverage is recomputed. The arithmetic is the report's own (`CoverageUnits` and `CoverageTotals`).
+- The verdict reads reports, the files or the ones traces embedded. No coverage is recomputed from spans. The arithmetic is the report's own (`CoverageUnits` and `CoverageTotals`).
 - Units are matched by target, category and identifier, so an OpenAPI property, a GraphQL field and a REST route compare by their own vocabulary.
 - A unit or a target that disappeared from the candidate is not a finding. The delta row shows it instead.
 - Unmatched traffic and schema drift are out of scope. Either a collector records them, or Verification does not claim them.

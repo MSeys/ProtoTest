@@ -14,11 +14,11 @@ One suite, one results folder, one post-run step:
 flowchart LR
     push["push or pull request"] --> test["dotnet test"]
     test --> folder["PROTOTEST_RESULTS/<br/>run.prototrace · report.json · report.html"]
-    folder --> action["ProtoTest Feedback action"]
-    action --> comment["pull request comment"]
+    folder --> action["ProtoTest Evidence action"]
+    base["base branch's last green trace"] -.-> action
+    action --> comment["pull request comment: what broke, what was fixed"]
     action --> annotations["one check annotation per failure"]
     action --> artifact["trace artifact"]
-    action -.-> verdict["verdict, with a baseline report"]
 ```
 
 ## Put every artifact in one place
@@ -44,27 +44,36 @@ This is the one place the wiring is written down. The CI configurations below se
 A trace can contain sanitized requests, response bodies, state values and attachments. ProtoTest removes authorization headers and browser input values, but your own attributes and attachments may still carry application data. Use private build artifacts where the suite touches private data, and apply the same retention policy as other test results.
 :::
 
-## The feedback action
+## The evidence action
 
-The *ProtoTest Feedback* action runs after the tests. It installs the CLI, uploads the trace, posts the digest to the pull request, and can gate the pull request on a baseline report.
+The [*ProtoTest Evidence*](https://github.com/MSeys/prototest-action) action runs after the tests. On a pull request it compares the run with the base branch's last green run, posts what the change broke and fixed, and keeps the trace.
 
 ```mermaid
 sequenceDiagram
     participant job as test job
-    participant action as feedback action
+    participant action as evidence action
+    participant base as base branch run
     participant cli as prototest CLI
     job->>action: run.prototrace
     action->>action: upload the trace artifact
-    action->>cli: prototest feedback
-    cli-->>action: annotations on stdout, channel outcomes on stderr
+    action->>base: download its trace artifact
+    action->>cli: prototest compare, prototest verify
+    action->>cli: prototest feedback --baseline
     cli->>cli: post the pull request comment
-    cli-->>action: posted / skipped / failed
-    Note over action: a green run posts no comment
+    Note over action: fails on a broken test or a failed verdict
 ```
 
-The digest is the run summary the CLI prints: the run, every test that did not pass with its cause and source location, and the artifact link. The action turns it into a pull request comment, one check annotation per failing test and per failed run gate, and one uploaded artifact. A green run posts no comment, and the status check is its report.
+On a pull request, the action:
 
-Here is what the post-run step prints, from a committed failing run of the Learn track with no pull request configured:
+- downloads the trace of the newest successful run of the same workflow on the base branch;
+- compares the two runs test by test, and names each test the change broke or fixed with the operation where it changed;
+- verifies the reports both runs embedded: a unit the base branch covered and this run does not, a changed specification, a failed run gate;
+- posts one comment with the comparison and the failure digest, and one check annotation per failing test;
+- uploads the trace, writes the comparison and the run summary to the job summary, and fails the step when a test broke or the verdict failed.
+
+A run with no failures and no changed outcome posts no comment.
+
+Here is what the post step prints, from a committed failing run of the Learn track with no pull request configured:
 
 ```text
 ::error::Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine: ConnectionError reaching http://127.0.0.1:5099: connection refused.
@@ -75,23 +84,24 @@ prototest feedback: webhook skipped (No webhook URL: set PROTOTEST_FEEDBACK_WEBH
 
 The `::error` lines are the check annotations. This one is the bare form, because the failure carries no source location. One that does renders `::error file=path/to/OrderTests.cs,line=42::message`. The channel lines are the per-channel outcome, and each one names why it skipped or failed.
 
-The same digest reaches a reviewer as a pull request comment. The comment below is illustrative, and its values come from the committed failing fixture:
+The comment a reviewer reads, illustrative, with values from a committed fixture:
 
 ```markdown
-## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
+## ProtoTest run `0979490656fa4a00a6adc2798a14362d`
 
 **2 tests · 1 failed · 1 succeeded**
 
-- **FAILED `orders match their shape`** (16 ms)
-  - `assert.json.shape` · failed
-  - Shape mismatch failed with 1 error(s):
-    • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
-  - at `artifacts/fixture-gen/Program.cs:65`
-  - mismatch `$.orderId`: expected 7, actual 42
+**Compared with the base branch** (run `ae31c391eb5948d6940afd9468d976c4`)
+- broke `orders are listed` at `http.request` `GET /api/orders`
 
-Coverage: 2/4 (50%)
+- **FAILED `orders are listed`** (2.01 s)
+  - `http.request` `List orders` · failed
+  - The API did not answer within 2 seconds.
+  - at `samples/Northstar.ProtoTest/FailureDrills.cs:35`
 
-[Full trace](https://github.com/you/your-repo/actions/runs/123/artifacts/prototest-trace)
+Coverage: 1/2 (50%)
+
+[Full trace](https://github.com/you/your-repo/actions/runs/123/artifacts/456)
 ```
 
 [The evidence loop](../agent-workflows/loop.md) walks the loop around this comment.
@@ -101,10 +111,13 @@ name: Integration tests
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
-  issues: write
+  actions: read
+  pull-requests: write
 
 jobs:
   test:
@@ -121,92 +134,49 @@ jobs:
       - run: dotnet restore
       - run: dotnet test --configuration Release --no-restore
 
-      - name: Post the evidence
+      - name: ProtoTest evidence
         if: always()
-        uses: MSeys/ProtoTest/.github/actions/feedback@main
+        uses: MSeys/prototest-action@v1
         with:
           trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
 ```
 
 - `if: always()` matters, because the step must run when the test step failed. That is when the evidence is needed.
-- `issues: write` lets the action comment on the pull request. The annotations and the artifact upload need nothing extra.
-- The comment carries the artifact link, so a reviewer opens the trace from the comment.
-- The action fails when a configured channel fails to post.
-- `@main` tracks the default branch. Pin a commit SHA for a stable pipeline. Switch to a release tag once one exists.
+- The workflow runs on pushes to `main` too. Each green run there keeps the trace the next pull request compares with.
+- `actions: read` lets the action download the base branch's trace. `pull-requests: write` lets it comment.
+- The verdict needs both runs to embed a JSON report, so keep the `JsonReportSink` from [the wiring above](#put-every-artifact-in-one-place). Without it the comparison still runs and the verdict is skipped.
+- Pin a release tag or a commit SHA for a stable pipeline.
 
-### Add the verdict
+### Compare with the base branch
 
-Give the action both reports to gate the pull request. A nightly job runs the suite on the default branch and keeps its `report.json`. The pull request job fetches it.
+`baseline: auto`, the default, finds the base branch's trace by itself: the newest successful run of the same workflow on the pull request's base branch, and its artifact with the same `artifact-name`. Until the base branch has such a run, the action skips the comparison and says why.
 
-```mermaid
-flowchart LR
-    nightly["nightly on main · 02:30"] --> baseline["baseline report.json"]
-    pr["pull request job"] --> current["current report.json"]
-    pr --> fetch["fetch the newest nightly artifact"]
-    fetch --> baseline
-    baseline --> gate["feedback with baseline + current"]
-    current --> gate
-    gate --> verdict["pass or fail the gate"]
+To compare with a trace from somewhere else, such as a nightly run, download it first and pass its path as `baseline`. `baseline: none` skips the comparison.
+
+To run the same checks locally, compare two traces and verify their reports:
+
+```bash
+prototest compare main.prototrace TestResults/ProtoTest/run.prototrace
+prototest verify main.prototrace TestResults/ProtoTest/run.prototrace
 ```
 
-```yaml
-# nightly.yml
-name: Nightly baseline
-
-on:
-  schedule:
-    - cron: '30 2 * * *'
-
-jobs:
-  baseline:
-    runs-on: ubuntu-latest
-    env:
-      PROTOTEST_RESULTS: ${{ github.workspace }}/TestResults/ProtoTest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - run: dotnet restore
-      - run: dotnet test --configuration Release --no-restore
-
-      - name: Keep the baseline report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: prototest-baseline
-          path: ${{ env.PROTOTEST_RESULTS }}/report.json
-          if-no-files-found: error
-```
-
-The pull request job downloads the newest nightly artifact and hands the action both reports. It needs `actions: read` in the workflow's permissions for the download:
-
-```yaml
-      - name: Fetch the nightly baseline
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          run_id=$(gh run list --workflow nightly.yml --branch main --limit 1 --json databaseId --jq '.[0].databaseId')
-          gh run download "$run_id" --name prototest-baseline --dir baseline
-
-      - name: Post the evidence
-        if: always()
-        uses: MSeys/ProtoTest/.github/actions/feedback@main
-        with:
-          trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
-          baseline-report: baseline/report.json
-          current-report: ${{ env.PROTOTEST_RESULTS }}/report.json
-```
-
-The step fails the pull request when the run is worse than the baseline. Without the two reports it only posts the digest. To run the same comparison locally, end the loop with `prototest verify baseline/report.json TestResults/ProtoTest/report.json`. [Verification](../agent-workflows/verification.md) explains the verdict and its finding classes.
+[Verification](../agent-workflows/verification.md) explains the verdict and its finding classes.
 
 ### Action inputs
 
-The action installs the ProtoTest CLI as a global tool. Set `version` to pin it to the release you target. Without it, the action updates the tool to the latest stable release. `dotnet-roll-forward` defaults to `LatestMajor`, so the .NET 8 tool runs on a newer runtime.
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `trace` | (required) | the `.prototrace` the run wrote |
+| `baseline` | `auto` | `auto`, a path to a trace, or `none` |
+| `artifact-name` | `prototest-trace` | the uploaded artifact, and the one `auto` looks for on the base branch |
+| `fail-on-broken` | `true` | fail the step when a test that passed on the base branch fails now |
+| `fail-on-regression` | `true` | fail the step when the verdict over the embedded reports has a failing finding |
+| `version` | latest | the `ProtoTest.Cli` version to install |
+| `source` | | an extra NuGet source for the CLI, such as a folder of pre-release packages |
+| `webhook-url`, `webhook-secret`, `webhook-secret-header` | | post the digest JSON to your endpoint too; the header defaults to `X-ProtoTest-Secret` |
+| `dotnet-roll-forward` | `LatestMajor` | lets the .NET 8 tool run on a newer runtime |
 
-The other inputs are optional. `webhook-url` and `webhook-secret` post the digest JSON to your endpoint, with `webhook-secret-header` naming the shared-secret header (default `X-ProtoTest-Secret`). The digest leaves the runner for your endpoint, and the pull request comment is visible to the repository, so treat both like the trace. `artifact-name` names the uploaded trace (default `prototest-trace`).
+The outputs are `artifact-url`, `baseline-run-id`, `broken` and `regressed`. The digest leaves the runner for your webhook, and the pull request comment is visible to the repository, so treat both like the trace.
 
 [The evidence loop](../agent-workflows/loop.md#what-the-reviewer-sees) shows what the reviewer sees. The [CLI reference](../agent-workflows/cli.md#environment-targets) lists every environment target.
 
@@ -299,13 +269,13 @@ The suite is the same in all three. What changes is the composition, and the com
 | Runner output (`.trx`, NUnit XML, JUnit XML) | Always | Native CI test history and annotations |
 | Playwright trace and screenshots | On failure, or for a short retention period | Browser-specific diagnostics carried inside `.prototrace` and by the runner |
 
-The action [above](#the-feedback-action) uploads the trace for you. Without it, upload the results folder as an artifact. Open a downloaded `.prototrace` in the [ProtoTrace viewer](https://trace.prototest.dev). The file stays in the browser. It is not uploaded.
+The action [above](#the-evidence-action) uploads the trace for you. Without it, upload the results folder as an artifact. Open a downloaded `.prototrace` in the [ProtoTrace viewer](https://trace.prototest.dev). The file stays in the browser. It is not uploaded.
 
 ### Retention and size
 
 A trace is small until it carries diagnostics. A synthetic test records about 7 KB of trace, and the OpenCSMS health-check trace holds 25.8 MB for 1,000 tests, about 25 KB each. Browser screenshots, response bodies and embedded sources grow it from there. Attachment capture is opt-in per integration, and `EmbedSources` and `EmbedArtifacts` decide whether the bytes travel inside the archive. The [benchmarks](../project/benchmarks.md) page has the full numbers.
 
-Keep the same retention as other test results, and shorter for sensitive suites. On GitHub Actions the upload step takes `retention-days`. The feedback action uploads its trace artifact with the defaults, so name it with `artifact-name` and expire the raw folder yourself. On GitLab, `expire_in: 14 days` on the [GitLab page](./gitlab-ci.md) is the starting point. Shorten it for suites with browser diagnostics, or keep failures longer than green runs.
+Keep the same retention as other test results, and shorter for sensitive suites. On GitHub Actions the upload step takes `retention-days`. The evidence action uploads its trace artifact with the defaults, so name it with `artifact-name` and expire the raw folder yourself. On GitLab, `expire_in: 14 days` on the [GitLab page](./gitlab-ci.md) is the starting point. Shorten it for suites with browser diagnostics, or keep failures longer than green runs.
 
 ## Related
 

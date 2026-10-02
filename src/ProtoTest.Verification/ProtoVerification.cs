@@ -14,6 +14,30 @@ public sealed record ProtoVerificationRun(ProtoReport Report, string? RunId = nu
     /// <summary>Reads a JSON report the reporting sink wrote and remembers where it came from.</summary>
     public static ProtoVerificationRun FromReportFile(string reportPath, string? runId = null)
         => new(ProtoReport.ReadJson(reportPath), runId, reportPath);
+
+    /// <summary>
+    /// Reads the JSON report a run embedded in its <c>.prototrace</c>, named by the run's id. A trace
+    /// without an embedded report fails naming the reporting sink that writes one.
+    /// </summary>
+    public static ProtoVerificationRun FromTrace(string tracePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tracePath);
+        var archive = ProtoTraceArchive.Open(tracePath);
+        return FromArchive(archive) ?? throw new InvalidOperationException(
+            $"No JSON report is embedded in '{tracePath}'. Add a ProtoTest.Reporting sink (JsonReportSink) so the run embeds one.");
+    }
+
+    /// <summary>The report an opened run embedded, or null when it embedded none.</summary>
+    internal static ProtoVerificationRun? FromArchive(ProtoTraceArchive archive)
+    {
+        if (!ProtoTraceReport.TryRead(archive, out var report, out _))
+        {
+            return null;
+        }
+
+        using var stream = new MemoryStream(archive.ReadArtifact(report.Artifact));
+        return new ProtoVerificationRun(ProtoReport.ReadJson(stream), archive.RunId, archive.SourcePath);
+    }
 }
 
 /// <summary>A candidate specification file the pull request carries for one target. Its content hash

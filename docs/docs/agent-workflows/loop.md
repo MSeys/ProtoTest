@@ -93,9 +93,9 @@ The [CLI reference](./cli.md#environment-targets) lists every target the comment
 
 ## Wire it into the pull request
 
-The *ProtoTest Feedback* action runs the post-run step. It installs the CLI, uploads the trace as one artifact, posts the digest and runs the verdict when both reports are given.
+The *ProtoTest Evidence* action runs the post-run step. It uploads the trace, compares the run with the base branch's last green run, verifies the two embedded reports, and posts the comparison and the digest as one comment.
 
-The workflow, the artifact folder and the `with:` block are on the [CI page](../continuous-integration/index.md#the-feedback-action). The suite writes its trace and report under `PROTOTEST_RESULTS`, the same wiring that page sets up, so one folder holds everything and one artifact step keeps it.
+The workflow, the artifact folder and the `with:` block are on the [CI page](../continuous-integration/index.md#the-evidence-action). The suite writes its trace and report under `PROTOTEST_RESULTS`, the same wiring that page sets up, so one folder holds everything and one artifact step keeps it.
 
 ## Limits
 

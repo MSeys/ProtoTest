@@ -1,16 +1,16 @@
 namespace ProtoTest.OpenApi.Internal;
 
-using Microsoft.OpenApi;
 using ProtoTest.Http;
+using ProtoTest.OpenApi.Internal.Model;
 
 /// <summary>
 /// Matches a request route to the document's paths and a status code to a response key: literal
 /// segments win, a constrained parameter such as <c>{id:int}</c> only matches a value its constraint
 /// accepts, and the comparison ignores case. One matcher serves one document.
 /// </summary>
-internal sealed class OpenApiRouteMatcher(OpenApiDocument document)
+internal sealed class OpenApiRouteMatcher(OpenApiSpec document)
 {
-    private readonly OpenApiDocument _document = document ?? throw new ArgumentNullException(nameof(document));
+    private readonly OpenApiSpec _document = document ?? throw new ArgumentNullException(nameof(document));
 
     /// <summary>Finds the contract path a request route addresses, or <see langword="null"/> when none does.</summary>
     public string? Find(string template)
@@ -26,10 +26,10 @@ internal sealed class OpenApiRouteMatcher(OpenApiDocument document)
     }
 
     /// <summary>Finds the response key a status code maps to: the exact code, its wildcard, else "default".</summary>
-    public static string? FindResponseKey(OpenApiOperation operation, int statusCode)
+    public static string? FindResponseKey(OpenApiSpecOperation operation, int statusCode)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        if (operation.Responses is not { } responses) return null;
+        var responses = operation.Responses;
 
         var exact = statusCode.ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (responses.ContainsKey(exact)) return exact;

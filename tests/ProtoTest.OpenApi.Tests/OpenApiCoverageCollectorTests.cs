@@ -2,7 +2,6 @@ namespace ProtoTest.OpenApi.Tests;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.OpenApi;
 using ProtoTest.Core;
 using ProtoTest.OpenApi;
 using ProtoTest.Rest;
@@ -11,22 +10,6 @@ using ProtoTest.Rest;
 public class OpenApiCoverageCollectorTests
 {
     private class DummyPayload { }
-
-    [Test]
-    public void Constructor_ShouldAcceptAPrebuiltOpenApiDocument()
-    {
-        var document = OpenApiDocument.Parse(OpenApiTestHelper.SampleJsonSpec).Document!;
-
-        var collector = new OpenApiCoverageCollector("TestApi", document);
-
-        var root = collector.GetReportItems().Single();
-        using (Assert.EnterMultipleScope())
-        {
-            Assert.That(root.Identifier, Is.EqualTo("GET /users/{id}"));
-            Assert.That(root.Children!.Single(child => child.Identifier == "200")
-                .Children!.Any(child => child.Identifier == "$.id"), Is.True);
-        }
-    }
 
     [Test]
     public void MissingSpecification_ShouldFailWhenTheHostIsBuilt()
@@ -151,17 +134,6 @@ public class OpenApiCoverageCollectorTests
             }
         }
         finally { Directory.Delete(directory, recursive: true); }
-    }
-
-    [Test]
-    public void SpecIdentity_ShouldNotBeEmittedForAPrebuiltDocument()
-    {
-        var document = OpenApiDocument.Parse(OpenApiTestHelper.SampleJsonSpec).Document!;
-
-        var collector = new OpenApiCoverageCollector("TestApi", document);
-
-        Assert.That(collector.GetReportItems().Any(item => item.Identifier == ProtoSpecIdentity.ReportIdentifier), Is.False,
-            "A prebuilt document records no source to identify.");
     }
 
     [Test]

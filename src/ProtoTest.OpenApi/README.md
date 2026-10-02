@@ -6,7 +6,9 @@ Creates contract coverage from ProtoTest REST observations and an OpenAPI docume
 dotnet add package ProtoTest.OpenApi
 ```
 
-Register `OpenApiCoverageCollector` on a REST target and point it at an OpenAPI file, URL or document. It reports which endpoints, responses and response properties were reached or asserted.
+Register `OpenApiCoverageCollector` on a REST target and point it at an OpenAPI file, URL or the document's text. It reports which endpoints, responses and response properties were reached or asserted.
+
+The package reads the document itself, so the application a suite hosts keeps its own OpenAPI library and version.
 
 This package reports coverage. It does not validate requests or responses against the specification.
 

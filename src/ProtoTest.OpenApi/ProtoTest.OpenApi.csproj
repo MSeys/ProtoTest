@@ -14,9 +14,9 @@
     <ProjectReference Include="..\ProtoTest.Core\ProtoTest.Core.csproj" />
     <ProjectReference Include="..\ProtoTest.Http\ProtoTest.Http.csproj" />
     <ProjectReference Include="..\ProtoTest.Rest\ProtoTest.Rest.csproj" />
-    <PackageReference Include="Microsoft.OpenApi" />
-    <!-- YAML documents are a separate reader in 2.x; 1.x read them out of the box. -->
-    <PackageReference Include="Microsoft.OpenApi.YamlReader" />
+    <!-- Documents are read by ProtoTest itself, so the package never imposes an OpenAPI library version on
+         the application a suite hosts. YAML is converted with YamlDotNet's representation model. -->
+    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
 </Project>

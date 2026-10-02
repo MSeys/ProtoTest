@@ -1,7 +1,7 @@
 namespace ProtoTest.OpenApi.Internal;
 
-using Microsoft.OpenApi;
 using ProtoTest.Core;
+using ProtoTest.OpenApi.Internal.Model;
 
 /// <summary>
 /// Builds the hierarchical coverage items from the loaded spec and the ledger's hit counts: one
@@ -11,7 +11,7 @@ using ProtoTest.Core;
 internal static class OpenApiReportBuilder
 {
     public static IReadOnlyList<ProtoReportItem> Build(
-        OpenApiDocument document,
+        OpenApiSpec document,
         OpenApiCoverageLedger ledger,
         string targetName,
         string category)
@@ -21,13 +21,12 @@ internal static class OpenApiReportBuilder
         var reportItems = new List<ProtoReportItem>();
         foreach (var (pathKey, pathItem) in document.Paths)
         {
-            foreach (var (httpMethod, operation) in pathItem.Operations ?? [])
+            foreach (var (method, operation) in pathItem.Operations)
             {
-                var method = httpMethod.Method.ToUpperInvariant();
                 var totalEndpointHits = ledger.EndpointHits(method, pathKey);
                 var childItems = new List<ProtoReportItem>();
 
-                foreach (var (responseKey, response) in operation.Responses ?? [])
+                foreach (var (responseKey, response) in operation.Responses)
                 {
                     var responseHits = ledger.ResponseHits(method, pathKey, responseKey);
                     var propertyItems = OpenApiSchemaExtractor

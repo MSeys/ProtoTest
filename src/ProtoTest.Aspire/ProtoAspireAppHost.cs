@@ -235,12 +235,14 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
 
     /// <summary>
     /// Whether the failure means the Aspire orchestration runtime is unavailable: the DCP executable
-    /// or the dashboard binaries the AppHost starts with could not be found, or DCP started but its own
-    /// API server never answered (a constrained CI machine). Suites catch the typed exception this maps
-    /// to and skip instead of failing.
+    /// or the dashboard binaries the AppHost starts with could not be found, or DCP itself could not
+    /// start: its dependency check failed (a container runtime that does not answer) or its API server
+    /// never came up. A resource that fails once DCP runs is the application's failure. Suites catch the
+    /// typed exception this maps to and skip instead of failing.
     /// </summary>
     internal static bool IsRuntimeMissing(Exception exception)
     {
+        ArgumentNullException.ThrowIfNull(exception);
         var queue = new Queue<Exception>();
         queue.Enqueue(exception);
         while (queue.Count > 0)
@@ -256,8 +258,8 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
                 return true;
             }
 
-            // DCP's API server never came up: Aspire's own wait for it timed out before any resource ran.
-            if (current.StackTrace?.Contains("Aspire.Hosting.Dcp.KubernetesService.EnsureKubernetesAsync", StringComparison.Ordinal) == true)
+            // DCP itself did not start, so no resource of the AppHost ran.
+            if (current.StackTrace is { } stack && DcpStartFrames.Any(frame => stack.Contains(frame, StringComparison.Ordinal)))
             {
                 return true;
             }
@@ -510,6 +512,14 @@ public sealed class ProtoAspireAppHost<TEntryPoint> : IProtoSettingsInfrastructu
 
         return merged;
     }
+
+    // The frames of DCP's own start: its dependency check, its host start and the wait for its API server.
+    private static readonly string[] DcpStartFrames =
+    [
+        "Aspire.Hosting.Dcp.DcpDependencyCheck.",
+        "Aspire.Hosting.Dcp.DcpHost.StartAsync",
+        "Aspire.Hosting.Dcp.KubernetesService.EnsureKubernetesAsync"
+    ];
 
     private static Exception MapStartFailure(string entryPoint, Exception exception)
     {

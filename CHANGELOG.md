@@ -165,7 +165,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Aspire
 
-- a DCP whose API server never answers (a constrained CI runner) fails the start with `ProtoAspireUnavailableException`, like missing orchestration binaries, so a suite skips with the reason. [Aspire](https://prototest.dev/docs/integrations/aspire)
+- a DCP that cannot start (its container-runtime check or its API server times out, as on a constrained CI runner) fails the start with `ProtoAspireUnavailableException`, like missing orchestration binaries, so a suite skips with the reason. [Aspire](https://prototest.dev/docs/integrations/aspire)
 - `AddAspireAppHost<TEntryPoint>()` runs an AppHost when selected and publishes its resources' addresses. [Aspire](https://prototest.dev/docs/integrations/aspire)
 - `UseAspireResource` serves an endpoint or connection string through the provider chain. [Aspire](https://prototest.dev/docs/integrations/aspire#serving-targets-through-the-chain)
 - the AppHost receives the suite's configuration and the run's settings as arguments. [Aspire](https://prototest.dev/docs/integrations/aspire)

@@ -308,21 +308,33 @@ public sealed class AspireCompositionTests
     }
 
     [Test]
-    public void IsRuntimeMissing_ShouldRecognizeADcpApiServerThatNeverAnswered()
+    public void IsRuntimeMissing_ShouldRecognizeADcpThatCouldNotStart()
     {
         // What a constrained runner records: Aspire's wait for DCP's API server times out.
         var timeout = new TimeoutException(
             "The operation didn't complete within the allowed timeout of '00:00:20'.",
             new DcpWaitCancelled());
         var resourceTimeout = new TimeoutException("The 'api' resource did not become healthy in time.");
+        // A runner whose Docker CLI does not answer fails DCP's dependency check before any resource runs.
+        var dependencyCheck = new InvalidOperationException(
+            "The Aspire AppHost failed to start.",
+            new DcpFailure("Application orchestrator dependency check returned an error: The operation has timed out.",
+                "   at Aspire.Hosting.Dcp.DcpDependencyCheck.GetDcpInfoAsync(Boolean force, CancellationToken cancellationToken)"));
 
         using (Assert.EnterMultipleScope())
         {
             Assert.That(ProtoAspireAppHost<TestAppHostAnchor>.IsRuntimeMissing(timeout), Is.True,
                 "DCP never came up, so the runtime is unavailable on this machine");
+            Assert.That(ProtoAspireAppHost<TestAppHostAnchor>.IsRuntimeMissing(dependencyCheck), Is.True,
+                "a container runtime that does not answer leaves DCP unable to start");
             Assert.That(ProtoAspireAppHost<TestAppHostAnchor>.IsRuntimeMissing(resourceTimeout), Is.False,
                 "a resource that times out is the application's failure");
         }
+    }
+
+    private sealed class DcpFailure(string message, string stackTrace) : Exception(message)
+    {
+        public override string StackTrace => stackTrace;
     }
 
     private sealed class DcpWaitCancelled() : OperationCanceledException("The operation was canceled.")

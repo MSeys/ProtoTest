@@ -47,13 +47,13 @@ prototest summary l0-time-drill.prototrace
 The command prints one deterministic document. This is the drill's output, with the run id shortened:
 
 ```text
-ProtoTest trace 2.0 · run d7b73deb... · 2026-09-29 18:36:43Z - 2026-09-29 18:36:46Z
+ProtoTest trace 2.0 · run ed41245e... · 2026-10-02 08:10:42Z - 2026-10-02 08:10:45Z
 1 tests · 1 failed
 
-FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (1.79 s)
+FAILED Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow (1.84 s)
   Shape mismatch failed with 1 error(s):
     • [$.status]: Values did not match. (Expected: "past_due", Actual: "active")
-  at samples/Northstar.ProtoTest/FailureDrills.cs:36 (Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow)
+  at samples/Northstar.ProtoTest/FailureDrills.cs:39 (Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow)
   assert.json.shape Assert response shape · failed
   cause: assertion (1 mismatch)
   mismatch: $.status: expected past_due, actual active
@@ -103,7 +103,7 @@ With `detail: context` the failure also returns its context package. This is the
 context: Northstar.ProtoTest.FailureDrills.ARealWaitDoesNotCloseTheDueWindow
 ancestors: test.execution > http.request REST GET /api/v1/organization > assert.json.shape
 attributes: $.status, expected past_due, actual active
-source: samples/Northstar.ProtoTest/FailureDrills.cs:36
+source: samples/Northstar.ProtoTest/FailureDrills.cs:39
 artifacts: rest-01-response, rest-01-expected-shape, scenario-summary.json
 ```
 
@@ -118,7 +118,7 @@ prototest review l0-time-drill.prototrace
 ```
 
 ```text
-untraced-gap: 1.0 s of the test body recorded no operation, starting 154 ms in, before 'REST · GET /api/v1/organization'.
+untraced-gap: 1.0 s of the test body recorded no operation, starting 160 ms in, before 'REST · GET /api/v1/organization'.
   next: Replace a sleep with a wait that records what it waits for (ProtoPolling, a message await, the test clock), ...
 ```
 

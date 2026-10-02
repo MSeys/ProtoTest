@@ -179,12 +179,16 @@ describe("untracedGaps and diagnosisRule over the committed demo trace", () => {
     const wait = untracedGaps(byMethod(run.tests, "ARealWaitDoesNotCloseTheDueWindow"));
     expect(wait).toHaveLength(1);
     expect(wait[0].phase).toBe("execution");
-    expect(Math.round(wait[0].duration)).toBe(1006);
+    // The drill sleeps for one real second; the recorded gap adds a few milliseconds of scheduling.
+    expect(wait[0].duration).toBeGreaterThanOrEqual(1000);
+    expect(wait[0].duration).toBeLessThan(1200);
     expect(wait[0].before?.name).toBe("REST · GET /api/v1/organization");
 
     const hardcoded = untracedGaps(byMethod(run.tests, "TheAddressWasHardcodedForOneMachine"));
     expect(hardcoded).toHaveLength(1);
-    expect(Math.round(hardcoded[0].duration)).toBe(2029);
+    // The raw HttpClient call is untraced; where the trace was recorded, the refused connection took about two seconds.
+    expect(hardcoded[0].duration).toBeGreaterThanOrEqual(1900);
+    expect(hardcoded[0].duration).toBeLessThan(2600);
     expect(hardcoded[0].before).toBeNull();
   });
 

@@ -3,7 +3,8 @@ namespace ProtoTest.TestSupport;
 using ProtoTest.Core;
 
 /// <summary>One operation a recorded test performs; a failure ends the test there.</summary>
-public sealed record RecordedStep(string Kind, string Name, string? Subject = null, Exception? Failure = null);
+/// <remarks>A step with an empty kind records nothing and waits for <paramref name="Pause"/>: an untraced gap.</remarks>
+public sealed record RecordedStep(string Kind, string Name, string? Subject = null, Exception? Failure = null, TimeSpan Pause = default);
 
 /// <summary>One test of a recorded run: its name and the operations it performs in order.</summary>
 public sealed record RecordedTest(string Name, params RecordedStep[] Steps);
@@ -23,6 +24,9 @@ public static class RecordedRuns
     /// <summary>A step that fails with the given error.</summary>
     public static RecordedStep FailedCall(string name, string subject, Exception failure)
         => new("http.request", name, subject, failure);
+
+    /// <summary>A wait that records no operation, the way a sleep in a test body does.</summary>
+    public static RecordedStep Sleep(TimeSpan duration) => new(string.Empty, "sleep", Pause: duration);
 
     /// <summary>A check that succeeds.</summary>
     public static RecordedStep Check(string name) => new("assert.json.shape", name);
@@ -48,6 +52,12 @@ public static class RecordedRuns
             Exception? failure = null;
             foreach (var step in test.Steps)
             {
+                if (step.Kind.Length == 0)
+                {
+                    await Task.Delay(step.Pause);
+                    continue;
+                }
+
                 var operation = context.Trace.Operation(step.Kind, step.Name, Source);
                 if (step.Subject is { Length: > 0 } subject)
                 {

@@ -67,6 +67,27 @@ public static class ProtoDiagnosis
         return Read(ProtoTraceArchive.Open(tracePath));
     }
 
+    /// <summary>
+    /// Reviews what each test proves from what it recorded: a body with no check, a call no check looked
+    /// at, and time with no recorded operation. Every finding names the next step.
+    /// </summary>
+    /// <param name="tracePath">The trace of the run to review.</param>
+    /// <param name="testNames">The tests to review, by name or id; empty reviews every test.</param>
+    public static ProtoRunReview Review(string tracePath, IReadOnlyCollection<string>? testNames = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tracePath);
+        return Review(ProtoTraceArchive.Open(tracePath), testNames);
+    }
+
+    /// <summary>Reviews what each test of an opened run proves; see <see cref="Review(string, IReadOnlyCollection{string}?)"/>.</summary>
+    /// <param name="archive">The run to review.</param>
+    /// <param name="testNames">The tests to review, by name or id; empty reviews every test.</param>
+    public static ProtoRunReview Review(ProtoTraceArchive archive, IReadOnlyCollection<string>? testNames = null)
+    {
+        ArgumentNullException.ThrowIfNull(archive);
+        return ProtoTestReviewer.Review(archive, testNames);
+    }
+
     /// <summary>Reads one run's diagnosis from an opened archive.</summary>
     public static ProtoDiagnosisDocument Read(ProtoTraceArchive archive)
     {

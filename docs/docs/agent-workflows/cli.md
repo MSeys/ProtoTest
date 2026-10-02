@@ -25,6 +25,7 @@ usage: prototest summary <file.prototrace>
        prototest verify <baseline-report.json> <current-report.json>
        prototest compare <baseline.prototrace> <current.prototrace>
        prototest prove <baseline.prototrace> <current.prototrace>... [--test <name>]...
+       prototest review <file.prototrace> [--test <name>]...
 ```
 
 | You want to | Run | It writes |
@@ -34,6 +35,7 @@ usage: prototest summary <file.prototrace>
 | check a run against a baseline | `verify <baseline.json> <current.json>` | nothing |
 | see what changed between two runs | `compare <baseline.prototrace> <current.prototrace>` | nothing |
 | prove a fix | `prove <baseline.prototrace> <current.prototrace>... [--test <name>]...` | nothing |
+| see what each test proves | `review <file.prototrace> [--test <name>]...` | nothing |
 | post the digest | `feedback <file.prototrace> [--digest <path>]` | the `--digest` file, and the posts |
 
 An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`. There is no `--help` verb: `prototest --help` prints the same usage to stderr and exits `1`.
@@ -175,6 +177,16 @@ ProtoTest fix proven: baseline run 5f2c... -> run 9a41...
 
 Exit `0` when the fix is proven and `1` when it is not, with one `::error` line per unproven or broken test.
 
+### review
+
+Reviews what each test proves from what it recorded: a body with no check, a call no check looked at, and time with no recorded operation. Every finding prints its next step:
+
+```bash
+prototest review TestResults/prototest-<runId>.prototrace
+```
+
+[Diagnosis](./diagnosis.md#review-what-a-test-proves) lists the rules. A review advises, so it exits `0` with findings; it exits `1` only when the trace is missing or cannot be read.
+
 ### feedback
 
 Reads one run's digest and posts it:
@@ -296,6 +308,7 @@ flowchart TD
     channel -->|"yes"| one
     channel -->|"no"| zero
     verb -->|"summary"| zero
+    verb -->|"review"| zero
 ```
 
 | Code | Meaning |
@@ -317,6 +330,6 @@ flowchart TD
 - `prove` proves what the recorded runs show. It cannot see a test that was not run.
 - The CLI writes UTF-8 without a BOM and sets the console output encoding, so the `·` separator renders on a default Windows console. Redirected output stays parsing-friendly.
 - The digest is built from the written archive after the run, so it reflects what the run recorded ([The evidence loop](./loop.md#limits)).
-- These six verbs are the whole `prototest` surface.
+- These seven verbs are the whole `prototest` surface.
 
 Run `prototest summary` over the newest archive, or `prototest index` over the results folder, and the same evidence your agent reads is on your terminal.

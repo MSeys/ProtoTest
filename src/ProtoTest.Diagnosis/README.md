@@ -28,6 +28,16 @@ log, an agent and the viewer select one failure and tell one story:
 - A failed run gate explains a red run in the gates list.
 
 Anything else is unexplained, with the run and test ids in the document and a pointer to the viewer.
+
+`ProtoDiagnosis.Review` says what each test proves: a test body with no check, a call no check looked
+at, and time with no recorded operation. Each finding names the next step.
+
+```csharp
+foreach (var test in ProtoDiagnosis.Review("TestResults/Shop.prototrace").Tests.Where(t => !t.Clean))
+{
+    Console.WriteLine($"{test.Name}: {string.Join(", ", test.Findings.Select(f => f.Rule))}");
+}
+```
 `ProtoDiagnosis.ReadContext(archive, testId)` returns what an agent reads for one failure: the
 selected operation with its attributes, the ancestor chain and the nearest call, section previews,
 the embedded source snippet, the test's artifacts, the state changes the operation caused and the

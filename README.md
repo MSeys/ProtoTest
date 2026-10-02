@@ -60,7 +60,7 @@ Each test gets its own `Proto.Context`. It carries the clients, the state and th
 The trace is the failure story. Drop the `.prototrace` file on the viewer and read the run: lifecycle, requests, checks, resources, attachments.
 
 <p align="center">
-  <img src="assets/trace-viewer.png" alt="ProtoTrace showing a failed integration test, its execution story, response mismatch and cleanup" />
+  <img src="assets/trace-viewer.jpg" alt="ProtoTrace showing a failed integration test, its execution story, response mismatch and cleanup" />
 </p>
 
 [Open the interactive trace](https://trace.prototest.dev/?demo=1)

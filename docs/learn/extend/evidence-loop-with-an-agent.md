@@ -3,7 +3,7 @@ id: evidence-loop-with-an-agent
 title: Run the evidence loop with an agent
 sidebar_label: The evidence loop with an agent
 sidebar_position: 6
-description: "Summarize a failing trace with the CLI, connect a coding agent to the same file over MCP, and close the loop with a verified fix."
+description: "Summarize a failing trace with the CLI, connect a coding agent to the same file over MCP, and let ProtoTest judge the fix."
 ---
 
 import Lesson from '@site/src/components/Lesson';
@@ -19,7 +19,7 @@ import Link from '@docusaurus/Link';
   outcomes={[
     'Summarize a real failing trace from the command line',
     'Connect a coding agent to the same file over MCP and ask for the failure',
-    'Verify a fix against a baseline and post the digest',
+    'Let ProtoTest review a test and prove a fix',
   ]}
   needs={[
     <>The previous lesson, <a href="/learn/extend/swap-a-dependency-for-one-test">Swap a dependency for one test</a></>,
@@ -86,14 +86,14 @@ The server finds the `.prototrace` archives under that folder. For one downloade
 
 ### 3. Ask the agent about the failure
 
-The server offers four read-only tools:
+The server offers read-only tools. These four read a failure:
 
 | Tool | Returns |
 | --- | --- |
 | `list_runs` | the newest runs, with counts and failing test ids |
 | `get_failure` | one failure: error, source line, failing check, mismatches, artifacts |
 | `get_diagnosis` | the run's diagnosis, or one failure's context with `detail: context` |
-| `get_coverage` | coverage totals and uncovered units |
+| `get_coverage` | coverage totals, uncovered units, and the test to start from for each |
 
 Ask the agent to list the runs, then for the failure in the time drill. The names, the line and the mismatch come out identical to the summary, because the viewer, the summary and the tools select the failure the same way.
 
@@ -109,28 +109,34 @@ artifacts: rest-01-response, rest-01-expected-shape, scenario-summary.json
 
 
 
-### 4. Close the loop
+### 4. Let ProtoTest judge
 
-A fix does not verify itself. After the change, compare the new report with the report from before it:
-
-```bash
-dotnet test
-prototest verify baseline.json TestResults/ProtoTest/report.json
-```
-
-Then post the digest, locally or from CI:
+The agent does the fixing. ProtoTest decides whether the result holds. Review the drill:
 
 ```bash
-prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
+prototest review l0-time-drill.prototrace
 ```
 
-The command prints one annotation per failure, for the pull request, on stdout. On stderr it says how each channel went, such as the comment or a webhook. With no target configured, those channels skip with their reason, so a local run is safe. In CI, the evidence action uploads the trace, compares it with the base branch's last green run, posts the comment and runs the verdict. The [loop page](/docs/agent-workflows/loop) carries the workflow.
+```text
+untraced-gap: 1.0 s of the test body recorded no operation, starting 154 ms in, before 'REST · GET /api/v1/organization'.
+  next: Replace a sleep with a wait that records what it waits for (ProtoPolling, a message await, the test clock), ...
+```
+
+The drill sleeps for real. Its fixed version, <a href="pathname:///lessons/l0-time-fix.prototrace">l0-time-fix.prototrace</a>, moves the test clock instead, and `prototest review` reads it clean.
+
+For your own fix, keep the trace of the failing run and the one after the fix, then ask for the receipt:
+
+```bash
+prototest prove before.prototrace after.prototrace
+```
+
+It says proven only when the test failed before, passes now, and no other test broke. Over MCP they are `review_tests` and `check_fix`.
 
 ## What happened
 
 The suite wrote one archive. The command and the agent both read that archive, so they could not tell different stories. The agent did not read the test output at all. It named the file, the line, the mismatch and the artifacts from recorded evidence.
 
-The agent is read-only: it runs no suite and changes no file. It never guesses either. A failure whose evidence was not recorded is reported as unexplained.
+The tools are read-only: they run no suite and change no file. They never guess either. A failure whose evidence was not recorded is reported as unexplained, and a fix counts only when the receipt proves it.
 
 ## Check yourself
 
@@ -145,12 +151,13 @@ It adds the failing check's ancestor chain and the artifacts the agent can reach
 ## Remember
 
 - `prototest summary` and the MCP tools read one archive and select the same failure.
-- The loop is fail, evidence, fix, verify, report. Verify the fix against an earlier report.
+- The loop is fail, evidence, fix, verify, report. ProtoTest judges the fix: `prove` and `check_fix`.
 - The agent reads recorded evidence only, so the trace has to exist first.
 
 Next: back to [all the tracks](/learn/).
 
 ## Go deeper
 
+- [Coding agents](/docs/agent-workflows/coding-agents): the three jobs and the tool that judges each.
 - [The evidence loop](/docs/agent-workflows/loop): the action, the digest and what the reviewer sees.
 - [Agent setup](/docs/agent-workflows/setup): clients and the copy-in skill that teaches the loop.

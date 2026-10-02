@@ -65,6 +65,14 @@ The trace is the failure story. Drop the `.prototrace` file on the viewer and re
 
 [Open the interactive trace](https://trace.prototest.dev/?demo=1)
 
+## With a coding agent
+
+Your agent fixes and writes tests; ProtoTest judges the result from the trace. The MCP server and the
+`prototest` CLI tell the agent where a run left the last green one, prove a fix only when the test failed
+before, passes now and broke nothing else, and say what each test actually checks. On a pull request, the
+[ProtoTest Evidence action](https://github.com/MSeys/prototest-action) posts what the change broke and
+fixed. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents) covers the setup.
+
 ## Learn
 
 - [Documentation](https://prototest.dev/docs/foundation/overview)

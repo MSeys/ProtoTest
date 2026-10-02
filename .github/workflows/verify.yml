@@ -113,6 +113,15 @@ jobs:
         shell: pwsh
         run: ./proto.ps1 template test
 
+      # The console keeps only the tail of a failing project; the logs hold each test's own message.
+      - name: Upload the test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-test-logs
+          path: artifacts/test-logs
+          retention-days: 7
+
       - name: Keep the validated release packages
         if: inputs.upload_packages
         uses: actions/upload-artifact@v4

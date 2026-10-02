@@ -17,6 +17,7 @@ public sealed class FeedbackCommentTests
 
         var expected = string.Join(Environment.NewLine,
         [
+            ProtoFeedbackComment.Marker,
             "## ProtoTest run `run-1`",
             string.Empty,
             "**1 tests · 1 failed**",
@@ -78,7 +79,7 @@ public sealed class FeedbackCommentTests
             Assert.That(result.Reason, Is.Null);
         }
 
-        var request = server.Requests.Single();
+        var request = server.Requests.Single(candidate => candidate.Method == "POST");
         using (Assert.EnterMultipleScope())
         {
             Assert.That(request.Method, Is.EqualTo("POST"));
@@ -167,7 +168,7 @@ public sealed class FeedbackCommentTests
         {
             Assert.That(result.Status, Is.EqualTo(ProtoFeedbackStatuses.Skipped));
             Assert.That(result.Reason, Does.Contain("no failures to report"));
-            Assert.That(server.Requests, Is.Empty);
+            Assert.That(server.Requests.Select(request => request.Method), Is.EqualTo(new[] { "GET" }), "it only looked for a comment to update");
         }
     }
 }

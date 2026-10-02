@@ -69,7 +69,7 @@ A remote specification source is recorded, not fetched. Without a candidate, the
 
 ## Gate the pull request
 
-The [ProtoTest Evidence action](../continuous-integration/index.md#compare-with-the-base-branch) runs this verdict over the reports the base branch's trace and the pull request's trace embedded, and fails the step on a failing finding. `prototest verify` reads a `.prototrace` as well as a `report.json`, so the same check runs locally over two traces. The feedback channel has already annotated each failing test at its source location, so the reviewer sees the failure where it happened.
+The [ProtoTest Evidence action](../continuous-integration/index.md#compare-with-the-base-branch) puts the coverage that moved in the pull request comment, with the test to start from for each new uncovered unit, and runs this verdict over the reports the base branch's trace and the pull request's trace embedded, and fails the step on a failing finding. `prototest verify` reads a `.prototrace` as well as a `report.json`, so the same check runs locally over two traces. The feedback channel has already annotated each failing test at its source location, so the reviewer sees the failure where it happened.
 
 ## Limits
 

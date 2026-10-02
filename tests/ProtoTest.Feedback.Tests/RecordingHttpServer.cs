@@ -17,12 +17,14 @@ internal sealed class RecordingHttpServer : IDisposable, IAsyncDisposable
     private readonly List<RecordedRequest> _requests = [];
     private readonly object _gate = new();
     private readonly int _status;
+    private readonly Func<RecordedRequest, (int Status, string Body)?>? _respond;
     private readonly string _reason;
 
-    private RecordingHttpServer(TcpListener listener, int status)
+    private RecordingHttpServer(TcpListener listener, int status, Func<RecordedRequest, (int Status, string Body)?>? respond = null)
     {
         _listener = listener;
         _status = status;
+        _respond = respond;
         _reason = status switch
         {
             200 => "OK",
@@ -60,6 +62,14 @@ internal sealed class RecordingHttpServer : IDisposable, IAsyncDisposable
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         return new RecordingHttpServer(listener, status);
+    }
+
+    /// <summary>Starts an endpoint that answers the requests <paramref name="respond"/> picks with their own status and body.</summary>
+    public static RecordingHttpServer Start(int status, Func<RecordedRequest, (int Status, string Body)?> respond)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return new RecordingHttpServer(listener, status, respond);
     }
 
     private async Task ServeAsync()
@@ -100,8 +110,12 @@ internal sealed class RecordingHttpServer : IDisposable, IAsyncDisposable
             _requests.Add(request);
         }
 
+        var (status, body) = _respond?.Invoke(request) ?? (_status, "ok");
+        var content = Encoding.UTF8.GetBytes(body);
         var response = Encoding.ASCII.GetBytes(
-            $"HTTP/1.1 {_status} {_reason}\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+                $"HTTP/1.1 {status} {(status == _status ? _reason : "Reply")}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n")
+            .Concat(content)
+            .ToArray();
         await stream.WriteAsync(response, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }

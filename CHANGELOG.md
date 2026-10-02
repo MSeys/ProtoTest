@@ -206,8 +206,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the MCP server offers three job prompts, `fix_failure`, `cover_change` and `improve_tests`, each ending with the tool that judges it; the skills and the starter's `AGENTS.md` point at them. [Setup](https://prototest.dev/docs/agent-workflows/setup#the-job-prompts)
 - `ProtoReport.ReadJson(Stream)` reads a report from a stream, such as the one a trace embeds. [Verification](https://prototest.dev/docs/agent-workflows/verification)
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. [Loop](https://prototest.dev/docs/agent-workflows/loop)
-- the ProtoTest Evidence action (`MSeys/prototest-action`) compares a pull request's run with the base branch's last green run, posts what broke and what was fixed, runs the verdict over the embedded reports and keeps the trace. [CI](https://prototest.dev/docs/continuous-integration/#the-evidence-action)
-- `prototest feedback --baseline <trace>` adds the comparison to the comment, and `prototest verify` reads the reports two traces embedded (`ProtoVerificationRun.FromTrace`). [CLI](https://prototest.dev/docs/agent-workflows/cli#feedback)
+- the ProtoTest Evidence action (`MSeys/prototest-action`) compares a pull request's run with the base branch's last green run, posts what broke, what was fixed and the coverage that moved, runs the verdict over the embedded reports (optionally failing on new uncovered units) and keeps the trace. [CI](https://prototest.dev/docs/continuous-integration/#the-evidence-action)
+- `prototest feedback --baseline <trace>` adds the comparison and the coverage that moved to the comment (each new uncovered unit with the test to start from, each unit no longer covered), and updates the pull request's one ProtoTest comment instead of adding another. `prototest verify` reads the reports two traces embedded (`ProtoVerificationRun.FromTrace`), and `--strict` fails a unit added without a test. [CLI](https://prototest.dev/docs/agent-workflows/cli#feedback)
 
 #### Traces and reporting
 

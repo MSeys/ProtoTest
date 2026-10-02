@@ -69,7 +69,7 @@ public sealed class FeedbackComparisonTests
             },
             client);
 
-        using var body = JsonDocument.Parse(server.Requests.Single().Body);
+        using var body = JsonDocument.Parse(server.Requests.Single(request => request.Method == "POST").Body);
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Status, Is.EqualTo(ProtoFeedbackStatuses.Posted));

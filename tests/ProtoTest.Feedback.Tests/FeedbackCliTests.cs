@@ -64,7 +64,8 @@ public sealed class FeedbackCliTests
                 ["PROTOTEST_FEEDBACK_TRACE_URL"] = "https://example.test/artifact"
             }, () => exit = CliHost.Run(["feedback", FeedbackFixtures.McpFixture("run-failed")], output, error));
 
-            var request = server.Requests.Single();
+            // The first request looks for an earlier ProtoTest comment to update; the second posts.
+            var request = server.Requests.Single(candidate => candidate.Method == "POST");
             using var body = JsonDocument.Parse(request.Body);
             using (Assert.EnterMultipleScope())
             {

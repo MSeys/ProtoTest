@@ -278,3 +278,10 @@ jobs:
       - name: Run the full test suite
         shell: pwsh
         run: ./proto.ps1 test -Configuration Release
+      - name: Upload the test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-logs
+          path: artifacts/test-logs
+          retention-days: 7

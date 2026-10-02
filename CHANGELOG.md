@@ -165,6 +165,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Aspire
 
+- a DCP whose API server never answers (a constrained CI runner) fails the start with `ProtoAspireUnavailableException`, like missing orchestration binaries, so a suite skips with the reason. [Aspire](https://prototest.dev/docs/integrations/aspire)
 - `AddAspireAppHost<TEntryPoint>()` runs an AppHost when selected and publishes its resources' addresses. [Aspire](https://prototest.dev/docs/integrations/aspire)
 - `UseAspireResource` serves an endpoint or connection string through the provider chain. [Aspire](https://prototest.dev/docs/integrations/aspire#serving-targets-through-the-chain)
 - the AppHost receives the suite's configuration and the run's settings as arguments. [Aspire](https://prototest.dev/docs/integrations/aspire)
@@ -211,6 +212,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Traces and reporting
 
+- a suite built deterministically (`ContinuousIntegrationBuild`, which maps sources to `/_/`) still records repository-relative locations and embeds its sources when it runs inside its repository. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - a check that runs after an await inside ProtoTest, such as `ExpectAsync` on a REST or GraphQL call, records the line of the test step it checks instead of no line. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - the HTML report reads like the viewer's run view: a headline that names what needs attention, a strip of every entry, a Needs attention list across all kinds and one tab per kind. Coverage is one tab with its own figure, not the page's headline. [Reporting](https://prototest.dev/docs/observability/reporting#the-html-report)
 - the report summary counts every kind in `Kinds`, written to the JSON report next to the existing totals. [Reporting](https://prototest.dev/docs/observability/reporting)

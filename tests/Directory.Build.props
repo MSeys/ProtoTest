@@ -8,6 +8,9 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- Tests ship nowhere, so their PDBs keep real paths: source locations and [CallerFilePath]
+         helpers find the repository the same way on a laptop and in CI, where CI=true would map them to /_/. -->
+    <ContinuousIntegrationBuild>false</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <ItemGroup>

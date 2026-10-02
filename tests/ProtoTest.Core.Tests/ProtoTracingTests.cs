@@ -98,6 +98,22 @@ public sealed class ProtoTracingTests
     }
 
     [Test]
+    public void SourceLocator_ShouldResolveADeterministicBuildsMappedPathInTheRepository()
+    {
+        // A CI build maps the source root to /_/ in the PDB; the suite runs inside the repository.
+        var mapped = ProtoSourceLocator.Unmapped("/_/tests/ProtoTest.Core.Tests/ProtoTracingTests.cs");
+        var unknown = ProtoSourceLocator.Unmapped("/_/tests/NoSuchFile.cs");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(mapped), Is.True, mapped);
+            Assert.That(mapped.Replace('\\', '/'), Does.EndWith("tests/ProtoTest.Core.Tests/ProtoTracingTests.cs"));
+            Assert.That(unknown, Is.EqualTo("/_/tests/NoSuchFile.cs"), "a path the repository lacks stays as recorded");
+            Assert.That(ProtoSourceLocator.Unmapped("/_9/x.cs"), Is.EqualTo("/_9/x.cs"));
+        });
+    }
+
+    [Test]
     public async Task SourceLocations_CanBeTurnedOff()
     {
         var builder = new ProtoHostBuilder();

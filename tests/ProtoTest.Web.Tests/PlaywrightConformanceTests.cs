@@ -11,6 +11,10 @@ using ProtoTest.Web.Playwright;
 [TestFixture]
 public sealed class PlaywrightConformanceTests
 {
+    // Setup content loads outside the short action timeout these tests use to fail fast, so a slow
+    // runner's page load does not fail the test before its assertion runs.
+    private static readonly PageSetContentOptions SetupContent = new() { Timeout = 30_000 };
+
     [Test]
     public async Task SharedWebModel_ShouldRunAgainstARealBrowser()
     {
@@ -109,7 +113,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("Playwright select semantics", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.Html);
+        await backend.Page.SetContentAsync(ConformanceMarkup.Html, SetupContent);
         var page = web.Page<ConformancePage>();
 
         await page.Language.SelectOptionAsync("nl");
@@ -138,7 +142,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright disabled controls", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync(ConformanceMarkup.DisabledInteractionsHtml);
+        await backend.Page.SetContentAsync(ConformanceMarkup.DisabledInteractionsHtml, SetupContent);
         var page = web.Page<DisabledInteractionsPage>();
 
         var check = Assert.ThrowsAsync<WebActionabilityException>(async () =>
@@ -313,7 +317,7 @@ public sealed class PlaywrightConformanceTests
         var context = await host.StartTestAsync("playwright missing element", TestMethods.Placeholder);
         var web = context.Web();
         var backend = await OpenBrowserAsync(web);
-        await backend.Page.SetContentAsync("<!doctype html><html><body><p class=\"dup\">one</p></body></html>");
+        await backend.Page.SetContentAsync("<!doctype html><html><body><p class=\"dup\">one</p></body></html>", SetupContent);
         var page = web.Page<DuplicatePage>();
 
         // A direct read reports the documented resolution failure instead of a raw Playwright timeout.

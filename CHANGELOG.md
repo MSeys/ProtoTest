@@ -278,6 +278,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - diagnostic request URLs keep a root-relative path on Linux and macOS instead of turning it into a `file://` address. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - `Build()` is terminal; every public registration after it throws the single-build message. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
 - shape mismatches with value constraints record every mismatch, not an internal type name. [Shape matching](https://prototest.dev/docs/foundation/shape-matching)
+- `ProtoPolling` waits out a deadline less than a millisecond away instead of probing in a tight loop until it passes. [Time](https://prototest.dev/docs/foundation/time)
 - malformed JSON bodies and report metadata are redacted with the same policy as the trace. [Attachments](https://prototest.dev/docs/foundation/attachments)
 - a failed run start unwinds completed run hooks in reverse and keeps the trace silent. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)
 - a scope disposed off its async flow records a `Lifecycle` finding and throws. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle)

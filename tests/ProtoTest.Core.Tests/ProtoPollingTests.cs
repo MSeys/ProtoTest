@@ -52,4 +52,28 @@ public sealed class ProtoPollingTests
                 "an unsatisfied poll returns around the deadline, not immediately");
         });
     }
+
+    [Test]
+    public async Task PollAsync_ShouldNotSpinWhenLessThanAMillisecondRemains()
+    {
+        // A deadline under a millisecond away must still be waited out, not polled in a tight loop:
+        // Task.Delay truncates a sub-millisecond span to zero and returns at once.
+        var attempts = 0;
+        var result = await ProtoPolling.PollAsync(
+            _ =>
+            {
+                attempts++;
+                return ValueTask.FromResult(false);
+            },
+            value => value,
+            TimeSpan.FromTicks(5_000),
+            TimeSpan.FromSeconds(2),
+            CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Satisfied, Is.False);
+            Assert.That(attempts, Is.LessThanOrEqualTo(3), "one probe, the deadline probe and timer slack");
+        });
+    }
 }

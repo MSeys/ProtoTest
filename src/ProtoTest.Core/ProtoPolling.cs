@@ -43,7 +43,9 @@ public static class ProtoPolling
                 return new ProtoPollResult<T>(observation, Satisfied: false, stopwatch.Elapsed);
             }
 
-            var remaining = timeout - stopwatch.Elapsed;
+            // Rounded up to whole milliseconds: Task.Delay truncates a sub-millisecond span to zero,
+            // which would spin the probe until the deadline.
+            var remaining = TimeSpan.FromMilliseconds(Math.Ceiling((timeout - stopwatch.Elapsed).TotalMilliseconds));
             await Task.Delay(remaining < pollInterval ? remaining : pollInterval, cancellationToken)
                 .ConfigureAwait(false);
         }

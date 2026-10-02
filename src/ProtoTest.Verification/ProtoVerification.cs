@@ -114,6 +114,49 @@ public static class ProtoVerification
         return ProtoTraceComparer.Compare(baseline, current);
     }
 
+    /// <summary>
+    /// Proves a fix from recorded runs. A claimed test is proven when the baseline recorded it failing and
+    /// every current run recorded it succeeded; the fix is proven when every claimed test is, no other
+    /// test broke, and the reports both runs embedded verify without a fail finding.
+    /// </summary>
+    /// <param name="baselinePath">The trace of the run that shows the failure.</param>
+    /// <param name="currentPaths">One or more traces of the run after the fix. Several runs guard
+    /// against a test that passes once by chance: every one of them must succeed.</param>
+    /// <param name="testNames">The tests the fix claims; empty claims every test the baseline did not
+    /// record as succeeded.</param>
+    public static ProtoFixReceipt Prove(
+        string baselinePath,
+        IReadOnlyList<string> currentPaths,
+        IReadOnlyCollection<string>? testNames = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(baselinePath);
+        ArgumentNullException.ThrowIfNull(currentPaths);
+        return Prove(
+            ProtoTraceArchive.Open(baselinePath),
+            [.. currentPaths.Select(ProtoTraceArchive.Open)],
+            testNames);
+    }
+
+    /// <summary>Proves a fix from recorded runs; see <see cref="Prove(string, IReadOnlyList{string}, IReadOnlyCollection{string}?)"/>.</summary>
+    /// <param name="baseline">The run that shows the failure.</param>
+    /// <param name="currentRuns">One or more runs after the fix; every one must succeed.</param>
+    /// <param name="testNames">The tests the fix claims; empty claims every test the baseline did not
+    /// record as succeeded.</param>
+    public static ProtoFixReceipt Prove(
+        ProtoTraceArchive baseline,
+        IReadOnlyList<ProtoTraceArchive> currentRuns,
+        IReadOnlyCollection<string>? testNames = null)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        ArgumentNullException.ThrowIfNull(currentRuns);
+        if (currentRuns.Count == 0)
+        {
+            throw new ArgumentException("A proof needs at least one run after the fix.", nameof(currentRuns));
+        }
+
+        return ProtoFixProver.Prove(baseline, currentRuns, testNames);
+    }
+
     private static void ValidateSeverities(ProtoVerificationOptions options)
     {
         RequireSeverity(options.RegressedSeverity, nameof(options.RegressedSeverity));

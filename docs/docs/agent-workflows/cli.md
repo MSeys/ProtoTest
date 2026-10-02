@@ -24,6 +24,7 @@ usage: prototest summary <file.prototrace>
        prototest feedback <file.prototrace> [--digest <path>]
        prototest verify <baseline-report.json> <current-report.json>
        prototest compare <baseline.prototrace> <current.prototrace>
+       prototest prove <baseline.prototrace> <current.prototrace>... [--test <name>]...
 ```
 
 | You want to | Run | It writes |
@@ -32,6 +33,7 @@ usage: prototest summary <file.prototrace>
 | share a folder of runs | `index <folder>` | `index.html` and a `.digest.json` beside each archive |
 | check a run against a baseline | `verify <baseline.json> <current.json>` | nothing |
 | see what changed between two runs | `compare <baseline.prototrace> <current.prototrace>` | nothing |
+| prove a fix | `prove <baseline.prototrace> <current.prototrace>... [--test <name>]...` | nothing |
 | post the digest | `feedback <file.prototrace> [--digest <path>]` | the `--digest` file, and the posts |
 
 An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`. There is no `--help` verb: `prototest --help` prints the same usage to stderr and exits `1`.
@@ -147,6 +149,32 @@ Unchanged tests are counted, not listed. A test that fails the same way in both 
 
 Exit `0` when no test broke and `1` when one did, or when a trace is missing or cannot be read.
 
+### prove
+
+Proves a fix from recorded runs. The baseline is the run that shows the failure; the current traces are runs after the fix:
+
+```bash
+prototest prove before.prototrace after.prototrace --test "orders are listed"
+```
+
+The fix is proven only when all of these hold:
+
+- the baseline recorded each claimed test as not succeeded;
+- every current run recorded each claimed test as succeeded;
+- no test that passed in the baseline fails now;
+- when both runs embedded a JSON report, `verify` over the two reports has no failing finding.
+
+Each unmet condition prints a reason code (`not-in-baseline`, `not-failing-in-baseline`, `not-in-current`, `still-failing`) with the run it is about. Without `--test`, the fix claims every test the baseline did not pass. Pass two or more current traces to guard against a test that passes once by chance.
+
+```text
+ProtoTest fix proven: baseline run 5f2c... -> run 9a41...
+  PROVEN orders are listed
+    changed at: http.request List orders [GET /orders] (status-changed)
+  note: No JSON report is embedded in baseline run 5f2c..., so coverage and run gates were not compared.
+```
+
+Exit `0` when the fix is proven and `1` when it is not, with one `::error` line per unproven or broken test.
+
 ### feedback
 
 Reads one run's digest and posts it:
@@ -258,6 +286,9 @@ flowchart TD
     verb -->|"compare"| broke{"A test that passed<br/>in the baseline fails?"}
     broke -->|"yes"| one
     broke -->|"no"| zero
+    verb -->|"prove"| proven{"Is the fix<br/>proven?"}
+    proven -->|"no"| one
+    proven -->|"yes"| zero
     verb -->|"verify"| verdict{"A finding<br/>with severity fail?"}
     verdict -->|"yes"| one
     verdict -->|"no"| zero
@@ -274,6 +305,7 @@ flowchart TD
 | `1` | `index` found no readable archive or could not write the page |
 | `1` | the verdict has a fail finding |
 | `1` | `compare` found a broken test |
+| `1` | `prove` could not prove the fix |
 | `1` | a feedback channel that reached its target failed |
 
 ## Limits
@@ -281,9 +313,10 @@ flowchart TD
 - The verbs read files. The only writes are the `index` page, the digests beside the traces and the `--digest` file.
 - No network call happens unless a target is configured. A missing target is a named skip, never a failure.
 - The verbs take no other arguments, and there is no verb that reruns a suite, writes a trace or changes an archive.
-- `compare` matches tests by name, so a renamed test reads as one removed and one new test.
+- `compare` and `prove` match tests by name, so a renamed test reads as one removed and one new test.
+- `prove` proves what the recorded runs show. It cannot see a test that was not run.
 - The CLI writes UTF-8 without a BOM and sets the console output encoding, so the `·` separator renders on a default Windows console. Redirected output stays parsing-friendly.
 - The digest is built from the written archive after the run, so it reflects what the run recorded ([The evidence loop](./loop.md#limits)).
-- These five verbs are the whole `prototest` surface.
+- These six verbs are the whole `prototest` surface.
 
 Run `prototest summary` over the newest archive, or `prototest index` over the results folder, and the same evidence your agent reads is on your terminal.

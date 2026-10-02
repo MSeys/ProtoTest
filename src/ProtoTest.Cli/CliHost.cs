@@ -44,6 +44,11 @@ public static class CliHost
             return Compare(args[1], args[2], output, error);
         }
 
+        if (args.Length >= 3 && string.Equals(args[0], "prove", StringComparison.Ordinal))
+        {
+            return Prove(args, output, error);
+        }
+
         WriteUsage(error);
         return 1;
     }
@@ -252,6 +257,67 @@ public static class CliHost
         return comparison.HasBroken ? 1 : 0;
     }
 
+    private static int Prove(string[] args, TextWriter output, TextWriter error)
+    {
+        var traces = new List<string>();
+        var tests = new List<string>();
+        for (var index = 1; index < args.Length; index++)
+        {
+            if (string.Equals(args[index], "--test", StringComparison.Ordinal))
+            {
+                if (index + 1 >= args.Length)
+                {
+                    WriteUsage(error);
+                    return 1;
+                }
+
+                tests.Add(args[++index]);
+                continue;
+            }
+
+            traces.Add(args[index]);
+        }
+
+        if (traces.Count < 2)
+        {
+            WriteUsage(error);
+            return 1;
+        }
+
+        foreach (var path in traces)
+        {
+            if (!File.Exists(path))
+            {
+                error.WriteLine($"Trace file not found: {path}");
+                return 1;
+            }
+        }
+
+        ProtoFixReceipt receipt;
+        try
+        {
+            receipt = ProtoVerification.Prove(traces[0], traces.Skip(1).ToArray(), tests);
+        }
+        catch (Exception exception)
+        {
+            error.WriteLine($"Could not prove: {exception.Message}");
+            return 1;
+        }
+
+        foreach (var test in receipt.Tests.Where(test => !test.Proven))
+        {
+            output.WriteLine(ProtoWorkflowCommand.Error($"not proven: {test.Name}"));
+        }
+
+        foreach (var name in receipt.BrokenTests)
+        {
+            output.WriteLine(ProtoWorkflowCommand.Error($"broken: {name}"));
+        }
+
+        ProtoVerificationText.Write(receipt, output);
+        return receipt.Proven ? 0 : 1;
+    }
+
     private static ProtoFeedbackTarget Target()
         => new()
         {
@@ -322,6 +388,7 @@ public static class CliHost
                    prototest feedback <file.prototrace> [--digest <path>]
                    prototest verify <baseline-report.json> <current-report.json>
                    prototest compare <baseline.prototrace> <current.prototrace>
+                   prototest prove <baseline.prototrace> <current.prototrace>... [--test <name>]...
             """);
 
     private static string Runs(int count)

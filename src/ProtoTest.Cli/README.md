@@ -11,6 +11,7 @@ prototest index TestResults
 prototest feedback TestResults/Shop.prototrace --digest digest.json
 prototest verify baseline.json current.json
 prototest compare main.prototrace TestResults/Shop.prototrace
+prototest prove before.prototrace after.prototrace --test "orders are listed"
 ```
 
 - `summary` prints the failure digest: the run, the outcome counts, and for every test that did
@@ -29,6 +30,8 @@ prototest compare main.prototrace TestResults/Shop.prototrace
   one `::error` annotation per failing finding on stdout.
 - `compare` compares two traces test by test: which tests broke, were fixed or still fail, and for
   each the first operation where the two runs part. Exit 1 when a test broke.
+- `prove` proves a fix: the claimed tests failed in the baseline and succeed in every current run,
+  nothing broke, and the embedded reports verify. Exit 1 with the reasons when it is not proven.
 
 The feedback targets follow the GitHub Actions environment: `GITHUB_TOKEN`, `GITHUB_REPOSITORY`,
 `GITHUB_EVENT_PATH` (the pull request number) and `GITHUB_API_URL` for the comment;
@@ -38,8 +41,9 @@ artifact link the comment carries. A missing target skips its channel with the r
 
 ## Limits
 
-- Five commands: `summary <file>`, `index <folder>`, `feedback <file> [--digest <path>]`,
-  `verify <baseline.json> <current.json>` and `compare <baseline.prototrace> <current.prototrace>`. The models underneath (`ProtoTest.Diagnosis`,
+- Six commands: `summary <file>`, `index <folder>`, `feedback <file> [--digest <path>]`,
+  `verify <baseline.json> <current.json>`, `compare <baseline.prototrace> <current.prototrace>` and
+  `prove <baseline.prototrace> <current.prototrace>... [--test <name>]...`. The models underneath (`ProtoTest.Diagnosis`,
   `ProtoTest.Traces`, `ProtoTest.Feedback`, `ProtoTest.Verification`) are the same ones the MCP tools
   use, so the surfaces cannot drift apart.
 - `index` writes only: `index.html` in the named folder and one digest beside each run's archive. It

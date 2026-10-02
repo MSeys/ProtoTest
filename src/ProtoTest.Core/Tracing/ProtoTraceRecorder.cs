@@ -12,6 +12,8 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
     private readonly ConcurrentQueue<TraceEntryState> _entries = new();
     private readonly ConcurrentDictionary<string, TraceEntryState> _entriesById = new(StringComparer.Ordinal);
     private readonly AsyncLocal<TraceEntryState?> _current = new();
+    // The location of the test body's last located step, which a step started past an await continues.
+    private IReadOnlyDictionary<string, string?>? _lastBodyLocation;
     private readonly long _startedTimestamp = Stopwatch.GetTimestamp();
     private readonly DateTimeOffset _startedAtUtc = DateTimeOffset.UtcNow;
     private readonly string? _className;
@@ -77,6 +79,12 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         var resolvedParentId = parentId ?? currentParent?.Id ?? Volatile.Read(ref _defaultParentId);
         var resolvedPhase = ResolvePhase(phase, resolvedParentId, currentParent);
         attributes = WithSourceLocation(attributes, kind, resolvedPhase);
+        if (resolvedPhase == ProtoTracePhase.Execution
+            && !kind.StartsWith("test.", StringComparison.Ordinal)
+            && attributes?.ContainsKey(ProtoSourceLocator.FilePathAttribute) == true)
+        {
+            Volatile.Write(ref _lastBodyLocation, attributes);
+        }
         var entry = new TraceEntryState(
             id,
             resolvedParentId,
@@ -126,13 +134,11 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         // operations inside the body inherit.
         if (phase != ProtoTracePhase.Execution
             || kind.StartsWith("test.", StringComparison.Ordinal)
-            || _entries.LastOrDefault(entry => entry.Phase == ProtoTracePhase.Execution
-                && entry.Attributes.ContainsKey(ProtoSourceLocator.FilePathAttribute)) is not { } previous)
+            || Volatile.Read(ref _lastBodyLocation) is not { } located)
         {
             return attributes;
         }
 
-        var located = previous.Attributes;
         foreach (var key in new[] { ProtoSourceLocator.FilePathAttribute, ProtoSourceLocator.LineNumberAttribute, ProtoSourceLocator.FunctionAttribute })
         {
             if (located.TryGetValue(key, out var value))

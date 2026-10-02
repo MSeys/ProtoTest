@@ -139,11 +139,11 @@ A green test can still prove little. `prototest review` and the `review_tests` t
 A check is an `assert.*` operation or an await for a message, so it fails the test when the answer is wrong. Only the test body (the execution phase) is reviewed; setup may call without checking. The gap uses the viewer's rule for an untraced gap, and a review reports it only from 250 ms, so scheduling noise never becomes a finding.
 
 ```text
-ProtoTest review: run ed41245e...
+ProtoTest review: run 093bd29d...
 1 tests · 0 clean · 1 untraced-gap
 
 FailureDrills.ARealWaitDoesNotCloseTheDueWindow (failed, 2 checks, 1 calls)
-  untraced-gap: 1.0 s of the test body recorded no operation, starting 160 ms in, before 'REST · GET /api/v1/organization'.
+  untraced-gap: 1.0 s of the test body recorded no operation, starting 174 ms in, before 'REST · GET /api/v1/organization'.
     at samples/Northstar.ProtoTest/FailureDrills.cs:38
     next: Replace a sleep with a wait that records what it waits for (ProtoPolling, a message await, the test clock), or call through a ProtoTest client so the call is traced.
 ```

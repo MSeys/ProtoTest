@@ -7,6 +7,8 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-02
+
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
 CLI, with compare, prove and review judging what a coding agent changed), the devices family (WebSocket, MQTT, TCP and serial), the topology integrations (Aspire, WireMock,
 Testcontainers), the extended runner surface, and a rewritten documentation site with the Learn track.

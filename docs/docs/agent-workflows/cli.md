@@ -148,7 +148,7 @@ BROKEN orders are listed (succeeded -> failed)
     current:  failed · System.TimeoutException: No answer in 2 seconds.
 ```
 
-Unchanged tests are counted, not listed. A test that fails the same way in both runs says so. Error messages are not compared, because they carry run-specific ids and ports; the error type is.
+Unchanged tests are counted, not listed. A test that fails the same way in both runs says so. A skipped test is not a failure, so a drill skipped in both runs reads unchanged. Steps pair even when their names carry values that change on every run (a port, an id, a long number). A changed status inside the test body wins over a step only one run recorded. Error messages are not compared, because they carry run-specific ids and ports; the error type is.
 
 Exit `0` when no test broke and `1` when one did, or when a trace is missing or cannot be read.
 

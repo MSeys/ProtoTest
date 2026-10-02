@@ -60,7 +60,7 @@ internal static class ProtoFixProver
         var comparisons = currentRuns.Select(current => ProtoTraceComparer.Compare(baseline, current)).ToArray();
         var claimed = testNames is { Count: > 0 }
             ? testNames.Distinct(StringComparer.Ordinal).ToArray()
-            : [.. baseline.Tests.Where(test => !test.Succeeded).Select(test => test.Name).Distinct(StringComparer.Ordinal)];
+            : [.. baseline.Tests.Where(ProtoTraceComparer.IsFailing).Select(test => test.Name).Distinct(StringComparer.Ordinal)];
 
         var proofs = claimed.Select(name => ProveTest(name, baseline, currentRuns, comparisons[0])).ToList();
         var broken = comparisons
@@ -91,11 +91,11 @@ internal static class ProtoFixProver
         {
             reasons.Add(new(ProtoFixReasons.NotInBaseline, $"Baseline run {baseline.RunId} did not record '{name}'."));
         }
-        else if (before.All(test => test.Succeeded))
+        else if (!before.Any(ProtoTraceComparer.IsFailing))
         {
             reasons.Add(new(
                 ProtoFixReasons.NotFailingInBaseline,
-                $"'{name}' succeeded in baseline run {baseline.RunId}, so the baseline does not show the failure the fix claims."));
+                $"'{name}' did not fail in baseline run {baseline.RunId} ({before[0].Outcome}), so the baseline does not show the failure the fix claims."));
         }
 
         foreach (var current in currentRuns)

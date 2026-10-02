@@ -61,7 +61,8 @@ loaded content. The identity item has no verdict, so report arithmetic ignores i
 - Failed candidate run gates are surfaced from the report's gate items; the candidate's own gate
   reasons stay its own. Verification does not add run gates and does not duplicate a suite's
   single-run coverage threshold.
-- `Compare` matches tests by name and pairs operations by kind, name and subject in recorded order.
+- `Compare` matches tests by name and pairs operations by kind, name and subject in recorded order,
+  with ports, ids and long numbers masked. A skipped test is not a failure.
   Error messages are not compared, only error types, because messages carry run-specific values.
 - `Prove` proves what the recorded runs show: the claimed tests failed in the baseline and succeeded in
   every current run, no test broke, and the reports both runs embedded verify. Without embedded

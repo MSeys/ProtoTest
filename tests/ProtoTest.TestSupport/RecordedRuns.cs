@@ -7,7 +7,11 @@ using ProtoTest.Core;
 public sealed record RecordedStep(string Kind, string Name, string? Subject = null, Exception? Failure = null, TimeSpan Pause = default);
 
 /// <summary>One test of a recorded run: its name and the operations it performs in order.</summary>
-public sealed record RecordedTest(string Name, params RecordedStep[] Steps);
+public sealed record RecordedTest(string Name, params RecordedStep[] Steps)
+{
+    /// <summary>Records the test as skipped, the way a runner reports a test it did not run.</summary>
+    public bool Skipped { get; init; }
+}
 
 /// <summary>
 /// Writes a real run through the host builder from a short description, so tests that read two runs
@@ -27,6 +31,9 @@ public static class RecordedRuns
 
     /// <summary>A wait that records no operation, the way a sleep in a test body does.</summary>
     public static RecordedStep Sleep(TimeSpan duration) => new(string.Empty, "sleep", Pause: duration);
+
+    /// <summary>A browser navigation; the URL is part of the name, as the web backends record it.</summary>
+    public static RecordedStep Navigate(string url) => new("web.navigate", $"WEB · Navigate · {url}");
 
     /// <summary>A check that succeeds.</summary>
     public static RecordedStep Check(string name) => new("assert.json.shape", name);
@@ -75,7 +82,9 @@ public static class RecordedRuns
                 scope.Succeed();
             }
 
-            await host.CompleteTestAsync(failure is null ? ProtoTestResult.Passed : ProtoTestResult.Failed(failure));
+            await host.CompleteTestAsync(test.Skipped
+                ? ProtoTestResult.Skipped
+                : failure is null ? ProtoTestResult.Passed : ProtoTestResult.Failed(failure));
         }
 
         await host.StopAsync();

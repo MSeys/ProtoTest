@@ -374,6 +374,46 @@ public sealed class GraphQLShapeDrivenApiTests
         finally { await host.CompleteTestAsync(); }
     }
 
+    [Test]
+    public async Task ExpectAsync_ShouldRecordTheShapeCheckAtTheTestsLine()
+    {
+        // The answer arrives asynchronously, as over a network, so the check runs on a continuation.
+        var builder = new ProtoHostBuilder();
+        builder.AddGraphQL(graphQL => graphQL.AddClient("Default", "https://example.test/graphql", http =>
+            http.ConfigurePrimaryHttpMessageHandler(() => new YieldingHandler("""{"data":{"orders":{"totalCount":2}}}"""))));
+        await using var host = builder.Build();
+        await host.StartTestAsync("shape-location", "1", TestMethods.Placeholder);
+        try
+        {
+            Assert.ThrowsAsync<GraphQLAssertionException>(async () =>
+            {
+                using var response = await Proto.Context.GraphQL()
+                    .Query("orders", new { first = 1 })
+                    .ExpectAsync(new { totalCount = 1 });
+            });
+
+            var entries = host.Trace.Snapshot().Tests.Single().Entries;
+            var check = entries.Single(entry => entry.Kind == "assert.json.shape").Attributes;
+            var call = entries.First(entry => entry.Kind == "graphql.operation").Attributes;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(check["code.file.path"], Is.EqualTo("tests/ProtoTest.GraphQL.Tests/GraphQLShapeDrivenApiTests.cs"));
+                Assert.That(check["code.line.number"], Is.EqualTo(call["code.line.number"]), "the check takes the line of the call it checks");
+            });
+        }
+        finally { await host.CompleteTestAsync(); }
+    }
+
+    private sealed class YieldingHandler(string content) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(10, cancellationToken);
+            return Json(content);
+        }
+    }
+
     private static ProtoHost CreateHost(Func<HttpRequestMessage, HttpResponseMessage> response)
     {
         var builder = new ProtoHostBuilder();

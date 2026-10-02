@@ -211,10 +211,10 @@ and the deprecated surface; the [docs](/docs/) cover the rest.
 - The demo endpoint (`samples/ProtoTest.Mcp.DemoEndpoint`) serves the same tools over the demo trace. <span className="changelog-ref">[Coding agents](/docs/agent-workflows/coding-agents#demo-endpoint)</span>
 - `ProtoDiagnosis.Read` builds a deterministic digest; `ReadContext` adds one test's context. <span className="changelog-ref">[Diagnosis](/docs/agent-workflows/diagnosis)</span>
 - `ProtoTest.Verification` compares a baseline and a candidate report. <span className="changelog-ref">[Verification](/docs/agent-workflows/verification)</span>
-- `prototest compare` and the `compare_runs` tool compare two runs test by test and name the operation where each broken, fixed or still-failing test left the baseline. <span className="changelog-ref">[CLI](/docs/agent-workflows/cli#compare)</span>
+- `prototest compare` and the `compare_runs` tool compare two runs test by test and name the operation where each broken, fixed or still-failing test left the baseline; a skipped test is not a failure, and steps pair across runs although their names carry ports or ids. <span className="changelog-ref">[CLI](/docs/agent-workflows/cli#compare)</span>
 - `prototest prove` and the `check_fix` tool return a fix receipt: proven only when the baseline failed, every rerun passes, nothing broke and the reports verify, with a named reason for each unmet condition. <span className="changelog-ref">[CLI](/docs/agent-workflows/cli#prove)</span>
 - `prototest review` and the `review_tests` tool say what each test proves: a body with no check, a call no check looked at, or an untraced gap, each with the next step. <span className="changelog-ref">[Diagnosis](/docs/agent-workflows/diagnosis#review-what-a-test-proves)</span>
-- `get_coverage` suggests where to cover each uncovered endpoint: extend the test that already calls it, or write a new test shaped like the closest recorded call (`ProtoDiagnosis.SuggestCoverage`). <span className="changelog-ref">[Setup](/docs/agent-workflows/setup#what-the-agent-can-see)</span>
+- `get_coverage` suggests where to cover each uncovered endpoint or page: extend the test that already calls or opens it, or write a new test shaped like the closest recorded call or browser journey (`ProtoDiagnosis.SuggestCoverage`). <span className="changelog-ref">[Setup](/docs/agent-workflows/setup#what-the-agent-can-see)</span>
 - The MCP server offers three job prompts, `fix_failure`, `cover_change` and `improve_tests`, each ending with the tool that judges it; the skills and the starter's `AGENTS.md` point at them. <span className="changelog-ref">[Setup](/docs/agent-workflows/setup#the-job-prompts)</span>
 - `ProtoReport.ReadJson(Stream)` reads a report from a stream, such as the one a trace embeds. <span className="changelog-ref">[Verification](/docs/agent-workflows/verification)</span>
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. <span className="changelog-ref">[Loop](/docs/agent-workflows/loop)</span>
@@ -223,6 +223,7 @@ and the deprecated surface; the [docs](/docs/) cover the rest.
 
 #### Traces and reporting
 
+- A check that runs after an await inside ProtoTest, such as `ExpectAsync` on a REST or GraphQL call, records the line of the test step it checks instead of no line. <span className="changelog-ref">[ProtoTrace](/docs/observability/prototrace)</span>
 - The HTML report reads like the viewer's run view: a headline that names what needs attention, a strip of every entry, a Needs attention list across all kinds and one tab per kind. Coverage is one tab with its own figure, not the page's headline. <span className="changelog-ref">[Reporting](/docs/observability/reporting#the-html-report)</span>
 - The report summary counts every kind in `Kinds`, written to the JSON report next to the existing totals. <span className="changelog-ref">[Reporting](/docs/observability/reporting)</span>
 - Run and test artifacts are declared and readable (`ProtoTraceArchive.Artifacts`, `ReadArtifact`). <span className="changelog-ref">[ProtoTrace](/docs/advanced/extending#reading-a-trace-in-code)</span>

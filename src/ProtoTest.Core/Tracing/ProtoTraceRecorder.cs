@@ -76,7 +76,7 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         var currentParent = _current.Value;
         var resolvedParentId = parentId ?? currentParent?.Id ?? Volatile.Read(ref _defaultParentId);
         var resolvedPhase = ResolvePhase(phase, resolvedParentId, currentParent);
-        attributes = WithSourceLocation(attributes);
+        attributes = WithSourceLocation(attributes, kind, resolvedPhase);
         var entry = new TraceEntryState(
             id,
             resolvedParentId,
@@ -98,11 +98,13 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         return new ProtoTraceOperation(this, entry);
     }
 
-    private IReadOnlyDictionary<string, string?>? WithSourceLocation(IReadOnlyDictionary<string, string?>? attributes)
+    private IReadOnlyDictionary<string, string?>? WithSourceLocation(
+        IReadOnlyDictionary<string, string?>? attributes,
+        string kind,
+        ProtoTracePhase phase)
     {
         if (!_options.CaptureSourceLocations
-            || attributes?.ContainsKey(ProtoSourceLocator.FilePathAttribute) == true
-            || ProtoSourceLocator.Find() is not { } location)
+            || attributes?.ContainsKey(ProtoSourceLocator.FilePathAttribute) == true)
         {
             return attributes;
         }
@@ -110,9 +112,35 @@ internal sealed class ProtoTestTraceRecorder : IProtoTraceWriter
         var merged = attributes is null
             ? new Dictionary<string, string?>(StringComparer.Ordinal)
             : new Dictionary<string, string?>(attributes, StringComparer.Ordinal);
-        merged[ProtoSourceLocator.FilePathAttribute] = location.File;
-        merged[ProtoSourceLocator.LineNumberAttribute] = location.Line.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        merged[ProtoSourceLocator.FunctionAttribute] = location.Function;
+        if (ProtoSourceLocator.Find() is { } location)
+        {
+            merged[ProtoSourceLocator.FilePathAttribute] = location.File;
+            merged[ProtoSourceLocator.LineNumberAttribute] = location.Line.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            merged[ProtoSourceLocator.FunctionAttribute] = location.Function;
+            return merged;
+        }
+
+        // Past an await inside ProtoTest (an ExpectAsync checking the response it just fetched) the stack no
+        // longer reaches the suite, so the operation continues the test's last located step and takes its line.
+        // Setup, teardown and the phase spans run framework code with no line of the test's own, so only
+        // operations inside the body inherit.
+        if (phase != ProtoTracePhase.Execution
+            || kind.StartsWith("test.", StringComparison.Ordinal)
+            || _entries.LastOrDefault(entry => entry.Phase == ProtoTracePhase.Execution
+                && entry.Attributes.ContainsKey(ProtoSourceLocator.FilePathAttribute)) is not { } previous)
+        {
+            return attributes;
+        }
+
+        var located = previous.Attributes;
+        foreach (var key in new[] { ProtoSourceLocator.FilePathAttribute, ProtoSourceLocator.LineNumberAttribute, ProtoSourceLocator.FunctionAttribute })
+        {
+            if (located.TryGetValue(key, out var value))
+            {
+                merged[key] = value;
+            }
+        }
+
         return merged;
     }
 

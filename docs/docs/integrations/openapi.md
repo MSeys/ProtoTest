@@ -48,7 +48,7 @@ The rows with 0 hits are what no test has checked yet. Receiving a response with
 dotnet add package ProtoTest.OpenApi
 ```
 
-ProtoTest supports .NET 8, 9 and 10. The template targets `net10.0` unless you pass `--framework net8.0` or `--framework net9.0`. The package reads its document with `Microsoft.OpenApi`, plus `Microsoft.OpenApi.YamlReader` for YAML, and depends on `ProtoTest.Rest`.
+ProtoTest supports .NET 8, 9 and 10. The template targets `net10.0` unless you pass `--framework net8.0` or `--framework net9.0`. The package reads the document itself, so it never changes the OpenAPI library your application uses (Swashbuckle, NSwag or `Microsoft.AspNetCore.OpenApi`). It depends on `ProtoTest.Rest`, and on `YamlDotNet` for YAML documents.
 
 ## Compose
 
@@ -219,7 +219,7 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - **Unknown constraints are assumed to match.** Only the listed constraint names are enforced.
 - **No base-path rewriting or authentication**, and no refetch on retry. The loader reads the source once.
 - **The specification identity row is not coverage.** One aggregate item per target records `spec.source` and `spec.hash`. It carries no verdict, so no total or gate changes because of it.
-- **Spec-version support follows the referenced `Microsoft.OpenApi` version, JSON or YAML.**
+- **OpenAPI 3.x and Swagger 2.0, in JSON or YAML.** Only local `$ref` references (`#/...`) resolve. A schema behind an external reference reports no properties.
 
 ## Links
 

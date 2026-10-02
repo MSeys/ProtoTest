@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <!-- Swashbuckle 6 brings Microsoft.OpenApi 1.6, the line many applications still run on. The OpenAPI
+         tests host this application in-process next to ProtoTest.OpenApi, which must not change it. -->
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
+  </ItemGroup>
+
+</Project>

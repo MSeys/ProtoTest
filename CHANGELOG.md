@@ -7,6 +7,23 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+ProtoTest 1.1.1 fixes `ProtoTest.OpenApi`, which in 1.1.0 replaced the OpenAPI library of the application a
+suite hosts in-process. Its one breaking change is the exception to the additive 1.x surface: a constructor
+that exposed `Microsoft.OpenApi`'s own type, the dependency that caused the failure.
+
+### Fixes
+
+#### OpenAPI
+
+- an application that documents itself with Swashbuckle, NSwag or `Microsoft.AspNetCore.OpenApi` keeps running next to OpenAPI coverage: the package reads the document itself instead of depending on `Microsoft.OpenApi`. [OpenAPI](https://prototest.dev/docs/integrations/openapi)
+
+### Breaking changes
+
+#### OpenAPI
+
+- `OpenApiCoverageCollector(string, OpenApiDocument)` is removed with the `Microsoft.OpenApi` dependency.
+  - Pass the document's file path, URL or text instead: `new OpenApiCoverageCollector(target, source)` ([OpenAPI](https://prototest.dev/docs/integrations/openapi#the-specification-source)).
+
 ## [1.1.0] - 2026-10-02
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the

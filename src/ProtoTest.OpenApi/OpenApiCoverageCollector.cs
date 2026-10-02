@@ -1,10 +1,10 @@
 namespace ProtoTest.OpenApi;
 
 using Microsoft.Extensions.Configuration;
-using Microsoft.OpenApi;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.OpenApi.Internal;
+using ProtoTest.OpenApi.Internal.Model;
 using ProtoTest.Rest;
 
 /// <summary>
@@ -14,7 +14,7 @@ using ProtoTest.Rest;
 /// </summary>
 public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 {
-    private readonly OpenApiDocument _document;
+    private readonly OpenApiSpec _document;
     private readonly OpenApiRouteMatcher _routes;
     private readonly OpenApiCoverageLedger _ledger = new();
     private readonly IReadOnlyDictionary<string, object>? _specIdentity;
@@ -52,13 +52,6 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
         _document = loaded.Document;
         _routes = new OpenApiRouteMatcher(_document);
         _specIdentity = ProtoSpecIdentity.Metadata(openApiSpecSource, loaded.Content);
-    }
-
-    public OpenApiCoverageCollector(string targetName, OpenApiDocument document)
-        : base(targetName)
-    {
-        _document = document ?? throw new ArgumentNullException(nameof(document));
-        _routes = new OpenApiRouteMatcher(_document);
     }
 
     public override bool CanCollect(ProtoObservation observation)
@@ -152,7 +145,7 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
         string requestRoute,
         out string method,
         out string route,
-        out OpenApiOperation operation)
+        out OpenApiSpecOperation operation)
     {
         method = requestMethod.ToUpperInvariant();
         route = string.Empty;
@@ -164,6 +157,6 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
 
         route = matchedRoute;
         return _document.Paths.TryGetValue(route, out var pathItem)
-            && pathItem.Operations?.TryGetValue(new HttpMethod(method), out operation!) == true;
+            && pathItem.Operations.TryGetValue(method, out operation!);
     }
 }

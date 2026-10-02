@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProtoTest.OpenApi\ProtoTest.OpenApi.csproj" />
+    <ProjectReference Include="..\..\src\ProtoTest.AspNetCore\ProtoTest.AspNetCore.csproj" />
+    <ProjectReference Include="..\ProtoTest.OpenApi.TestApi\ProtoTest.OpenApi.TestApi.csproj" />
   </ItemGroup>
 
   <ItemGroup>

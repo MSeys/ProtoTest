@@ -220,7 +220,7 @@ closed-box limits below apply only to the AppHost.
 ## Skip
 
 - While the AppHost serves (selected, and not fully configured), it adds the capability `aspire`, named after the AppHost assembly, so `[RequiresCapability("aspire")]` proves composition. A test that needs one resource's application uses `[RequiresApplication]`.
-- The AppHost needs Aspire's orchestration binaries at runtime, and DCP's API server has to come up. A machine without the binaries, or where DCP's API server never answers (a constrained CI runner), fails the start with `ProtoAspireUnavailableException`; catch it to skip with its reason instead of failing:
+- The AppHost needs Aspire's orchestration binaries at runtime, and DCP's API server has to come up. A machine without the binaries, or where DCP itself cannot start (its container-runtime check or its API server times out, as on a constrained CI runner), fails the start with `ProtoAspireUnavailableException`; catch it to skip with its reason instead of failing:
 
 ```csharp
 try

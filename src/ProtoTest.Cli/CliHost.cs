@@ -39,6 +39,11 @@ public static class CliHost
             return Verify(args[1], args[2], output, error);
         }
 
+        if (args.Length == 3 && string.Equals(args[0], "compare", StringComparison.Ordinal))
+        {
+            return Compare(args[1], args[2], output, error);
+        }
+
         WriteUsage(error);
         return 1;
     }
@@ -216,6 +221,37 @@ public static class CliHost
         return verdict.Failed ? 1 : 0;
     }
 
+    private static int Compare(string baselinePath, string currentPath, TextWriter output, TextWriter error)
+    {
+        foreach (var path in new[] { baselinePath, currentPath })
+        {
+            if (!File.Exists(path))
+            {
+                error.WriteLine($"Trace file not found: {path}");
+                return 1;
+            }
+        }
+
+        ProtoTraceComparison comparison;
+        try
+        {
+            comparison = ProtoVerification.Compare(baselinePath, currentPath);
+        }
+        catch (Exception exception)
+        {
+            error.WriteLine($"Could not compare: {exception.Message}");
+            return 1;
+        }
+
+        foreach (var test in comparison.Tests.Where(test => test.Change == ProtoTestChanges.Broken))
+        {
+            output.WriteLine(ProtoWorkflowCommand.Error($"broken: {test.Name}"));
+        }
+
+        ProtoVerificationText.Write(comparison, output);
+        return comparison.HasBroken ? 1 : 0;
+    }
+
     private static ProtoFeedbackTarget Target()
         => new()
         {
@@ -285,6 +321,7 @@ public static class CliHost
                    prototest index <folder>
                    prototest feedback <file.prototrace> [--digest <path>]
                    prototest verify <baseline-report.json> <current-report.json>
+                   prototest compare <baseline.prototrace> <current.prototrace>
             """);
 
     private static string Runs(int count)

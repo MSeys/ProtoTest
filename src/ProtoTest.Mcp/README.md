@@ -46,6 +46,7 @@ Every tool is read-only and returns a compact JSON document.
 | `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the recorded shape mismatches and the test's evidence artifacts. Defaults to the newest run's first non-succeeded test |
 | `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary`/`context`) | the deterministic diagnosis: the digest with each failure's rule and mismatches, the run gates, findings and coverage; `detail=context` returns the failing test's context package (ancestors, call, section previews, source snippet, artifacts, state, report rows) |
 | `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | the coverage totals and the uncovered units from the JSON report a `ProtoTest.Reporting` sink embedded; states a missing report instead of inventing numbers |
+| `compare_runs` | optional `baselineRunId`, `currentRunId`, `baselineTrace` | each test that broke, was fixed, still fails, is new or was removed, with the first operation where the two runs part; defaults to the newest run against the one before it |
 | `get_suite_map` | optional `runId` | what a new test reuses, as the run recorded it: capabilities and infrastructure, clients, data provisioners, attributes (the suite's own marked), page objects with keyed elements normalised to `[key]`, devices, one passed example test per kind of work with its file, and the open coverage gaps |
 
 ## Limits
@@ -55,7 +56,7 @@ Every tool is read-only and returns a compact JSON document.
 - Nothing leaves the machine by default: no telemetry, no uploads, no accounts. The stdio host reads
   local archives and logs to stderr; stdout carries the protocol only.
 - Hard caps bound every payload: 50 runs, 20 failing tests per run, 10 failed operations, 25 mismatches, 20 artifacts per
-  test, 200 uncovered units, 50 entries per suite-map list, a 64 MB report read and a 4,000-character error message. `list_runs`
+  test, 200 uncovered units, 50 entries per suite-map list, 50 compared tests, a 64 MB report read and a 4,000-character error message. `list_runs`
   clamps `limit` to 1-50 and `get_coverage` clamps `limit` to 1-200. `get_diagnosis` applies the
   diagnosis library's own caps (25 mismatches, 10 findings, 10 artifacts, 4 KB previews, 32 ancestors).
 - `get_failure` and `get_diagnosis` report the same failure selection the viewer uses: the deepest

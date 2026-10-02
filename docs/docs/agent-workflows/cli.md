@@ -23,6 +23,7 @@ usage: prototest summary <file.prototrace>
        prototest index <folder>
        prototest feedback <file.prototrace> [--digest <path>]
        prototest verify <baseline-report.json> <current-report.json>
+       prototest compare <baseline.prototrace> <current.prototrace>
 ```
 
 | You want to | Run | It writes |
@@ -30,6 +31,7 @@ usage: prototest summary <file.prototrace>
 | read one run | `summary <file.prototrace>` | nothing |
 | share a folder of runs | `index <folder>` | `index.html` and a `.digest.json` beside each archive |
 | check a run against a baseline | `verify <baseline.json> <current.json>` | nothing |
+| see what changed between two runs | `compare <baseline.prototrace> <current.prototrace>` | nothing |
 | post the digest | `feedback <file.prototrace> [--digest <path>]` | the `--digest` file, and the posts |
 
 An unknown verb, or the wrong arguments, prints that usage to stderr and exits `1`. There is no `--help` verb: `prototest --help` prints the same usage to stderr and exits `1`.
@@ -119,6 +121,31 @@ Exit `0` when no finding is a fail and `1` when one is. Exit `1` also when a rep
 ```text
 Report file not found: baseline.json
 ```
+
+### compare
+
+Compares two runs test by test:
+
+```bash
+prototest compare main.prototrace TestResults/prototest-<runId>.prototrace
+```
+
+Tests match by name. Each test is `broken` (it passed in the baseline and fails now), `fixed`, `still-failing`, `new`, `removed` or `unchanged`. For a test that changed, the output names the first operation where the two runs part: an operation whose status or error type changed, or one only one run recorded. That is usually the line to look at.
+
+```text
+::error::broken: orders are listed
+ProtoTest comparison: run 5f2c... -> run 9a41...
+3 tests · 1 broken · 2 unchanged
+
+BROKEN orders are listed (succeeded -> failed)
+  diverges at: http.request List orders [GET /orders] (status-changed)
+    baseline: succeeded
+    current:  failed · System.TimeoutException: No answer in 2 seconds.
+```
+
+Unchanged tests are counted, not listed. A test that fails the same way in both runs says so. Error messages are not compared, because they carry run-specific ids and ports; the error type is.
+
+Exit `0` when no test broke and `1` when one did, or when a trace is missing or cannot be read.
 
 ### feedback
 
@@ -228,6 +255,9 @@ flowchart TD
     verb -->|"index"| idx{"Any readable archive,<br/>and a writable page?"}
     idx -->|"no"| one
     idx -->|"yes"| zero["exit 0"]
+    verb -->|"compare"| broke{"A test that passed<br/>in the baseline fails?"}
+    broke -->|"yes"| one
+    broke -->|"no"| zero
     verb -->|"verify"| verdict{"A finding<br/>with severity fail?"}
     verdict -->|"yes"| one
     verdict -->|"no"| zero
@@ -243,6 +273,7 @@ flowchart TD
 | `1` | the input was missing or unreadable |
 | `1` | `index` found no readable archive or could not write the page |
 | `1` | the verdict has a fail finding |
+| `1` | `compare` found a broken test |
 | `1` | a feedback channel that reached its target failed |
 
 ## Limits
@@ -250,8 +281,9 @@ flowchart TD
 - The verbs read files. The only writes are the `index` page, the digests beside the traces and the `--digest` file.
 - No network call happens unless a target is configured. A missing target is a named skip, never a failure.
 - The verbs take no other arguments, and there is no verb that reruns a suite, writes a trace or changes an archive.
+- `compare` matches tests by name, so a renamed test reads as one removed and one new test.
 - The CLI writes UTF-8 without a BOM and sets the console output encoding, so the `·` separator renders on a default Windows console. Redirected output stays parsing-friendly.
 - The digest is built from the written archive after the run, so it reflects what the run recorded ([The evidence loop](./loop.md#limits)).
-- These four verbs are the whole `prototest` surface.
+- These five verbs are the whole `prototest` surface.
 
 Run `prototest summary` over the newest archive, or `prototest index` over the results folder, and the same evidence your agent reads is on your terminal.

@@ -31,7 +31,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `ProtoTest.Mcp`: an MCP server that lets a coding agent read runs.
 - `ProtoTest.Messaging.MassTransit`: uses the application's MassTransit test harness as the broker.
 - `ProtoTest.Traces`: reads `.prototrace` archives for the CLI, MCP and tools.
-- `ProtoTest.Verification`: compares a run's report with a baseline.
+- `ProtoTest.Verification`: compares a run with a baseline, by report and by trace.
 - `ProtoTest.Web.Pages`: the page model and coverage, shared by the web backends and ASP.NET Core.
 - `ProtoTest.WireMock`: WireMock.Net fakes owned by a test or the run.
 
@@ -199,6 +199,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the demo endpoint (`samples/ProtoTest.Mcp.DemoEndpoint`) serves the same tools over the demo trace. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#demo-endpoint)
 - `ProtoDiagnosis.Read` builds a deterministic digest; `ReadContext` adds one test's context. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
 - `ProtoTest.Verification` compares a baseline and a candidate report. [Verification](https://prototest.dev/docs/agent-workflows/verification)
+- `prototest compare` and the `compare_runs` tool compare two runs test by test and name the operation where each broken, fixed or still-failing test left the baseline. [CLI](https://prototest.dev/docs/agent-workflows/cli#compare)
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. [Loop](https://prototest.dev/docs/agent-workflows/loop)
 - the ProtoTest Feedback GitHub Action uploads the trace and posts the digest. [CI](https://prototest.dev/docs/continuous-integration/#the-feedback-action)
 

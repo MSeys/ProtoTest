@@ -1,0 +1,40 @@
+/* The blog's top band: the home hero's blueprint surface, a grid and the cyan glow. Every value is a token. */
+.hero,
+.band {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-strong);
+  background:
+    radial-gradient(circle at 78% 30%, color-mix(in srgb, var(--pt-cyan) 16%, transparent), transparent 46%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / var(--grid-size) var(--grid-size),
+    var(--pt-navy-deep);
+  color: var(--text);
+}
+.hero { padding: calc(var(--space-7) * 1.75) 0 calc(var(--space-7) * 1.5); }
+.band { padding: var(--space-4) 0; }
+
+.hero h1 {
+  margin-bottom: var(--space-5);
+  color: var(--pt-white);
+  font-size: clamp(calc(var(--text-heading) * 1.7), 3.4vw, calc(var(--text-heading) * 2.2));
+  line-height: 1.04;
+}
+.hero h1 span { display: block; color: var(--blueprint); }
+
+.eyebrow {
+  margin: 0 0 var(--space-4);
+  color: var(--pt-cyan);
+  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.lead { max-width: 56ch; margin-bottom: 0; color: var(--muted); font-size: calc(var(--text-title) * 1.1); line-height: var(--leading); }
+
+.back {
+  color: var(--muted);
+  font: var(--weight-semibold) var(--text-meta) var(--font-mono);
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+.back:hover { color: var(--pt-white); text-decoration: none; }

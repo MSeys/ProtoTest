@@ -240,6 +240,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Docs and samples
 
+- the site has a blog for articles on the problems ProtoTest solves, with RSS and Atom feeds. [Blog](https://prototest.dev/blog)
 - a copy-in skill (`skills/prototest-evidence-loop`) teaches agents the evidence loop and the CLI. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#the-skills-bundle)
 - the xUnit pages cover converting an existing suite and the Microsoft.Testing.Platform opt-in on SDK 10. [Runners](https://prototest.dev/docs/runners/overview)
 - the integrations overview lists every `ProtoTest.Devices*` package with a one-line purpose. [Overview](https://prototest.dev/docs/integrations/overview)

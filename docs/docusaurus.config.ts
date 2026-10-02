@@ -67,7 +67,20 @@ export default async function createConfig(): Promise<Config> {
           // One set of pages: the site documents the current release only, so `docs/docs` serves `/docs`
           // directly and a release cuts no versioned snapshot.
         },
-        blog: false,
+        // Articles about the problems ProtoTest solves; the changelog carries the release notes. A post with
+        // `draft: true` builds in development only, so it ships when its front matter changes.
+        blog: {
+          routeBasePath: '/blog',
+          blogTitle: 'ProtoTest blog',
+          blogDescription: 'Articles on integration testing in .NET: evidence, agents and testing across boundaries.',
+          blogSidebarTitle: 'All articles',
+          blogSidebarCount: 'ALL',
+          showReadingTime: true,
+          onInlineTags: 'ignore',
+          onInlineAuthors: 'throw',
+          onUntruncatedBlogPosts: 'throw',
+          feedOptions: {type: ['rss', 'atom'], xslt: false},
+        },
         sitemap: {
           ignorePatterns: ['/search'],
           // The git date of each page, so a search engine sees which pages changed.
@@ -159,6 +172,7 @@ export default async function createConfig(): Promise<Config> {
           label: 'Docs',
         },
         {to: '/docs/recipes/overview', label: 'Recipes', position: 'left'},
+        {to: '/blog', label: 'Blog', position: 'left'},
         {label: 'Resources', position: 'left', items: [
           {label: 'API reference', href: 'https://prototest.dev/api/'},
           {label: 'Trace viewer', href: 'https://trace.prototest.dev'},
@@ -200,6 +214,7 @@ export default async function createConfig(): Promise<Config> {
           title: 'Project',
           items: [
             {label: 'Why ProtoTest', to: '/docs/project/why-prototest'},
+            {label: 'Blog', to: '/blog'},
             {label: 'Benchmarks', to: '/docs/project/benchmarks'},
             {label: 'Roadmap', to: '/docs/project/roadmap'},
             {label: 'Sustainability', to: '/docs/project/sustainability'},

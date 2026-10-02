@@ -3,61 +3,86 @@ id: why-it-gets-hard
 title: Why integration tests get hard
 sidebar_label: Why it gets hard
 sidebar_position: 1
-description: "Four questions about time, state, environment and visibility, each with an example and the track that teaches it."
+description: "The failures every team recognizes, the four causes behind them, and the track that teaches each fix."
 ---
 
 # Why integration tests get hard
 
-An integration test checks how running parts of a system work together, such as an API and a database. It can expose problems that a test of one isolated component would miss.
+An integration test checks how running parts of a system work together, such as an API and a database. It catches
+problems that a test of one isolated component would miss.
 
-A test may fail once and pass on retry without explaining what changed. The cause might be application code, or a dependency the test did not control or describe.
+Most teams know what goes wrong next. A test passes on your machine and fails on CI. It fails once and passes on
+retry. It fails with a message that does not say why, and someone spends an hour finding out. After a while, people
+stop reading its failures.
 
-This page introduces four questions to ask: about time, state, environment and visibility. The sample suite pairs each example with a deliberate failure and a passing test. The later lessons show how to run these drills or read their recorded traces.
+Those failures look random, but most of them have one of four causes: **time**, **state**, **environment** and
+**visibility**. This page shows each one with an example from the sample suite. The suite pairs every example with a
+deliberate failure and a passing test, and the later lessons run those drills and read their traces.
 
 ## Time
 
-**Question: who moves the clock?**
+**What you see:** the test passes locally and fails on a busy CI machine.
 
-A test issues an invoice, waits one real second and expects the subscription to be past due. The application still reports it as active. It reads a test clock, which advances only when the test moves it. The check fails on `$.status`: it expected `past_due` and read `active`.
+A test issues an invoice, waits one real second and expects the subscription to be past due. The application still
+reports it as active. It reads a test clock, which advances only when the test moves it. The check fails on
+`$.status`: it expected `past_due` and read `active`.
 
-The fix advances that clock beyond the invoice's due date: `Proto.Context.Clock.Advance(TimeSpan.FromDays(8))`. The application then reports `past_due`, as the test expects.
+The fix advances that clock beyond the invoice's due date: `Proto.Context.Clock.Advance(TimeSpan.FromDays(8))`. The
+application then reports `past_due`, as the test expects.
 
-Learn it in [Reliable tests](/learn/reliable-tests/the-test-clock).
+The question to ask: **who moves the clock?** Learn it in
+[Reliable tests](/learn/reliable-tests/the-test-clock).
 
 ## State
 
-**Question: what does the test share with others?**
+**What you see:** the test passes alone and fails in the suite, or the other way round.
 
-A test reads the project with id `prj_1` without creating it. The request returns 404. A hardcoded id does not establish that the record exists or belongs to this test.
+A test reads the project with id `prj_1` without creating it. The request returns 404. A hardcoded id does not
+establish that the record exists or belongs to this test.
 
-The fix creates a project inside the test's own tenant, an organization prepared during setup. It checks that the tenant's project list contains that project. Teardown deletes the tenant and its data.
+The fix creates a project inside the test's own tenant, an organization prepared during setup. It checks that the
+tenant's project list contains that project. Teardown deletes the tenant and its data.
 
-Learn it in [Good tests](/learn/good-tests/per-test-state-and-cleanup).
+The question to ask: **what does the test share with others?** Learn it in
+[Good tests](/learn/good-tests/per-test-state-and-cleanup).
 
 ## Environment
 
-**Question: where does the address come from?**
+**What you see:** the test works on one machine and fails with a connection error on another.
 
-A test opens a raw `HttpClient` on `127.0.0.1:5099`, assuming an application is listening there. In the recorded drill, the connection fails. The raw client bypasses ProtoTest's request recording, so the trace has no request operation for that call.
+A test opens a raw `HttpClient` on `127.0.0.1:5099`, assuming an application is listening there. In the recorded
+drill, the connection fails. The raw client bypasses ProtoTest's request recording, so the trace has no request
+operation for that call.
 
-The fix uses the test's client, `Proto.Context.Rest()`. It takes its address from the suite's composition: the setup that chooses applications, dependencies and their addresses. The test can then use the environment selected by that setup without hardcoding an address.
+The fix uses the test's client, `Proto.Context.Rest()`. It takes its address from the suite's composition: the
+setup that chooses applications, dependencies and their addresses. The test can then use the environment selected
+by that setup without hardcoding an address.
 
-Learn it in [Good tests](/learn/good-tests/capabilities-and-the-host) and [Reliable tests](/learn/reliable-tests/readiness-instead-of-sleeps).
+The question to ask: **where does the address come from?** Learn it in
+[Good tests](/learn/good-tests/capabilities-and-the-host) and
+[Reliable tests](/learn/reliable-tests/readiness-instead-of-sleeps).
 
 ## Visibility
 
-**Question: what can the test show when it fails?**
+**What you see:** the test fails, and the message does not tell you why.
 
-A test sends an empty project name and asserts only the status. It expected `201 Created` and the check reported `400`. The response body said `validation_failed` and named the empty parameter. ProtoTest includes that body in the failure message, but the test did not check it.
+A test sends an empty project name and asserts only the status. It expected `201 Created` and the check reported
+`400`. The response body said `validation_failed` and named the empty parameter. ProtoTest includes that body in the
+failure message, but the test did not check it.
 
-The passing test expects `400 Bad Request` and checks the problem body's code and message. It verifies that the application rejected the empty name for the expected reason.
+The passing test expects `400 Bad Request` and checks the problem body's code and message. It verifies that the
+application rejected the empty name for the expected reason.
 
-Learn it in [Understand failures](/learn/understand-failures/a-failure-tour).
+The question to ask: **what can the test show when it fails?** Learn it in
+[Understand failures](/learn/understand-failures/a-failure-tour).
 
-## What a passing test has answered
+## What a passing test has handled
 
-Apply these questions to the dependencies your test uses. For time-dependent behavior, decide how the test controls or observes time. For mutable data, decide who creates it, who can see it and who removes it. Choose addresses through the suite's setup, and make assertions that explain a mismatch.
+A test you can trust has handled each cause that applies to it. For time-dependent behavior, it controls or
+observes time. For mutable data, it decides who creates it, who can see it and who removes it. It gets its
+addresses from the suite's setup, and its assertions explain a mismatch.
 
-Not every test needs to move a clock or create data. State those responsibilities where they apply, so a failure gives you evidence to investigate.
+Not every test needs to move a clock or create data. When a failure does look random, the four questions above are
+where to start looking.
 
 Next: [Run the sample suite](/learn/start/install-and-run).

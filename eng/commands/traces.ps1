@@ -42,10 +42,12 @@ $lessonTraces = @(
     @{ Name = "l2-broker-skip"; Filter = "FullyQualifiedName~BrokerJourney.PayingAnInvoicePublishesAnInvoicePaidEvent"; Expect = "Skipped" },
     @{ Name = "l3-clock-window"; Filter = "FullyQualifiedName~ClockJourney.ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock"; Expect = "Passed" },
     @{ Name = "l3-lagging-read"; Filter = "FullyQualifiedName~WebhookJourney.CreatingAProjectDeliversItsWebhook"; Expect = "Passed" },
-    # The flaky drill passes or fails by timing (about one Release run in six fails), so the passing
-    # trace re-runs it until it passes. The failing trace widens the race with a two-second dispatcher,
-    # the way the lesson confirms the cause, and fails on the first run.
-    @{ Name = "l4-flaky-pass"; Filter = "FullyQualifiedName~WebhookJourney.OneReadRacesTheDispatcher"; Drills = $true; Expect = "Passed"; Attempts = 10 },
+    # The flaky drill passes or fails by timing: about a third of the Release runs pass with the
+    # dispatcher at its 100 ms default, so waiting for a lucky run is not a plan. Each trace controls the
+    # race instead, the way the lesson confirms the cause. The passing trace runs the dispatcher every
+    # millisecond, so it has delivered before the read, and the failing trace widens the race with a
+    # two-second dispatcher, so the read comes first. Both are the same test with one setting changed.
+    @{ Name = "l4-flaky-pass"; Filter = "FullyQualifiedName~WebhookJourney.OneReadRacesTheDispatcher"; Drills = $true; Expect = "Passed"; Attempts = 3; Environment = @{ Northstar__WebhookDispatchInterval = "00:00:00.001" } },
     @{ Name = "l4-flaky-fail"; Filter = "FullyQualifiedName~WebhookJourney.OneReadRacesTheDispatcher"; Drills = $true; Expect = "Failed"; Attempts = 3; Environment = @{ Northstar__WebhookDispatchInterval = "00:00:02" } },
     @{ Name = "l4-coverage"; Filter = "FullyQualifiedName~PlatformJourney.RestWritesAreVisibleThroughGraphQL"; Expect = "Passed" },
     @{ Name = "l4-artifacts"; Filter = "FullyQualifiedName~SheetsJourney.TheMonthlyReportMatchesItsModel"; Expect = "Passed" },
@@ -186,13 +188,20 @@ function Write-DemoTrace {
     Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue
 
     # OneReadRacesTheDispatcher is the flaky lesson's race and fails some of the time with the drills on.
-    # The demo shows the four intentional failures only, so a run where the race lost is run again.
+    # The demo shows the four intentional failures only, so the dispatcher runs every millisecond and the
+    # race is won; a run that lost it anyway is run again.
     $flakyName = "OneReadRacesTheDispatcher"
-    for ($attempt = 1; $attempt -le 5; $attempt++) {
-        $run = Invoke-ProtoSampleRun -Configuration $Configuration -NoBuild:($NoBuild -or $attempt -gt 1) -Drills -Name "demo"
-        if ($run.Text -notmatch "Failed\s+$flakyName\b") { break }
-        Write-Host "The demo run lost the $flakyName race (attempt $attempt of 5); running it again."
+    $dispatchInterval = "Northstar__WebhookDispatchInterval"
+    $previousInterval = [Environment]::GetEnvironmentVariable($dispatchInterval)
+    [Environment]::SetEnvironmentVariable($dispatchInterval, "00:00:00.001")
+    try {
+        for ($attempt = 1; $attempt -le 5; $attempt++) {
+            $run = Invoke-ProtoSampleRun -Configuration $Configuration -NoBuild:($NoBuild -or $attempt -gt 1) -Drills -Name "demo"
+            if ($run.Text -notmatch "Failed\s+$flakyName\b") { break }
+            Write-Host "The demo run lost the $flakyName race (attempt $attempt of 5); running it again."
+        }
     }
+    finally { [Environment]::SetEnvironmentVariable($dispatchInterval, $previousInterval) }
     $text = $run.Text
     $summary = $run.Summary
     if (-not $summary.Success) {

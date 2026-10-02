@@ -52,9 +52,9 @@ deliveries
     });
 ```
 
-It passes in most runs and fails in some: 4 of 25 on one machine. Both archives are kept on this site:
+It passes in some runs and fails in others, depending on whether the dispatcher ran first: 12 of 24 Debug runs passed on one machine. Both archives are kept on this site:
 
-- [l4-flaky-pass.prototrace](pathname:///lessons/l4-flaky-pass.prototrace), a run that passed
+- [l4-flaky-pass.prototrace](pathname:///lessons/l4-flaky-pass.prototrace), a run that passed, recorded with the dispatcher running every millisecond so it has delivered before the read
 - [l4-flaky-fail.prototrace](pathname:///lessons/l4-flaky-fail.prototrace), a run that failed, recorded with the setting from step 5
 
 To record your own pair, run the drill ten times from the repository root. Drills skip unless `ProtoTest__Sample__Drills` is set:

@@ -21,33 +21,46 @@ Ask for the newest failure:
 
 The run id above stands in for any run, because ids and times are new on every run.
 
-## The workflow an agent follows
+## The agent does the work, ProtoTest judges it
+
+An agent can say a test is fixed or a change is covered. ProtoTest checks the claim against what the runs recorded. Each job ends with a tool that decides whether it is done:
+
+| The job | The agent | ProtoTest judges with | Done when |
+| --- | --- | --- | --- |
+| Fix a failing test | reads the failure, compares with the last green run, edits code or test, reruns | `check_fix` | the receipt says proven: the baseline failed, every rerun passed, nothing else broke |
+| Cover a change | writes or extends the test the coverage suggestion names | `get_coverage`, `review_tests` | the new units read covered, and the test checks what it calls |
+| Improve tests | applies each review finding's next step | `review_tests`, `compare_runs` | the tests read clean and no test broke |
+
+Each job is also an MCP prompt (`fix_failure`, `cover_change`, `improve_tests`), so a client that shows prompts starts the whole job from one. Every job starts from `get_suite_map`, which lists the clients, data provisioners, attributes, page objects and example tests the suite already has. The agent writes in your suite's style instead of inventing new setup.
+
+## Fixing a failure, step by step
 
 ```mermaid
 flowchart LR
-    a["1 list_runs<br/>which run"] --> b["2 get_failure<br/>the error and the line"]
+    a["1 get_failure<br/>the error and the line"] --> b["2 compare_runs<br/>where it left the green run"]
     b --> c["3 get_diagnosis<br/>ancestors, snippet, state"]
-    c --> d["4 edit<br/>the file it named"]
-    d --> e["5 prototest verify<br/>did the fix regress"]
-    e --> f["6 prototest feedback<br/>the digest"]
+    c --> d["4 edit<br/>code or test"]
+    d --> e["5 rerun"]
+    e --> f["6 check_fix<br/>proven or the reasons"]
+    f -->|"not proven"| d
 ```
 
 | The agent's turn | It calls | It learns |
 | --- | --- | --- |
-| Find the run | `list_runs` | which run failed and which tests it holds |
-| Read the failure | `get_failure` | the error, the source location, the selected failing operation, the mismatches |
-| Read the context | `get_diagnosis` with `detail=context` | the ancestors, the nearest call, the section previews, the source snippet, the artifacts, the state changes, the report rows |
-| Fix | an editor | the file and line the context named |
-| Verify | `prototest verify` | whether the fix regressed a covered unit or changed the specification |
-| Report | `prototest feedback` or the action | the digest the pull request reads |
+| Read the failure | `list_runs`, `get_failure` | which run failed, the error, the source location, the failing operation, the mismatches |
+| Find what changed | `compare_runs` | the operation where this run left the last green one |
+| Read the context | `get_diagnosis` with `detail=context` | the ancestors, the nearest call, the section previews, the source snippet, the artifacts, the state changes |
+| Fix | an editor | the file and line the evidence named |
+| Prove | `check_fix` | proven, or each unmet condition with the run it is about |
+| Report | the [evidence action](../continuous-integration/index.md#the-evidence-action) | the pull request comment with what broke and what was fixed |
 
-The steps map to the **evidence loop**: fail, evidence, fix, verify, report. [The evidence loop](./loop.md) names the same five steps and shows the pull request comment they produce.
+The steps map to the **evidence loop**: fail, evidence, fix, verify, report. [The evidence loop](./loop.md) shows the pull request comment they produce.
 
 ## The pages in this section
 
 - [Setup](./setup.md) installs the MCP server and points it at your runs.
-- [Diagnosis](./diagnosis.md) shows what the agent reads when a test fails.
-- [Verification](./verification.md) turns two runs' reports into a pull request verdict.
+- [Diagnosis](./diagnosis.md) shows what the agent reads when a test fails, and how a review says what each test proves.
+- [Verification](./verification.md) turns two runs into a pull request verdict.
 - [The evidence loop](./loop.md) wires the whole workflow into CI.
 - [CLI reference](./cli.md) runs the same evidence from a terminal, with no agent.
 
@@ -55,7 +68,7 @@ The tools here are for your agent. How the project itself uses AI is on the [AI 
 
 ## What the agent reads, and what it should not
 
-- The MCP tool descriptions are the contract. An agent that lists tools sees four names, what each reads and that each is read-only.
+- The MCP tool descriptions are the contract. An agent that lists tools sees eight names, what each reads and that each is read-only, and three prompts.
 - Summaries first. Every tool caps its payload, so the agent asks for one failure, one test or one page of coverage. It never pulls a whole trace into context.
 - The trace itself is for depth. A `.prototrace` archive holds `spans.json`, `state.json`, embedded sources and artifacts ([ProtoTrace](../observability/prototrace.md)). The MCP tools read it, and the viewer shows it.
 - `prototest summary` and the pull request comment render the same diagnosis document. The agent log and the reviewer comment match.

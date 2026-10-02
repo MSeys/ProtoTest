@@ -149,6 +149,51 @@ public sealed class ComparisonTests
     }
 
     [Test]
+    public async Task Compare_ShouldNotCountASkippedTestAsFailing()
+    {
+        using var baseline = new TemporaryTrace("compare-baseline");
+        using var current = new TemporaryTrace("compare-current");
+        var skipped = new RecordedTest("a drill that only runs on request") { Skipped = true };
+        await WriteAsync(baseline.Path, skipped, new RecordedTest("orders are listed", FailedCall("List orders", "GET /orders", new TimeoutException("No answer."))));
+        await WriteAsync(current.Path, skipped, new RecordedTest("orders are listed", Call("List orders", "GET /orders")));
+
+        var changes = ProtoVerification.Compare(baseline.Path, current.Path).Tests.ToDictionary(test => test.Name, test => test.Change);
+        var receipt = ProtoVerification.Prove(baseline.Path, [current.Path]);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(changes["a drill that only runs on request"], Is.EqualTo(ProtoTestChanges.Unchanged));
+            Assert.That(changes["orders are listed"], Is.EqualTo(ProtoTestChanges.Fixed));
+            Assert.That(receipt.Tests.Select(test => test.Name), Is.EqualTo(new[] { "orders are listed" }), "a skipped test is not claimed");
+            Assert.That(receipt.Proven, Is.True);
+        }
+    }
+
+    [Test]
+    public async Task Compare_ShouldPairStepsWhoseNamesCarryRunValuesAndPreferTheFailedCheck()
+    {
+        using var baseline = new TemporaryTrace("compare-baseline");
+        using var current = new TemporaryTrace("compare-current");
+        await WriteAsync(
+            baseline.Path,
+            new RecordedTest("a project appears on the page", Navigate("http://127.0.0.1:58860/login"), Check("Status should have text \"active\"")));
+        await WriteAsync(
+            current.Path,
+            new RecordedTest(
+                "a project appears on the page",
+                Navigate("http://127.0.0.1:60278/login"),
+                FailedCheck("Status should have text \"active\"", new InvalidOperationException("Was \"ACTIVE\"."))));
+
+        var divergence = ProtoVerification.Compare(baseline.Path, current.Path).Tests.Single().Divergence;
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(divergence!.Reason, Is.EqualTo(ProtoDivergenceReasons.StatusChanged), "the navigation pairs although its port changed");
+            Assert.That(divergence.Current!.Kind, Is.EqualTo("assert.json.shape"));
+        }
+    }
+
+    [Test]
     public async Task WriteComparison_ShouldListChangedTestsWithTheirDivergence()
     {
         using var baseline = new TemporaryTrace("compare-baseline");

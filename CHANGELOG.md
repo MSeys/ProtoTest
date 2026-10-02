@@ -199,10 +199,10 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - the demo endpoint (`samples/ProtoTest.Mcp.DemoEndpoint`) serves the same tools over the demo trace. [Coding agents](https://prototest.dev/docs/agent-workflows/coding-agents#demo-endpoint)
 - `ProtoDiagnosis.Read` builds a deterministic digest; `ReadContext` adds one test's context. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis)
 - `ProtoTest.Verification` compares a baseline and a candidate report. [Verification](https://prototest.dev/docs/agent-workflows/verification)
-- `prototest compare` and the `compare_runs` tool compare two runs test by test and name the operation where each broken, fixed or still-failing test left the baseline. [CLI](https://prototest.dev/docs/agent-workflows/cli#compare)
+- `prototest compare` and the `compare_runs` tool compare two runs test by test and name the operation where each broken, fixed or still-failing test left the baseline; a skipped test is not a failure, and steps pair across runs although their names carry ports or ids. [CLI](https://prototest.dev/docs/agent-workflows/cli#compare)
 - `prototest prove` and the `check_fix` tool return a fix receipt: proven only when the baseline failed, every rerun passes, nothing broke and the reports verify, with a named reason for each unmet condition. [CLI](https://prototest.dev/docs/agent-workflows/cli#prove)
 - `prototest review` and the `review_tests` tool say what each test proves: a body with no check, a call no check looked at, or an untraced gap, each with the next step. [Diagnosis](https://prototest.dev/docs/agent-workflows/diagnosis#review-what-a-test-proves)
-- `get_coverage` suggests where to cover each uncovered endpoint: extend the test that already calls it, or write a new test shaped like the closest recorded call (`ProtoDiagnosis.SuggestCoverage`). [Setup](https://prototest.dev/docs/agent-workflows/setup#what-the-agent-can-see)
+- `get_coverage` suggests where to cover each uncovered endpoint or page: extend the test that already calls or opens it, or write a new test shaped like the closest recorded call or browser journey (`ProtoDiagnosis.SuggestCoverage`). [Setup](https://prototest.dev/docs/agent-workflows/setup#what-the-agent-can-see)
 - the MCP server offers three job prompts, `fix_failure`, `cover_change` and `improve_tests`, each ending with the tool that judges it; the skills and the starter's `AGENTS.md` point at them. [Setup](https://prototest.dev/docs/agent-workflows/setup#the-job-prompts)
 - `ProtoReport.ReadJson(Stream)` reads a report from a stream, such as the one a trace embeds. [Verification](https://prototest.dev/docs/agent-workflows/verification)
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. [Loop](https://prototest.dev/docs/agent-workflows/loop)
@@ -211,6 +211,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Traces and reporting
 
+- a check that runs after an await inside ProtoTest, such as `ExpectAsync` on a REST or GraphQL call, records the line of the test step it checks instead of no line. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - the HTML report reads like the viewer's run view: a headline that names what needs attention, a strip of every entry, a Needs attention list across all kinds and one tab per kind. Coverage is one tab with its own figure, not the page's headline. [Reporting](https://prototest.dev/docs/observability/reporting#the-html-report)
 - the report summary counts every kind in `Kinds`, written to the JSON report next to the existing totals. [Reporting](https://prototest.dev/docs/observability/reporting)
 - run and test artifacts are declared and readable (`ProtoTraceArchive.Artifacts`, `ReadArtifact`). [ProtoTrace](https://prototest.dev/docs/advanced/extending#reading-a-trace-in-code)

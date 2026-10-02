@@ -40,7 +40,8 @@ internal static partial class ProtoCoverageSuggester
         var calls = archive.Tests
             .Where(test => test.Succeeded)
             .SelectMany(test => test.Operations
-                .Where(operation => ProtoTraceOperation.IsCall(operation.Kind) && operation.Subject is { Length: > 0 })
+                .Where(operation => (ProtoTraceOperation.IsCall(operation.Kind) && operation.Subject is { Length: > 0 })
+                    || operation.Kind == Navigate)
                 .Select(operation => (Test: test, Operation: operation)))
             .ToList();
         var suggestions = new List<ProtoCoverageSuggestion>();
@@ -83,6 +84,12 @@ internal static partial class ProtoCoverageSuggester
         var unit = endpoint is null || endpoint == item.Identifier ? $"'{key}'" : $"'{item.Identifier}' of '{endpoint}'";
         var (method, path) = Split(key);
 
+        if (method is null && item.Identifier.StartsWith('/'))
+        {
+            return SuggestPage(item, endpoint, calls);
+        }
+
+        calls = [.. calls.Where(call => call.Operation.Subject is not null)];
         if (calls.FirstOrDefault(call => Matches(call.Operation.Subject!, method, path, sameMethod: true)) is { Test: not null } exact)
         {
             return Create(item, endpoint, ProtoCoverageActions.Extend, exact.Test, exact.Operation,
@@ -109,6 +116,36 @@ internal static partial class ProtoCoverageSuggester
                 $"No test reaches {unit}. '{example.Test.Name}' is a recorded call of the same kind; write a new test shaped like it.");
     }
 
+    // A page unit is a route a browser test opens; the navigation records the URL in its name.
+    private static ProtoCoverageSuggestion SuggestPage(
+        ProtoTraceReportItem item,
+        string? endpoint,
+        List<(ProtoTraceTest Test, ProtoTraceOperation Operation)> calls)
+    {
+        var navigations = calls.Where(call => call.Operation.Kind == Navigate).ToList();
+        var page = Template(item.Identifier);
+        if (navigations.FirstOrDefault(call => NavigatedPath(call.Operation) is { } path && page.IsMatch(path)) is { Test: not null } opened)
+        {
+            return Create(item, endpoint, ProtoCoverageActions.Extend, opened.Test, opened.Operation,
+                $"'{opened.Test.Name}' opens {item.Identifier} but checks nothing on it; assert on that page there so it counts as verified.");
+        }
+
+        return navigations.FirstOrDefault() is { Test: not null } journey
+            ? Create(item, endpoint, ProtoCoverageActions.New, journey.Test, journey.Operation,
+                $"No test opens {item.Identifier}. '{journey.Test.Name}' is a recorded browser journey; write a new test shaped like it.")
+            : Create(item, endpoint, ProtoCoverageActions.New, null, null, $"No test opens {item.Identifier}, and the run recorded no browser journey to start from.");
+    }
+
+    private static string? NavigatedPath(ProtoTraceOperation operation)
+    {
+        var target = operation.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        return target is null
+            ? null
+            : Uri.TryCreate(target, UriKind.Absolute, out var uri) ? uri.AbsolutePath : target.StartsWith('/') ? Strip(target) : null;
+    }
+
+    private const string Navigate = "web.navigate";
+
     private static ProtoCoverageSuggestion Create(
         ProtoTraceReportItem item,
         string? endpoint,
@@ -116,7 +153,14 @@ internal static partial class ProtoCoverageSuggester
         ProtoTraceTest? test,
         ProtoTraceOperation? operation,
         string reason)
-        => new(item.TargetName, item.Category, item.Identifier, endpoint, action, test?.Name, operation?.SourceFile, reason);
+        => new(item.TargetName, item.Category, item.Identifier, endpoint, action, test?.Name, operation?.SourceFile ?? TestFile(test), reason);
+
+    // A navigation or a framework call may carry no location; the test method's own calls do.
+    private static string? TestFile(ProtoTraceTest? test)
+        => test?.Operations
+            .FirstOrDefault(operation => operation.SourceFile is not null
+                && operation.SourceFunction?.Contains(test.MethodName, StringComparison.Ordinal) == true)
+            ?.SourceFile;
 
     private static (string? Method, string? Path) Split(string identifier)
     {

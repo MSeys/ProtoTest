@@ -80,6 +80,28 @@ public sealed class CoverageSuggestionTests
     }
 
     [Test]
+    public async Task SuggestCoverage_ShouldExtendTheBrowserTestThatOpensAnUnverifiedPage()
+    {
+        using var trace = new TemporaryTrace("suggest-page");
+        await WriteAsync(
+            trace.Path,
+            WithReport(trace.Path,
+                new ProtoReportItem("Web", "Web", "/login", ProtoReportItemKinds.Coverage, IsCovered: false),
+                new ProtoReportItem("Web", "Web", "/settings", ProtoReportItemKinds.Coverage, IsCovered: false)),
+            new RecordedTest("a project appears on the page", Navigate("http://127.0.0.1:60278/login"), Check("status")));
+
+        var suggestions = ProtoDiagnosis.SuggestCoverage(ProtoTraceArchive.Open(trace.Path)).ToDictionary(s => s.Identifier);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(suggestions["/login"].Action, Is.EqualTo(ProtoCoverageActions.Extend));
+            Assert.That(suggestions["/login"].Reason, Does.Contain("opens /login but checks nothing on it"));
+            Assert.That(suggestions["/settings"].Action, Is.EqualTo(ProtoCoverageActions.New));
+            Assert.That(suggestions["/settings"].Test, Is.EqualTo("a project appears on the page"), "a recorded browser journey is the model");
+        }
+    }
+
+    [Test]
     public async Task SuggestCoverage_ShouldReturnNothingWithoutAnEmbeddedReport()
     {
         using var trace = new TemporaryTrace("suggest-no-report");

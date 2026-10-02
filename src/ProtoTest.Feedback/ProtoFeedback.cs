@@ -59,6 +59,12 @@ public sealed record ProtoFeedbackTarget
     /// <summary>The pull request number the digest is about, read from the event payload.</summary>
     public int? PullRequestNumber { get; init; }
 
+    /// <summary>
+    /// True when the pull request comes from a fork. Its workflow token can read but not comment, so the
+    /// comment channel skips with that reason; the annotations and the job summary still carry the evidence.
+    /// </summary>
+    public bool FromFork { get; init; }
+
     /// <summary>The GitHub REST base URL; defaults to <c>https://api.github.com</c>.</summary>
     public Uri? ApiUrl { get; init; }
 

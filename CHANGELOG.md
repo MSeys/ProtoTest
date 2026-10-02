@@ -5,7 +5,7 @@ All notable changes to ProtoTest are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 All ProtoTest packages share one version; breaking API changes are called out below.
 
-## [1.1.0] - 2026-09-30
+## [Unreleased]
 
 ProtoTest 1.1 adds the agent evidence layer (the MCP server, diagnosis, verification, feedback and the
 CLI, with compare, prove and review judging what a coding agent changed), the devices family (WebSocket, MQTT, TCP and serial), the topology integrations (Aspire, WireMock,
@@ -207,7 +207,7 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 - `ProtoReport.ReadJson(Stream)` reads a report from a stream, such as the one a trace embeds. [Verification](https://prototest.dev/docs/agent-workflows/verification)
 - `ProtoTest.Feedback` posts a failing run's digest to a PR comment, annotations or a webhook. [Loop](https://prototest.dev/docs/agent-workflows/loop)
 - the ProtoTest Evidence action (`MSeys/prototest-action`) compares a pull request's run with the base branch's last green run, posts what broke, what was fixed and the coverage that moved, runs the verdict over the embedded reports (optionally failing on new uncovered units) and keeps the trace. [CI](https://prototest.dev/docs/continuous-integration/#the-evidence-action)
-- `prototest feedback --baseline <trace>` adds the comparison and the coverage that moved to the comment (each new uncovered unit with the test to start from, each unit no longer covered), and updates the pull request's one ProtoTest comment instead of adding another. `prototest verify` reads the reports two traces embedded (`ProtoVerificationRun.FromTrace`), and `--strict` fails a unit added without a test. [CLI](https://prototest.dev/docs/agent-workflows/cli#feedback)
+- `prototest feedback --baseline <trace>` adds the comparison and the coverage that moved to the comment (each new uncovered unit with the test to start from, each unit no longer covered), and updates the pull request's one ProtoTest comment instead of adding another. A pull request from a fork skips the comment with the reason (its token cannot comment), and a refused post names the missing `pull-requests: write`. `prototest verify` reads the reports two traces embedded (`ProtoVerificationRun.FromTrace`), and `--strict` fails a unit added without a test. [CLI](https://prototest.dev/docs/agent-workflows/cli#feedback)
 
 #### Traces and reporting
 

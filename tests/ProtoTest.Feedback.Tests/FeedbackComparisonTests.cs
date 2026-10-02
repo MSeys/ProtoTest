@@ -11,6 +11,8 @@ using static ProtoTest.TestSupport.RecordedRuns;
 /// fixed, a green run that fixed a test still posting, and the CLI's <c>--baseline</c> option.
 /// </summary>
 [TestFixture]
+// The CLI reads its targets from process-wide environment variables, so these tests run alone.
+[NonParallelizable]
 public sealed class FeedbackComparisonTests
 {
     [Test]

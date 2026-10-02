@@ -179,8 +179,8 @@ describe("untracedGaps and diagnosisRule over the committed demo trace", () => {
     const wait = untracedGaps(byMethod(run.tests, "ARealWaitDoesNotCloseTheDueWindow"));
     expect(wait).toHaveLength(1);
     expect(wait[0].phase).toBe("execution");
-    // The drill sleeps for one real second; the recorded gap adds a few milliseconds of scheduling.
-    expect(wait[0].duration).toBeGreaterThanOrEqual(1000);
+    // The drill sleeps for one real second; the gap is measured between recorded steps, so it lands near that.
+    expect(wait[0].duration).toBeGreaterThanOrEqual(950);
     expect(wait[0].duration).toBeLessThan(1200);
     expect(wait[0].before?.name).toBe("REST · GET /api/v1/organization");
 

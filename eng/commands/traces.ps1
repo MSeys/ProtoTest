@@ -185,7 +185,14 @@ function Write-DemoTrace {
     New-Item -ItemType Directory -Force -Path $destinationDirectory | Out-Null
     Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue
 
-    $run = Invoke-ProtoSampleRun -Configuration $Configuration -NoBuild:$NoBuild -Drills -Name "demo"
+    # OneReadRacesTheDispatcher is the flaky lesson's race and fails some of the time with the drills on.
+    # The demo shows the four intentional failures only, so a run where the race lost is run again.
+    $flakyName = "OneReadRacesTheDispatcher"
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        $run = Invoke-ProtoSampleRun -Configuration $Configuration -NoBuild:($NoBuild -or $attempt -gt 1) -Drills -Name "demo"
+        if ($run.Text -notmatch "Failed\s+$flakyName\b") { break }
+        Write-Host "The demo run lost the $flakyName race (attempt $attempt of 5); running it again."
+    }
     $text = $run.Text
     $summary = $run.Summary
     if (-not $summary.Success) {

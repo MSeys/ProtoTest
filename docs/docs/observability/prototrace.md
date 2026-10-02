@@ -20,7 +20,7 @@ prototest summary TestResults/prototest-{runId}.prototrace
 ```
 
 ```text
-ProtoTest trace 2.0 · run 354e988ba0bd451ab5ac652b44fdaaea · 2026-10-02 08:10:55Z - 2026-10-02 08:10:58Z
+ProtoTest trace 2.0 · run 59f2aa5ff7fd43069060b49f0cfe3106 · 2026-10-02 08:32:36Z - 2026-10-02 08:32:40Z
 1 tests · 1 failed
 
 FAILED Northstar.ProtoTest.FailureDrills.TheAddressWasHardcodedForOneMachine (2.57 s)

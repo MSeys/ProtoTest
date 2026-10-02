@@ -207,6 +207,8 @@ and the deprecated surface; the [docs](https://prototest.dev/docs/) cover the re
 
 #### Traces and reporting
 
+- the HTML report reads like the viewer's run view: a headline that names what needs attention, a strip of every entry, a Needs attention list across all kinds and one tab per kind. Coverage is one tab with its own figure, not the page's headline. [Reporting](https://prototest.dev/docs/observability/reporting#the-html-report)
+- the report summary counts every kind in `Kinds`, written to the JSON report next to the existing totals. [Reporting](https://prototest.dev/docs/observability/reporting)
 - run and test artifacts are declared and readable (`ProtoTraceArchive.Artifacts`, `ReadArtifact`). [ProtoTrace](https://prototest.dev/docs/advanced/extending#reading-a-trace-in-code)
 - `ProtoTest.Traces` reads the whole 2.0 archive and selects the viewer's failure. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
 - `ProtoReport.ReadJson` reads the JSON report a sink wrote. [Reporting](https://prototest.dev/docs/observability/reporting#the-json-report)

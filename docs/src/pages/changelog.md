@@ -219,6 +219,8 @@ and the deprecated surface; the [docs](/docs/) cover the rest.
 
 #### Traces and reporting
 
+- The HTML report reads like the viewer's run view: a headline that names what needs attention, a strip of every entry, a Needs attention list across all kinds and one tab per kind. Coverage is one tab with its own figure, not the page's headline. <span className="changelog-ref">[Reporting](/docs/observability/reporting#the-html-report)</span>
+- The report summary counts every kind in `Kinds`, written to the JSON report next to the existing totals. <span className="changelog-ref">[Reporting](/docs/observability/reporting)</span>
 - Run and test artifacts are declared and readable (`ProtoTraceArchive.Artifacts`, `ReadArtifact`). <span className="changelog-ref">[ProtoTrace](/docs/advanced/extending#reading-a-trace-in-code)</span>
 - `ProtoTest.Traces` reads the whole 2.0 archive and selects the viewer's failure. <span className="changelog-ref">[ProtoTrace](/docs/observability/prototrace)</span>
 - `ProtoReport.ReadJson` reads the JSON report a sink wrote. <span className="changelog-ref">[Reporting](/docs/observability/reporting#the-json-report)</span>

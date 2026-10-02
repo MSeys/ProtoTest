@@ -6,9 +6,6 @@
     <!-- The analyzer assembly ships under analyzers/, not lib/, so the SDK output is packed by hand. -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
-    <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <!-- The analyzer ships under analyzers/, not lib/, so a symbol package would hold a lone PDB. -->
     <IncludeSymbols>false</IncludeSymbols>
     <PackageId>ProtoTest.Analyzers</PackageId>

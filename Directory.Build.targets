@@ -1,13 +1,13 @@
 <Project>
   <!--
     Compatibility guard for the published packages: validate every packable project against the last
-    released baseline (1.0.1) and fail the pack when a public API changes without a recorded
+    released baseline (1.1.0) and fail the pack when a public API changes without a recorded
     suppression. Directory.Build.props runs before a project sets IsPackable, so the condition lives
-    here, in the targets pass. A project may opt out by setting EnablePackageValidation itself: the
-    Web.Pages family has no 1.0.1 release yet, so it cannot restore a baseline.
+    here, in the targets pass. A project may opt out by setting EnablePackageValidation itself, with a
+    PackageValidationOptOutReason, when it has no released baseline to restore.
   -->
   <PropertyGroup Condition="'$(IsPackable)' == 'true'">
     <EnablePackageValidation Condition="'$(EnablePackageValidation)' == ''">true</EnablePackageValidation>
-    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == ''">1.0.1</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == ''">1.1.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 </Project>

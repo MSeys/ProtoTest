@@ -6,10 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
 
-    <!-- New in 1.1: no released baseline exists yet, so there is nothing to validate against. -->
     <IsPackable>true</IsPackable>
-    <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <PackageId>ProtoTest.WireMock</PackageId>
     <Description>Fake HTTP services for ProtoTest suites, backed by WireMock.Net: per-test stubs, matched-request trace evidence and stub coverage.</Description>
     <PackageTags>testing;integration-testing;http;fake;wiremock;dotnet</PackageTags>

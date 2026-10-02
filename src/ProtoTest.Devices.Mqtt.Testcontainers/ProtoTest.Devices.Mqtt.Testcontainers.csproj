@@ -3,8 +3,6 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>true</IsPackable>
-    <EnablePackageValidation>false</EnablePackageValidation>
-    <PackageValidationOptOutReason>New in 1.1; no released baseline exists yet. Validate against the 1.1.0 baseline after it publishes (RELEASING.md).</PackageValidationOptOutReason>
     <PackageId>ProtoTest.Devices.Mqtt.Testcontainers</PackageId>
     <AssemblyName>ProtoTest.Devices.Mqtt.Testcontainers</AssemblyName>
     <RootNamespace>ProtoTest.Devices.Mqtt.Testcontainers</RootNamespace>

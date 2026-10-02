@@ -19,5 +19,6 @@
   <ItemGroup>
     <ProjectReference Include="..\ProtoTest.Diagnosis\ProtoTest.Diagnosis.csproj" />
     <ProjectReference Include="..\ProtoTest.Traces\ProtoTest.Traces.csproj" />
+    <ProjectReference Include="..\ProtoTest.Verification\ProtoTest.Verification.csproj" />
   </ItemGroup>
 </Project>

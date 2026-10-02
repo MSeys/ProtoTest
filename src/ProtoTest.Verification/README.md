@@ -4,7 +4,8 @@
 
 Compares two runs' reports and returns a verdict a pull request gate can use: coverage regressions,
 new uncovered units, the specification identity the candidate was verified against, and the failed run
-gates the candidate recorded.
+gates the candidate recorded. It also compares two traces test by test and names where each changed
+test's runs part.
 
 ```bash
 dotnet add package ProtoTest.Verification
@@ -27,13 +28,21 @@ if (verdict.Failed)
 }
 ```
 
+```csharp
+var comparison = ProtoVerification.Compare("main.prototrace", "current.prototrace");
+foreach (var test in comparison.Tests.Where(t => t.Change == ProtoTestChanges.Broken))
+{
+    Console.WriteLine($"{test.Name} broke at {test.Divergence?.Current?.Name}");
+}
+```
+
 A run recorded its specification identity when its OpenAPI or GraphQL schema coverage collector
 loaded one: one aggregate coverage item per target carrying `spec.source` and the SHA-256 hash of the
 loaded content. The identity item has no verdict, so report arithmetic ignores it.
 
 ## Limits
 
-- The comparison reads reports, not traces. Write them with a `ProtoTest.Reporting` sink
+- `Verify` reads reports, not traces. Write them with a `ProtoTest.Reporting` sink
   (`JsonReportSink`); `ProtoReport.ReadJson` reads the sink's format.
 - Coverage is the report's own arithmetic: units are coverage items with a verdict, matched by target,
   category and identifier. No spans are re-read and no coverage is recomputed.
@@ -47,6 +56,8 @@ loaded content. The identity item has no verdict, so report arithmetic ignores i
 - Failed candidate run gates are surfaced from the report's gate items; the candidate's own gate
   reasons stay its own. Verification does not add run gates and does not duplicate a suite's
   single-run coverage threshold.
+- `Compare` matches tests by name and pairs operations by kind, name and subject in recorded order.
+  Error messages are not compared, only error types, because messages carry run-specific values.
 - The library writes nothing: no trace, no report, no rerun.
 
 ## Learn more

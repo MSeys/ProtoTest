@@ -3,6 +3,7 @@ namespace ProtoTest.Verification;
 using System.Text.Json;
 using ProtoTest.Core;
 using ProtoTest.Reporting;
+using ProtoTest.Traces;
 
 /// <summary>One side of a comparison: the report a run produced and how the verdict names it.</summary>
 /// <param name="Report">The run's report, as the reporting sink recorded it.</param>
@@ -85,6 +86,32 @@ public static class ProtoVerification
         findings.Sort(CompareFindings);
 
         return new ProtoVerificationVerdict(findings, coverageDeltas, specChecks);
+    }
+
+    /// <summary>
+    /// Compares two recorded runs test by test: which tests broke, which were fixed, which still fail,
+    /// and for each of those the first operation where the two recordings part.
+    /// </summary>
+    /// <param name="baselinePath">The trace of the run the current run is compared with.</param>
+    /// <param name="currentPath">The trace of the run under review.</param>
+    public static ProtoTraceComparison Compare(string baselinePath, string currentPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(baselinePath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(currentPath);
+        return Compare(ProtoTraceArchive.Open(baselinePath), ProtoTraceArchive.Open(currentPath));
+    }
+
+    /// <summary>
+    /// Compares two recorded runs test by test. Tests match by name; operations pair by kind, name and
+    /// subject in recorded order.
+    /// </summary>
+    /// <param name="baseline">The run the current run is compared with.</param>
+    /// <param name="current">The run under review.</param>
+    public static ProtoTraceComparison Compare(ProtoTraceArchive baseline, ProtoTraceArchive current)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        ArgumentNullException.ThrowIfNull(current);
+        return ProtoTraceComparer.Compare(baseline, current);
     }
 
     private static void ValidateSeverities(ProtoVerificationOptions options)

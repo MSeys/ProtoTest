@@ -48,4 +48,80 @@ public static class ProtoVerificationText
             }
         }
     }
+
+    /// <summary>
+    /// Writes a run comparison: the counts line, then every test that did not stay the same with the
+    /// operation where its two recordings part. Unchanged tests are counted, not listed.
+    /// </summary>
+    public static void Write(ProtoTraceComparison comparison, TextWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(comparison);
+        ArgumentNullException.ThrowIfNull(writer);
+
+        string[] classes =
+        [
+            ProtoTestChanges.Broken, ProtoTestChanges.Fixed, ProtoTestChanges.StillFailing,
+            ProtoTestChanges.New, ProtoTestChanges.Removed, ProtoTestChanges.Unchanged
+        ];
+        var counts = classes
+            .Where(change => comparison.Counts.ContainsKey(change))
+            .Select(change => $"{comparison.Counts[change]} {change}");
+        writer.WriteLine($"ProtoTest comparison: run {comparison.BaselineRunId} -> run {comparison.CurrentRunId}");
+        writer.WriteLine($"{comparison.Tests.Count} tests · {string.Join(" · ", counts)}");
+
+        foreach (var test in comparison.Tests.Where(test => test.Change != ProtoTestChanges.Unchanged))
+        {
+            writer.WriteLine();
+            writer.WriteLine($"{test.Change.ToUpperInvariant()} {test.Name} ({test.BaselineOutcome ?? "absent"} -> {test.CurrentOutcome ?? "absent"})");
+            if (test.Divergence is not { } divergence)
+            {
+                if (test.Change == ProtoTestChanges.StillFailing)
+                {
+                    writer.WriteLine("  fails the same way: no operation changed status or error type");
+                }
+
+                continue;
+            }
+
+            writer.WriteLine($"  diverges at: {Operation(divergence.Current ?? divergence.Baseline!)} ({divergence.Reason})");
+            if (divergence.Baseline is { } before)
+            {
+                writer.WriteLine($"    baseline: {Outcome(before)}");
+            }
+
+            if (divergence.Current is { } after)
+            {
+                writer.WriteLine($"    current:  {Outcome(after)}");
+            }
+
+            var located = divergence.Current ?? divergence.Baseline!;
+            if (located.SourceFile is { Length: > 0 } file)
+            {
+                writer.WriteLine($"    at {file}{(located.SourceLine is { } line ? $":{line}" : string.Empty)}");
+            }
+        }
+    }
+
+    private static string Operation(ProtoComparedOperation operation)
+        => operation.Subject is { Length: > 0 } subject
+            ? $"{operation.Kind} {operation.Name} [{subject}]"
+            : $"{operation.Kind} {operation.Name}";
+
+    private static string Outcome(ProtoComparedOperation operation)
+    {
+        var error = operation.ErrorType ?? (operation.ErrorMessage is null ? null : "error");
+        if (error is null)
+        {
+            return operation.Status;
+        }
+
+        var message = operation.ErrorMessage is { Length: > 0 } text ? $": {FirstLine(text)}" : string.Empty;
+        return $"{operation.Status} · {error}{message}";
+    }
+
+    private static string FirstLine(string text)
+    {
+        var line = text.Split('\n', 2)[0].TrimEnd('\r');
+        return line.Length <= 200 ? line : string.Concat(line.AsSpan(0, 200), "...");
+    }
 }

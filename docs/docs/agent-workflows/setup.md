@@ -188,6 +188,7 @@ The run id, file paths and timestamps above stand in for any run. A real call re
 | `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the shape mismatches and the test's artifacts | 10 failed operations, 25 mismatches |
 | `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary` or `context`) | the run's diagnosis, or one failing test's context package | the [diagnosis caps](./diagnosis.md#limits) |
 | `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | coverage totals and uncovered units from the report the run embedded | 200 uncovered units |
+| `compare_runs` | optional `baselineRunId`, `currentRunId`, `baselineTrace` | each test that broke, was fixed, still fails, is new or was removed, with the first operation where the two runs part. Defaults to the newest run against the run before it | 50 tests |
 | `get_suite_map` | optional `runId` | what a new test reuses: the capabilities and infrastructure the host composed, the clients, data provisioners, attributes, page objects and devices the tests used, one passed example test per kind of work with its file, and the open coverage gaps | 50 entries per list, 50 gaps |
 
 [Diagnosis](./diagnosis.md) explains what `get_failure` and `get_diagnosis` return and what the agent can do with it.

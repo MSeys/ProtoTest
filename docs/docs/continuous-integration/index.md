@@ -68,10 +68,10 @@ On a pull request, the action:
 - downloads the trace of the newest successful run of the same workflow on the base branch;
 - compares the two runs test by test, and names each test the change broke or fixed with the operation where it changed;
 - verifies the reports both runs embedded: a unit the base branch covered and this run does not, a changed specification, a failed run gate;
-- posts one comment with the comparison and the failure digest, and one check annotation per failing test;
+- posts one comment with the comparison, the failure digest and the coverage that moved, and one check annotation per failing test. A later push updates that comment instead of adding a new one;
 - uploads the trace, writes the comparison and the run summary to the job summary, and fails the step when a test broke or the verdict failed.
 
-A run with no failures and no changed outcome posts no comment.
+A run with no failures, no changed outcome and no coverage change posts no comment. When a pull request turns green, its comment is updated to say so.
 
 Here is what the post step prints, from a committed failing run of the Learn track with no pull request configured:
 
@@ -93,6 +93,10 @@ The comment a reviewer reads, illustrative, with values from a committed fixture
 
 **Compared with the base branch** (run `ae31c391eb5948d6940afd9468d976c4`)
 - broke `orders are listed` at `http.request` `GET /api/orders`
+
+**Coverage against the base branch**
+- `Shop:Api` · OpenAPI: 2/2 → 2/3 (-33.33 points)
+- new and uncovered: `DELETE /api/orders/{id}` (Shop:Api · OpenAPI). No test calls DELETE /api/orders/{id}. 'an order is read' calls GET /api/orders/42 on the same path; write a new test shaped like it.
 
 - **FAILED `orders are listed`** (2.01 s)
   - `http.request` `List orders` · failed
@@ -171,6 +175,7 @@ prototest verify main.prototrace TestResults/ProtoTest/run.prototrace
 | `artifact-name` | `prototest-trace` | the uploaded artifact, and the one `auto` looks for on the base branch |
 | `fail-on-broken` | `true` | fail the step when a test that passed on the base branch fails now |
 | `fail-on-regression` | `true` | fail the step when the verdict over the embedded reports has a failing finding |
+| `fail-on-new-uncovered` | `false` | also fail when the change adds an endpoint, operation or page no test covers; the comment names those either way |
 | `version` | latest | the `ProtoTest.Cli` version to install |
 | `source` | | an extra NuGet source for the CLI, such as a folder of pre-release packages |
 | `webhook-url`, `webhook-secret`, `webhook-secret-header` | | post the digest JSON to your endpoint too; the header defaults to `X-ProtoTest-Secret` |

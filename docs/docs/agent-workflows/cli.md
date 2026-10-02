@@ -107,7 +107,10 @@ Compares two JSON reports from a `ProtoTest.Reporting` sink, as files or as the 
 ```bash
 prototest verify baseline.json TestResults/ProtoTest/report.json
 prototest verify main.prototrace TestResults/ProtoTest/run.prototrace
+prototest verify main.prototrace TestResults/ProtoTest/run.prototrace --strict
 ```
+
+`--strict` also fails a unit the change added without a test (`added-uncovered`), which only warns by default.
 
 The baseline is the default branch report. The current report is the run under review. The failing findings print one `::error` workflow command each, which a GitHub runner turns into an annotation. The verdict then lists the findings and the coverage deltas. The default severities make the verb a pull request gate: `regressed`, `stale-spec` and `gate-failed` fail, and `added-uncovered` warns.
 
@@ -196,7 +199,7 @@ Reads one run's digest and posts it:
 prototest feedback TestResults/ProtoTest/run.prototrace --digest digest.json
 ```
 
-With `--baseline <file.prototrace>`, the comment also says which tests the run broke or fixed against that trace, and where each one changed. A run with no failures still posts when it fixed a test.
+With `--baseline <file.prototrace>`, the comment also says which tests the run broke or fixed against that trace, and where each one changed. When both traces embed a report, it adds the coverage that moved: each unit the change added without a test, with the test to extend or copy, and each unit it stopped covering. A run with no failures still posts when it fixed a test or changed coverage. The comment starts with `<!-- prototest-evidence -->`, and a later run updates that comment instead of posting a new one.
 
 Two streams, and the split is the point:
 

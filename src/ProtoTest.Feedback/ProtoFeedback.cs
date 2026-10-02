@@ -79,6 +79,16 @@ public sealed record ProtoFeedbackTarget
     /// change broke or fixed and where each one left the baseline; null leaves that section out.
     /// </summary>
     public ProtoTraceComparison? Comparison { get; init; }
+
+    /// <summary>
+    /// The verdict over the reports the base branch's run and this run embedded. The comment then shows
+    /// the coverage that moved, the units the change added without a test and the ones it stopped
+    /// covering; null leaves that section out.
+    /// </summary>
+    public ProtoVerificationVerdict? Coverage { get; init; }
+
+    /// <summary>Where to cover each uncovered unit, from this run; the comment names it next to a new gap.</summary>
+    public IReadOnlyList<ProtoCoverageSuggestion> CoverageSuggestions { get; init; } = [];
 }
 
 /// <summary>

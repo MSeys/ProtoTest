@@ -34,9 +34,15 @@ public static class CliHost
             return Feedback(args, output, error);
         }
 
-        if (args.Length == 3 && string.Equals(args[0], "verify", StringComparison.Ordinal))
+        if (args.Length is 3 or 4 && string.Equals(args[0], "verify", StringComparison.Ordinal))
         {
-            return Verify(args[1], args[2], output, error);
+            if (args.Length == 4 && !string.Equals(args[3], "--strict", StringComparison.Ordinal))
+            {
+                WriteUsage(error);
+                return 1;
+            }
+
+            return Verify(args[1], args[2], strict: args.Length == 4, output, error);
         }
 
         if (args.Length == 3 && string.Equals(args[0], "compare", StringComparison.Ordinal))
@@ -185,6 +191,8 @@ public static class CliHost
         }
 
         ProtoTraceComparison? comparison = null;
+        ProtoVerificationVerdict? coverage = null;
+        IReadOnlyList<ProtoCoverageSuggestion> suggestions = [];
         if (baselinePath is { Length: > 0 })
         {
             if (!File.Exists(baselinePath))
@@ -202,13 +210,16 @@ public static class CliHost
                 error.WriteLine($"Could not compare with '{baselinePath}': {exception.Message}");
                 return 1;
             }
+
+            (coverage, suggestions) = CoverageAgainst(baselinePath, path, error);
         }
 
         ProtoFeedbackReport report;
         using var client = new HttpClient();
         try
         {
-            report = ProtoFeedback.PostAsync(digest, Target() with { Comparison = comparison }, client, output).GetAwaiter().GetResult();
+            var target = Target() with { Comparison = comparison, Coverage = coverage, CoverageSuggestions = suggestions };
+            report = ProtoFeedback.PostAsync(digest, target, client, output).GetAwaiter().GetResult();
         }
         catch (Exception exception)
         {
@@ -225,7 +236,25 @@ public static class CliHost
         return report.Failed ? 1 : 0;
     }
 
-    private static int Verify(string baselinePath, string currentPath, TextWriter output, TextWriter error)
+    // The coverage verdict needs both runs to embed a report; without one the comment leaves coverage out.
+    private static (ProtoVerificationVerdict? Verdict, IReadOnlyList<ProtoCoverageSuggestion> Suggestions) CoverageAgainst(
+        string baselinePath,
+        string currentPath,
+        TextWriter error)
+    {
+        try
+        {
+            var verdict = ProtoVerification.Verify(ProtoVerificationRun.FromTrace(baselinePath), ProtoVerificationRun.FromTrace(currentPath));
+            return (verdict, ProtoDiagnosis.SuggestCoverage(ProtoTraceArchive.Open(currentPath)));
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine($"prototest feedback: coverage left out ({exception.Message})");
+            return (null, []);
+        }
+    }
+
+    private static int Verify(string baselinePath, string currentPath, bool strict, TextWriter output, TextWriter error)
     {
         foreach (var path in new[] { baselinePath, currentPath })
         {
@@ -239,7 +268,11 @@ public static class CliHost
         ProtoVerificationVerdict verdict;
         try
         {
-            verdict = ProtoVerification.Verify(Run(baselinePath), Run(currentPath));
+            // --strict fails a unit the change added without a test, not only one it stopped covering.
+            var options = strict
+                ? ProtoVerificationOptions.Default with { AddedUncoveredSeverity = ProtoVerificationSeverities.Fail }
+                : ProtoVerificationOptions.Default;
+            verdict = ProtoVerification.Verify(Run(baselinePath), Run(currentPath), options: options);
         }
         catch (Exception exception)
         {
@@ -456,7 +489,7 @@ public static class CliHost
             usage: prototest summary <file.prototrace>
                    prototest index <folder>
                    prototest feedback <file.prototrace> [--digest <path>] [--baseline <file.prototrace>]
-                   prototest verify <baseline> <current>   (report.json or .prototrace)
+                   prototest verify <baseline> <current> [--strict]   (report.json or .prototrace)
                    prototest compare <baseline.prototrace> <current.prototrace>
                    prototest prove <baseline.prototrace> <current.prototrace>... [--test <name>]...
                    prototest review <file.prototrace> [--test <name>]...

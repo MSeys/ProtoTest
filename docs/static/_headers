@@ -1,0 +1,6 @@
+# The blog feeds can be read from other sites, so a page can list the newest posts itself.
+/blog/rss.xml
+  Access-Control-Allow-Origin: *
+
+/blog/atom.xml
+  Access-Control-Allow-Origin: *

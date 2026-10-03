@@ -167,7 +167,7 @@ Every tool is read-only and returns a compact JSON document. `list_runs` over a 
   "runs": [
     {
       "runId": "761778e6dc82498a9f9965fa1e6b5a24",
-      "traceFile": "C:/dev/your-repo/TestResults/run.prototrace",
+      "traceFile": "TestResults/run.prototrace",
       "startedAtUtc": "2026-09-29T06:19:01Z",
       "completedAtUtc": "2026-09-29T06:19:05Z",
       "outcomes": { "failed": 1 },
@@ -180,12 +180,12 @@ Every tool is read-only and returns a compact JSON document. `list_runs` over a 
 }
 ```
 
-The run id, file paths and timestamps above stand in for any run. A real call returns your machine's.
+The run id, file paths and timestamps above stand in for any run. A real call returns your machine's. Paths under `root` are relative to it, with forward slashes, so the agent spends its context on the evidence; `root` itself stays absolute.
 
 | Tool | Input | Returns | Cap |
 | --- | --- | --- | --- |
 | `list_runs` | optional `folder`, `limit` (default 10) | the newest runs first: run id, trace file, start and completion, outcome counts, failing test ids, and the archives it had to skip | 50 runs |
-| `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the shape mismatches and the test's artifacts | 10 failed operations, 25 mismatches |
+| `get_failure` | optional `runId`, `testId` | the failure entry: outcome, error, source location, the selected failing operation, the other operations that failed, the shape mismatches and the test's artifacts | 10 failed operations, 25 mismatches |
 | `get_diagnosis` | optional `runId`, `testId`, `detail` (`summary` or `context`) | the run's diagnosis, or one failing test's context package | the [diagnosis caps](./diagnosis.md#limits) |
 | `get_coverage` | optional `runId`, `target`, `category`, `includeUncovered`, `offset`, `limit` | coverage totals and uncovered units from the report the run embedded, with one suggestion per endpoint: extend the test that already calls it, or write a new test shaped like the named one | 200 uncovered units, 20 suggestions |
 | `compare_runs` | optional `baselineRunId`, `currentRunId`, `baselineTrace` | each test that broke, was fixed, still fails, is new or was removed, with the first operation where the two runs part. Defaults to the newest run against the run before it | 50 tests |

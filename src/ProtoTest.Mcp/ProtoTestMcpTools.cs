@@ -28,11 +28,6 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
     private const int MaxUncoveredLimit = 200;
     private const int MaxSuggestions = 20;
 
-    private static readonly JsonSerializerOptions s_json = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     /// <summary>Lists the runs this server can see, newest first.</summary>
     [McpServerTool(
         Name = "list_runs",
@@ -111,8 +106,8 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
         OpenWorld = false)]
     [Description(
         "Reads one failure: the test's outcome, the error, the source location, the failing operation, " +
-        "the recorded shape mismatches and the test's evidence artifacts. Defaults to the newest run's " +
-        "first non-succeeded test. Read-only.")]
+        "the other operations that failed, the recorded shape mismatches and the test's evidence artifacts. " +
+        "Defaults to the newest run's first non-succeeded test. Paths are relative to the server's folder. Read-only.")]
     public string GetFailure(
         [Description("Run id to read; defaults to the newest discovered run.")]
         string? runId = null,
@@ -130,7 +125,8 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
 
         IEnumerable<ProtoTraceOperation> failedOperations = test is null
             ? []
-            : test.Operations.Where(operation => operation.Failed && operation.Kind != "test.execution");
+            : test.Operations.Where(operation =>
+                operation.Failed && operation.Kind != "test.execution" && operation.SpanId != failure?.SpanId);
         var failedPage = failedOperations.Take(MaxFailedOperations + 1).ToArray();
         var (mismatches, mismatchesTruncated) = ReadMismatches(test, failure);
 
@@ -321,7 +317,7 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
         var kind = (detail ?? "summary").Trim().ToLowerInvariant();
         if (kind == "summary")
         {
-            return ProtoDiagnosisJson.ToJson(ProtoDiagnosis.Read(run.Archive));
+            return McpOutput.Rewrite(ProtoDiagnosisJson.ToJson(ProtoDiagnosis.Read(run.Archive)), Root);
         }
 
         if (kind == "context")
@@ -338,7 +334,7 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
                     $"Test '{test.Name}' ({test.Outcome}) succeeded; there is no diagnosis context to read.");
             }
 
-            return ProtoDiagnosisJson.ToJson(ProtoDiagnosis.ReadContext(run.Archive, test.TestId));
+            return McpOutput.Rewrite(ProtoDiagnosisJson.ToJson(ProtoDiagnosis.ReadContext(run.Archive, test.TestId)), Root);
         }
 
         throw new McpException($"Unknown detail '{detail}'; use 'summary' or 'context'.");
@@ -435,7 +431,10 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
     private static string? Timestamp(DateTimeOffset? value)
         => value?.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
 
-    private static string Json(object value) => JsonSerializer.Serialize(value, s_json);
+    private string Json(object value) => McpOutput.Write(value, Root);
+
+    // The folder paths in the output are relative to: the project folder, or the folder of the one trace file.
+    private string? Root => options.ProjectDirectory ?? Path.GetDirectoryName(options.TracePath);
 
     private sealed record MismatchDetail(
         string? PropertyPath,

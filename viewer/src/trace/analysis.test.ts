@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkItems, deriveVisibility, diagnosisRule, findFailure, shapeMismatches, untracedGaps } from "./analysis";
+import { checkItems, deriveVisibility, diagnosisRule, findFailure, groupCapabilities, groupResources, shapeMismatches, untracedGaps } from "./analysis";
 import { openTraceArchive } from "./archive";
 import { buildRun } from "./model";
 import type { ChangeSource, Item, SectionItem, Span, TestTrace } from "./model";
@@ -128,6 +128,43 @@ describe("deriveVisibility", () => {
     expect(visibility.backends).toEqual(["Northstar", "Postgres"]);
     expect(visibility.sources).toEqual(["testside", "observed", "applicationside"]);
     expect(visibility.applicationInstrumented).toBe(true);
+  });
+});
+
+describe("groupCapabilities", () => {
+  it("names a capability composed for several hosts once, with its instances", () => {
+    const clock = (instance: string, source: string) =>
+      ({ ...item("capability", "Test clock", { "capability.instance": instance, "capability.source": source }), id: `clock:Test clock:${instance}` });
+    const groups = groupCapabilities([
+      item("capability", "REST", { "capability.source": "ProtoTest.Rest" }),
+      clock("Notifications", "ProtoTest.Hosting"),
+      clock("Csms", "ProtoTest.AspNetCore"),
+      clock("Billing", "ProtoTest.Hosting")
+    ]);
+
+    expect(groups.map(group => group.name)).toEqual(["REST", "Test clock"]);
+    expect(groups[1]).toEqual({
+      name: "Test clock", count: 3, instances: ["Billing", "Csms", "Notifications"], sources: ["ProtoTest.Hosting", "ProtoTest.AspNetCore"]
+    });
+    expect(groups[0]).toEqual({ name: "REST", count: 1, instances: [], sources: ["ProtoTest.Rest"] });
+  });
+});
+
+describe("groupResources", () => {
+  it("groups resources by kind, takes the kind off each name and merges a fake recorded twice", () => {
+    const resource = (kind: string, id: string, description: string, state: Record<string, string> = {}) =>
+      ({ ...item(kind, `Resource · ${id}`, { "resource.description": description, "resource.state": "released", ...state }), id });
+    const groups = groupResources([
+      resource("readiness", "readiness:application:Csms", "Readiness · Csms address"),
+      resource("database", "database:postgres", "PostgreSQL container"),
+      { ...item("server", "Fake · InvoiceReadyTarget", { "server.state": "stopped" }), id: "server:WireMock:InvoiceReadyTarget" },
+      resource("wiremock", "wiremock:InvoiceReadyTarget", "WireMock fake 'InvoiceReadyTarget'"),
+      resource("custom", "custom:thing", "Thing")
+    ]);
+
+    expect(groups.map(group => group.label)).toEqual(["Databases", "Fakes", "Readiness", "Custom"]);
+    expect(groups[1].entries).toEqual([{ text: "InvoiceReadyTarget", title: "server:WireMock:InvoiceReadyTarget (stopped)" }]);
+    expect(groups[2].entries).toEqual([{ text: "Csms address", title: "readiness:application:Csms (released)" }]);
   });
 });
 

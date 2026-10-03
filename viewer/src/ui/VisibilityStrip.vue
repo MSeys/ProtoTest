@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { groupCapabilities, groupResources } from "../trace/analysis";
 import type { ChangeSource, Item, Visibility } from "../trace/model";
 import Panel from "./Panel.vue";
 
@@ -22,15 +23,14 @@ const sources: { id: ChangeSource; label: string; detail: string }[] = [
 ];
 const seen = computed(() => new Set(props.visibility.sources));
 
-/* A run-scoped resource reads by its description; the id stays behind the title for the exact key. */
-function describe(item: Item): string {
-  const description = item.state["resource.description"];
-  return typeof description === "string" && description ? description : item.name;
+/* A clock on three hosts is one capability three times: it reads once, with the hosts behind the title. */
+const capabilities = computed(() => groupCapabilities(props.visibility.capabilities));
+function capabilityTitle(group: { instances: string[]; sources: string[] }): string | undefined {
+  return [group.instances.join(", "), group.sources.join(", ")].filter(Boolean).join(" · ") || undefined;
 }
-function resourceTitle(item: Item): string {
-  const state = item.state["resource.state"];
-  return typeof state === "string" && state ? `${item.id} (${state})` : item.id;
-}
+
+/* Resources read per kind, short names as chips; the id and its state stay behind the title for the exact key. */
+const resourceGroups = computed(() => groupResources(props.resources));
 </script>
 
 <template>
@@ -42,9 +42,9 @@ function resourceTitle(item: Item): string {
       </div>
       <div>
         <dt>Capabilities</dt>
-        <dd v-if="visibility.capabilities.length" class="chips">
-          <span v-for="capability in visibility.capabilities" :key="capability.id" class="capability"
-                :title="capability.state['capability.source'] ?? undefined">{{ capability.name }}</span>
+        <dd v-if="capabilities.length" class="chips">
+          <span v-for="capability in capabilities" :key="capability.name" class="capability"
+                :title="capabilityTitle(capability)">{{ capability.name }}<span v-if="capability.count > 1" class="count"> ×{{ capability.count }}</span></span>
         </dd>
         <dd v-else class="absent">None recorded</dd>
       </div>
@@ -52,9 +52,16 @@ function resourceTitle(item: Item): string {
         <dt>Backends</dt>
         <dd>{{ visibility.backends.join(", ") }}</dd>
       </div>
-      <div v-if="resources.length">
+      <div v-if="resourceGroups.length" class="resources">
         <dt>Resources</dt>
-        <dd><span v-for="(item, index) in resources" :key="item.key" :title="resourceTitle(item)">{{ describe(item) }}<span v-if="index < resources.length - 1">, </span></span></dd>
+        <dd>
+          <div v-for="group in resourceGroups" :key="group.label" class="group">
+            <span class="kind">{{ group.label }}</span>
+            <span class="chips">
+              <span v-for="entry in group.entries" :key="entry.text" class="resource" :title="entry.title">{{ entry.text }}</span>
+            </span>
+          </div>
+        </dd>
       </div>
       <div>
         <dt>Values from</dt>
@@ -76,6 +83,14 @@ dt { color: var(--dim); font-size: var(--text-micro); }
 dd { margin: 0; font-size: var(--text-meta); font-weight: var(--weight-semibold); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); font-weight: var(--weight-regular); }
 .capability { padding: 0 var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-chip); line-height: 1.8; }
+.capability .count { color: var(--dim); }
+/* Resources can run long, so they take the full width: one row per kind, its resources as quiet chips. */
+dl > div.resources { flex-basis: 100%; align-items: flex-start; }
+.resources > dt { padding-top: var(--space-1); }
+.resources > dd { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-1) var(--space-3); align-items: baseline; }
+.resources .group { display: contents; }
+.resources .kind { color: var(--dim); font-size: var(--text-micro); font-weight: var(--weight-regular); }
+.resource { padding: 0 var(--space-2); border-radius: var(--radius-chip); background: var(--surface-2, color-mix(in srgb, var(--border) 45%, transparent)); line-height: 1.8; font-weight: var(--weight-regular); }
 /* Present is solid, absent is the dashed outline of the same chip: the gap keeps its place. */
 .source { padding: 0 var(--space-2); display: inline-flex; align-items: center; gap: var(--space-1); border: 1px solid var(--blueprint); border-radius: var(--radius-chip); background: var(--blueprint-soft); line-height: 1.8; }
 .source i { width: 6px; height: 6px; border-radius: 50%; background: var(--blueprint); }

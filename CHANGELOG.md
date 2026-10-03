@@ -7,6 +7,21 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-10-03
+
+ProtoTest 1.1.4 makes what a coding agent reads from the MCP server about a quarter smaller, and fixes the viewer's capability list.
+
+### Fixes
+
+#### Agent workflows
+
+- the MCP tools return paths relative to the folder they read, leave quotes and symbols unescaped, drop attributes that repeat an operation's source location, and `get_failure` no longer repeats the selected failure in `failedOperations`: on a template project's failure the four tools an agent calls first return 28% less text. [Setup](https://prototest.dev/docs/agent-workflows/setup#what-the-agent-can-see)
+
+#### Viewer
+
+- a capability composed for several hosts, such as a test clock per application, reads once with a count, and its instances show in the chip's title. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+- a run's resources read per kind (applications, databases, messaging, fakes, workers, readiness, setup) as short names, and a fake recorded as a server and as a WireMock resource shows once. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
 ## [1.1.3] - 2026-10-03
 
 ProtoTest 1.1.3 fixes the summary card of the pull request comment in GitHub's dark mode.

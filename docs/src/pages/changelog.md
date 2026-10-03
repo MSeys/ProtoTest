@@ -13,6 +13,27 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.4
+
+<p className="changelog-date">3 October 2026</p>
+
+ProtoTest 1.1.4 makes what a coding agent reads from the MCP server about a quarter smaller, and fixes the viewer's capability list.
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+#### Agent workflows
+
+- The MCP tools return paths relative to the folder they read, leave quotes and symbols unescaped, drop attributes that repeat an operation's source location, and `get_failure` no longer repeats the selected failure in `failedOperations`: on a template project's failure the four tools an agent calls first return 28% less text. <span className="changelog-ref">[Setup](/docs/agent-workflows/setup#what-the-agent-can-see)</span>
+
+#### Viewer
+
+- A capability composed for several hosts, such as a test clock per application, reads once with a count, and its instances show in the chip's title. <span className="changelog-ref">[ProtoTrace](/docs/observability/prototrace)</span>
+- A run's resources read per kind (applications, databases, messaging, fakes, workers, readiness, setup) as short names, and a fake recorded as a server and as a WireMock resource shows once. <span className="changelog-ref">[ProtoTrace](/docs/observability/prototrace)</span>
+
+</div>
+
 ## 1.1.3
 
 <p className="changelog-date">3 October 2026</p>

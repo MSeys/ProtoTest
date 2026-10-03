@@ -109,6 +109,68 @@ export function diagnosisRule(test: TestTrace): DiagnosisRule | null {
   return testFindings(test).length ? "finding" : null;
 }
 
+/** One capability as a reader names it: the same clock composed for three hosts reads once, with its instances. */
+export interface CapabilityGroup {
+  name: string;
+  count: number;
+  instances: string[];
+  sources: string[];
+}
+
+/** Groups the run's capabilities by name, in the order the run composed them. */
+export function groupCapabilities(capabilities: Item[]): CapabilityGroup[] {
+  const groups = new Map<string, CapabilityGroup>();
+  const add = (list: string[], value: unknown) => {
+    if (typeof value === "string" && value && !list.includes(value)) list.push(value);
+  };
+  for (const item of capabilities) {
+    const group = groups.get(item.name) ?? { name: item.name, count: 0, instances: [], sources: [] };
+    group.count++;
+    add(group.instances, item.state["capability.instance"]);
+    add(group.sources, item.state["capability.source"]);
+    groups.set(item.name, group);
+  }
+  return [...groups.values()].map(group => ({ ...group, instances: [...group.instances].sort((left, right) => left.localeCompare(right)) }));
+}
+
+/** The run's resources of one kind, as short names under one label. */
+export interface ResourceGroup {
+  label: string;
+  entries: { text: string; title: string }[];
+}
+
+// Kinds read in this order; a fake recorded as a server and as a WireMock resource is one fake.
+const resourceKinds: [string[], string][] = [
+  [["application"], "Applications"], [["aspire"], "Aspire"], [["database"], "Databases"], [["broker"], "Messaging"],
+  [["server", "wiremock"], "Fakes"], [["worker"], "Workers"], [["readiness"], "Readiness"], [["setup"], "Setup"]
+];
+
+/** Groups the run's resources by kind, with the kind prefix taken off each name and repeats merged. */
+export function groupResources(items: Item[]): ResourceGroup[] {
+  const groups = new Map<string, ResourceGroup>();
+  const labelOf = (kind: string) =>
+    resourceKinds.find(([kinds]) => kinds.includes(kind))?.[1] ?? kind.charAt(0).toUpperCase() + kind.slice(1);
+  for (const item of items) {
+    const description = item.state["resource.description"];
+    const full = typeof description === "string" && description ? description : item.name;
+    // "Readiness · Csms address" reads "Csms address" under Readiness; "WireMock fake 'X'" reads "X" under Fakes.
+    const quoted = /'([^']+)'$/.exec(full);
+    const text = quoted ? quoted[1] : full.includes(" · ") ? full.slice(full.indexOf(" · ") + 3) : full;
+    const state = item.state["resource.state"] ?? item.state["server.state"];
+    const label = labelOf(item.kind);
+    const group = groups.get(label) ?? { label, entries: [] };
+    if (!group.entries.some(entry => entry.text === text)) {
+      group.entries.push({ text, title: typeof state === "string" && state ? `${item.id} (${state})` : item.id });
+    }
+    groups.set(label, group);
+  }
+  const order = (label: string) => {
+    const index = resourceKinds.findIndex(([, name]) => name === label);
+    return index < 0 ? resourceKinds.length : index;
+  };
+  return [...groups.values()].sort((left, right) => order(left.label) - order(right.label) || left.label.localeCompare(right.label));
+}
+
 /** What a run could see, derived from the state it recorded. */
 export function deriveVisibility(runItems: Item[], tests: TestTrace[]): Visibility {
   const capabilities = runItems.filter(item => item.kind === "capability");

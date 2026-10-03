@@ -102,7 +102,6 @@ public sealed class RunToolsTests
 
         var test = failure.GetProperty("test");
         var operation = failure.GetProperty("failure");
-        var failedOperation = failure.GetProperty("failedOperations")[0];
         var mismatch = failure.GetProperty("mismatches")[0];
         var artifacts = failure.GetProperty("artifacts");
         using (Assert.EnterMultipleScope())
@@ -114,9 +113,10 @@ public sealed class RunToolsTests
             Assert.That(operation.GetProperty("kind").GetString(), Is.EqualTo("assert.json.shape"));
             Assert.That(operation.GetProperty("status").GetString(), Is.EqualTo("failed"));
             Assert.That(operation.GetProperty("errorMessage").GetString(), Is.Not.Empty);
-            Assert.That(failedOperation.GetProperty("kind").GetString(), Is.EqualTo("assert.json.shape"));
-            Assert.That(failedOperation.GetProperty("sourceFile").GetString(), Does.EndWith("Program.cs"));
-            Assert.That(failedOperation.GetProperty("sourceLine").GetInt32(), Is.GreaterThan(0));
+            Assert.That(operation.GetProperty("sourceFile").GetString(), Does.EndWith("Program.cs"));
+            Assert.That(operation.GetProperty("sourceLine").GetInt32(), Is.GreaterThan(0));
+            // The shape check is the only failing operation, so there is no other one to list.
+            Assert.That(failure.GetProperty("failedOperations").GetArrayLength(), Is.Zero);
             Assert.That(mismatch.GetProperty("propertyPath").GetString(), Is.EqualTo("$.orderId"));
             Assert.That(mismatch.GetProperty("expected").GetInt32(), Is.EqualTo(7));
             Assert.That(mismatch.GetProperty("actual").GetInt32(), Is.EqualTo(42));

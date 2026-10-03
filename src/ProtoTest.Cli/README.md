@@ -41,7 +41,9 @@ The feedback targets follow the GitHub Actions environment: `GITHUB_TOKEN`, `GIT
 `GITHUB_EVENT_PATH` (the pull request number) and `GITHUB_API_URL` for the comment;
 `PROTOTEST_FEEDBACK_WEBHOOK_URL`, `PROTOTEST_FEEDBACK_WEBHOOK_SECRET` and
 `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER` for the webhook; `PROTOTEST_FEEDBACK_TRACE_URL` is the
-artifact link the comment carries. A missing target skips its channel with the reason.
+artifact link the comment carries. The comment opens with a summary card from
+`api.prototest.dev`; `PROTOTEST_FEEDBACK_CARD_URL=off` leaves it out. A missing target skips its
+channel with the reason.
 
 ## Limits
 

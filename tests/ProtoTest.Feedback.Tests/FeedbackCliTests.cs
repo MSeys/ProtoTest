@@ -74,7 +74,7 @@ public sealed class FeedbackCliTests
                 Assert.That(request.Headers["Authorization"], Is.EqualTo("Bearer test-token"));
                 Assert.That(
                     body.RootElement.GetProperty("body").GetString(),
-                    Does.Contain("[Full trace](https://example.test/artifact)"));
+                    Does.Contain("[**Open the full trace ↗**](https://example.test/artifact)"));
                 Assert.That(error.ToString(), Does.Contain("github-pr-comment posted"));
                 Assert.That(error.ToString(), Does.Contain("webhook skipped"));
             }
@@ -82,6 +82,50 @@ public sealed class FeedbackCliTests
         finally
         {
             Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task Feedback_ShouldOpenTheCommentWithTheSummaryCardByDefault()
+    {
+        var body = await PostedBodyAsync(new Dictionary<string, string?>(StringComparer.Ordinal));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(body, Does.Contain("<img src=\"https://api.prototest.dev/evidence/card.svg?broke="));
+            Assert.That(body, Does.Contain("&amp;theme=dark"));
+            Assert.That(body, Does.Contain("](https://github.com/owner/repo/blob/0123abc/"), "source locations link to the head commit");
+        }
+    }
+
+    [Test]
+    public async Task Feedback_ShouldLeaveTheCardOutWhenItIsTurnedOff()
+    {
+        var off = await PostedBodyAsync(new Dictionary<string, string?>(StringComparer.Ordinal) { ["PROTOTEST_FEEDBACK_CARD_URL"] = "off" });
+        var own = await PostedBodyAsync(new Dictionary<string, string?>(StringComparer.Ordinal) { ["PROTOTEST_FEEDBACK_CARD_URL"] = "https://cards.example.test/card.svg" });
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(off, Does.Not.Contain("<picture>"));
+            Assert.That(off, Does.Not.Contain("api.prototest.dev"));
+            Assert.That(own, Does.Contain("<img src=\"https://cards.example.test/card.svg?broke="));
+        }
+    }
+
+    [Test]
+    public void Feedback_ShouldFailAnInvalidCardAddress()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exit = FeedbackFixtures.WithEnvironmentResult(
+            new Dictionary<string, string?>(StringComparer.Ordinal) { ["PROTOTEST_FEEDBACK_CARD_URL"] = "cards" },
+            () => CliHost.Run(["feedback", FeedbackFixtures.McpFixture("run-failed")], output, error));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(exit, Is.EqualTo(1));
+            Assert.That(error.ToString(), Does.Contain("not an absolute URL for PROTOTEST_FEEDBACK_CARD_URL"));
         }
     }
 
@@ -182,6 +226,38 @@ public sealed class FeedbackCliTests
         {
             Assert.That(exit, Is.EqualTo(1));
             Assert.That(error.ToString(), Does.Contain("prototest feedback <file.prototrace>"));
+        }
+    }
+
+    // Runs the feedback verb against the base branch's passing run and returns the comment body it posted.
+    private static async Task<string> PostedBodyAsync(Dictionary<string, string?> environment)
+    {
+        var directory = FeedbackFixtures.NewTempDirectory("feedback-cli-card");
+        await using var server = RecordingHttpServer.Start(201);
+        try
+        {
+            var payloadPath = Path.Combine(directory, "event.json");
+            await File.WriteAllTextAsync(payloadPath, """{"pull_request":{"number":7,"head":{"sha":"0123abc"}}}""");
+            environment["GITHUB_TOKEN"] = "test-token";
+            environment["GITHUB_REPOSITORY"] = "owner/repo";
+            environment["GITHUB_EVENT_PATH"] = payloadPath;
+            environment["GITHUB_API_URL"] = server.Url;
+            environment["GITHUB_SHA"] = "merge-commit";
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+
+            var exit = FeedbackFixtures.WithEnvironmentResult(environment, () => CliHost.Run(
+                ["feedback", FeedbackFixtures.McpFixture("run-failed"), "--baseline", FeedbackFixtures.McpFixture("run-passed")],
+                output,
+                error));
+
+            Assert.That(exit, Is.EqualTo(0), error.ToString());
+            using var body = JsonDocument.Parse(server.Requests.Single(candidate => candidate.Method == "POST").Body);
+            return body.RootElement.GetProperty("body").GetString()!;
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 }

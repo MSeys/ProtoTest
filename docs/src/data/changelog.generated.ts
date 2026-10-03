@@ -9,6 +9,12 @@ export interface ChangelogRelease {
 
 export const releases: ChangelogRelease[] = [
   {
+    "version": "1.1.2",
+    "date": "2026-10-03",
+    "summary": "ProtoTest 1.1.2 rewrites the pull request comment around what a reviewer reads first: what the change broke, where, and the coverage it moved, with a summary card on top and the full record folded underneath.",
+    "body": "ProtoTest 1.1.2 rewrites the pull request comment around what a reviewer reads first: what the change broke,\nwhere, and the coverage it moved, with a summary card on top and the full record folded underneath.\n\n### Features\n\n#### Agent workflows\n\n- The pull request comment leads with what changed: a summary card, one headline, a table of the failing tests with the first mismatch and a linked source line, a caution when failures share a cause, a coverage table against the base branch, and the full record per test folded under **Failure details**. A skipped test is no longer listed. [CI](https://prototest.dev/docs/continuous-integration#the-summary-card)\n- `ProtoFeedbackComment.Body(digest, target)` renders the comment the post sends; `ProtoFeedbackTarget.SummaryCardUrl` and `SourceBaseUrl` add the card and the source links. The CLI sets both, and `PROTOTEST_FEEDBACK_CARD_URL=off` leaves the card out. [CLI](https://prototest.dev/docs/agent-workflows/cli#environment-targets)"
+  },
+  {
     "version": "1.1.1",
     "date": "2026-10-02",
     "summary": "ProtoTest 1.1.1 fixes ProtoTest.OpenApi, which in 1.1.0 replaced the OpenAPI library of the application a suite hosts in-process.",

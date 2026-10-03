@@ -30,9 +30,10 @@ public sealed class FeedbackCoverageTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(markdown, Does.StartWith(ProtoFeedbackComment.Marker));
-            Assert.That(markdown, Does.Contain("**Coverage against the base branch**"));
-            Assert.That(markdown, Does.Contain("- `Shop:Api` · OpenAPI: 1/1 → 1/2 (-50 points)"));
-            Assert.That(markdown, Does.Contain("- new and uncovered: `DELETE /orders/{id}` (Shop:Api · OpenAPI). No test calls DELETE /orders/{id}."));
+            Assert.That(markdown, Does.Contain("**1 addition** has no test"));
+            Assert.That(markdown, Does.Contain("| OpenAPI<br><sub>`Shop:Api`</sub> | 1 / 1 | 1 / 2 | 🔻 −50 pts |"));
+            Assert.That(markdown, Does.Contain("| All recorded coverage | | 12 / 20 · 60 % | |"));
+            Assert.That(markdown, Does.Contain("> **New and not covered**" + Environment.NewLine + "> - `DELETE /orders/{id}` · Shop:Api · OpenAPI. No test calls DELETE /orders/{id}."));
             Assert.That(markdown, Does.Contain("write a new test shaped like it."));
         }
     }
@@ -48,7 +49,7 @@ public sealed class FeedbackCoverageTests
 
             var markdown = ProtoFeedbackComment.Markdown(FeedbackFixtures.GreenDigest(), null, null, verdict);
 
-            Assert.That(markdown, Does.Contain("- no longer covered: `GET /api/v1/orders` (Northstar:Api · OpenAPI)"));
+            Assert.That(markdown, Does.Contain("> **No longer covered**" + Environment.NewLine + "> - `GET /api/v1/orders` · Northstar:Api · OpenAPI."));
         }
         finally
         {
@@ -150,7 +151,7 @@ public sealed class FeedbackCoverageTests
         ApiUrl = new Uri(server.Url)
     };
 
-    private static ProtoVerificationVerdict AddedEndpointVerdict(out string directory)
+    internal static ProtoVerificationVerdict AddedEndpointVerdict(out string directory)
     {
         directory = FeedbackFixtures.NewTempDirectory("coverage-added");
         var baseline = FeedbackFixtures.WriteReport(Path.Combine(directory, "baseline.json"),

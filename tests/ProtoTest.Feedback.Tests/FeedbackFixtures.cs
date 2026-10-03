@@ -23,7 +23,10 @@ internal static class FeedbackFixtures
         "PROTOTEST_FEEDBACK_TRACE_URL",
         "PROTOTEST_FEEDBACK_WEBHOOK_URL",
         "PROTOTEST_FEEDBACK_WEBHOOK_SECRET",
-        "PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER"
+        "PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER",
+        "PROTOTEST_FEEDBACK_CARD_URL",
+        "GITHUB_SERVER_URL",
+        "GITHUB_SHA"
     ];
 
     /// <summary>One committed MCP fixture trace, written by the framework and reused here.</summary>

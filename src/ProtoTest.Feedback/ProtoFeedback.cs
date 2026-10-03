@@ -95,6 +95,18 @@ public sealed record ProtoFeedbackTarget
 
     /// <summary>Where to cover each uncovered unit, from this run; the comment names it next to a new gap.</summary>
     public IReadOnlyList<ProtoCoverageSuggestion> CoverageSuggestions { get; init; } = [];
+
+    /// <summary>
+    /// The summary card image the comment opens with, drawn from the run's counts and its built-in coverage
+    /// kinds only; null leaves the card out. The CLI sets <c>https://api.prototest.dev/evidence/card.svg</c>.
+    /// </summary>
+    public Uri? SummaryCardUrl { get; init; }
+
+    /// <summary>
+    /// The address a relative source location links under, such as
+    /// <c>https://github.com/owner/repo/blob/{sha}/</c>; null prints the location without a link.
+    /// </summary>
+    public Uri? SourceBaseUrl { get; init; }
 }
 
 /// <summary>

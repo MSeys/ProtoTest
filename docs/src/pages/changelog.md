@@ -13,6 +13,24 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.2
+
+<p className="changelog-date">3 October 2026</p>
+
+ProtoTest 1.1.2 rewrites the pull request comment around what a reviewer reads first: what the change broke,
+where, and the coverage it moved, with a summary card on top and the full record folded underneath.
+
+<div className="changelog-group changelog-group--features">
+
+### Features
+
+#### Agent workflows
+
+- The pull request comment leads with what changed: a summary card, one headline, a table of the failing tests with the first mismatch and a linked source line, a caution when failures share a cause, a coverage table against the base branch, and the full record per test folded under **Failure details**. A skipped test is no longer listed. <span className="changelog-ref">[CI](/docs/continuous-integration#the-summary-card)</span>
+- `ProtoFeedbackComment.Body(digest, target)` renders the comment the post sends; `ProtoFeedbackTarget.SummaryCardUrl` and `SourceBaseUrl` add the card and the source links. The CLI sets both, and `PROTOTEST_FEEDBACK_CARD_URL=off` leaves the card out. <span className="changelog-ref">[CLI](/docs/agent-workflows/cli#environment-targets)</span>
+
+</div>
+
 ## 1.1.1
 
 <p className="changelog-date">2 October 2026</p>

@@ -432,8 +432,59 @@ public static class CliHost
             TraceLink = Value("PROTOTEST_FEEDBACK_TRACE_URL"),
             WebhookUrl = AbsoluteUrl("PROTOTEST_FEEDBACK_WEBHOOK_URL"),
             WebhookSecret = Value("PROTOTEST_FEEDBACK_WEBHOOK_SECRET"),
-            WebhookSecretHeader = Value("PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER")
+            WebhookSecretHeader = Value("PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER"),
+            SummaryCardUrl = SummaryCardUrl(),
+            SourceBaseUrl = SourceBaseUrl()
         };
+
+    // The card is on by default; off, none or false leaves it out, and any other value is the card's address.
+    private static Uri? SummaryCardUrl()
+        => Value("PROTOTEST_FEEDBACK_CARD_URL") is { } value
+            && (value.Equals("off", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("none", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("false", StringComparison.OrdinalIgnoreCase))
+                ? null
+                : AbsoluteUrl("PROTOTEST_FEEDBACK_CARD_URL") ?? new Uri("https://api.prototest.dev/evidence/card.svg");
+
+    // Source locations link to the pull request's head commit; a push run falls back to the commit it built.
+    private static Uri? SourceBaseUrl()
+    {
+        var repository = Value("GITHUB_REPOSITORY");
+        var commit = HeadCommit() ?? Value("GITHUB_SHA");
+        if (repository is null || commit is null)
+        {
+            return null;
+        }
+
+        var server = (Value("GITHUB_SERVER_URL") ?? "https://github.com").TrimEnd('/');
+        return Uri.TryCreate($"{server}/{repository}/blob/{commit}/", UriKind.Absolute, out var uri) ? uri : null;
+    }
+
+    private static string? HeadCommit()
+    {
+        var path = Value("GITHUB_EVENT_PATH");
+        if (path is null || !File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            return document.RootElement.TryGetProperty("pull_request", out var pullRequest)
+                && pullRequest.ValueKind == JsonValueKind.Object
+                && pullRequest.TryGetProperty("head", out var head)
+                && head.ValueKind == JsonValueKind.Object
+                && head.TryGetProperty("sha", out var sha)
+                && sha.ValueKind == JsonValueKind.String
+                    ? sha.GetString()
+                    : null;
+        }
+        catch (Exception exception) when (exception is JsonException or IOException)
+        {
+            return null;
+        }
+    }
 
     private static string? Value(string name)
     {

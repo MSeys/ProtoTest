@@ -18,19 +18,32 @@ public sealed class FeedbackCommentTests
         var expected = string.Join(Environment.NewLine,
         [
             ProtoFeedbackComment.Marker,
-            "## ProtoTest run `run-1`",
             string.Empty,
-            "**1 tests · 1 failed**",
+            "**1 of 1 test failed** · [**Open the full trace ↗**](https://example.test/artifact)",
             string.Empty,
-            "- **FAILED `orders match their shape`** (16 ms)",
-            "  - `assert.json.shape` · failed",
-            "  - Shape mismatch failed with 1 error(s).",
-            "  - at `tests/Orders/OrderTests.cs:42`",
-            "  - mismatch `$.orderId`: expected 7, actual 42",
+            "### What failed",
             string.Empty,
-            "Coverage: 12/20 (60%)",
+            "| | Test | What failed |",
+            "|:-:|---|---|",
+            "| 🔴 | **orders match their shape**<br><sub>`FixtureMethods` · 16 ms</sub> | `$.orderId` expected `7`, got `42`<br><sub>`OrderTests.cs:42`</sub> |",
             string.Empty,
-            "[Full trace](https://example.test/artifact)"
+            "**Coverage:** 12 of 20 covered (60 %)",
+            string.Empty,
+            "<details>",
+            "<summary><b>Failure details</b> · 1 test</summary>",
+            string.Empty,
+            "#### orders match their shape",
+            "```text",
+            "FAILED  orders match their shape  (16 ms)",
+            "assert.json.shape  · failed",
+            "Shape mismatch failed with 1 error(s).",
+            "$.orderId  expected 7  actual 42",
+            "at tests/Orders/OrderTests.cs:42",
+            "```",
+            string.Empty,
+            "</details>",
+            string.Empty,
+            "<sub>ProtoTest · 1 test · 1 failed · run <code>run-1</code> · <a href=\"https://prototest.dev/docs/continuous-integration\">what is this?</a></sub>"
         ]) + Environment.NewLine;
 
         Assert.That(markdown, Is.EqualTo(expected));
@@ -42,7 +55,7 @@ public sealed class FeedbackCommentTests
         var markdown = ProtoFeedbackComment.Markdown(FeedbackFixtures.FailedDigest());
 
         Assert.That(markdown, Does.Contain("Trace: `TestResults/run-1.prototrace`"));
-        Assert.That(markdown, Does.Not.Contain("[Full trace]"));
+        Assert.That(markdown, Does.Not.Contain("Open the full trace"));
     }
 
     [Test]
@@ -50,10 +63,39 @@ public sealed class FeedbackCommentTests
     {
         var markdown = ProtoFeedbackComment.Markdown(FeedbackFixtures.FailedDigest(failedGate: true));
 
-        Assert.That(markdown, Does.Contain("**Run gates**"));
-        Assert.That(
-            markdown,
-            Does.Contain("- `coverage gate` failed: Coverage regressed below the agreed floor."));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(markdown, Does.Contain("**1 run gate failed**"));
+            Assert.That(markdown, Does.Contain("> [!WARNING]" + Environment.NewLine + "> **Run gates failed**"));
+            Assert.That(markdown, Does.Contain("> - `coverage gate`: Coverage regressed below the agreed floor."));
+        }
+    }
+
+    [Test]
+    public void Markdown_ShouldSayAGreenRunPassed()
+    {
+        var markdown = ProtoFeedbackComment.Markdown(FeedbackFixtures.GreenDigest());
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(markdown, Does.Contain("**1 test passed**"));
+            Assert.That(markdown, Does.Not.Contain("### What failed"));
+            Assert.That(markdown, Does.Not.Contain("<details>"));
+        }
+    }
+
+    [Test]
+    public void Markdown_ShouldLeaveOutASkippedTest()
+    {
+        var markdown = ProtoFeedbackComment.Markdown(FeedbackFixtures.FailedDigest(outcome: "skipped"));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(markdown, Does.Contain("**No test failed**"));
+            Assert.That(markdown, Does.Not.Contain("passed"));
+            Assert.That(markdown, Does.Not.Contain("### What failed"));
+            Assert.That(markdown, Does.Contain("1 skipped"));
+        }
     }
 
     [Test]
@@ -91,7 +133,7 @@ public sealed class FeedbackCommentTests
         using var body = JsonDocument.Parse(request.Body);
         Assert.That(
             body.RootElement.GetProperty("body").GetString(),
-            Does.Contain("[Full trace](https://example.test/artifact)"));
+            Does.Contain("[**Open the full trace ↗**](https://example.test/artifact)"));
     }
 
     [Test]

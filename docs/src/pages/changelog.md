@@ -13,6 +13,22 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.3
+
+<p className="changelog-date">3 October 2026</p>
+
+ProtoTest 1.1.3 fixes the summary card of the pull request comment in GitHub's dark mode.
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+#### Agent workflows
+
+- The dark summary card keeps every coverage row: the card's address no longer carries a comma, which GitHub reads as the end of the dark image's address and so dropped every row after the first. <span className="changelog-ref">[CI](/docs/continuous-integration#the-summary-card)</span>
+
+</div>
+
 ## 1.1.2
 
 <p className="changelog-date">3 October 2026</p>

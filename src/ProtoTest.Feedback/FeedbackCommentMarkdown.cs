@@ -85,7 +85,8 @@ internal static partial class FeedbackCommentMarkdown
             $"broke={broken}&failed={failed}&fixed={fixedCount}&passed={passed}&total={total}&uncovered={added}");
         if (rows.Length > 0)
         {
-            query += $"&cov={string.Join(',', rows)}";
+            // A comma separates candidates in srcset, so GitHub would cut the dark card's URL at the first one.
+            query += $"&cov={string.Join("%2C", rows)}";
         }
 
         var address = card.AbsoluteUri + (string.IsNullOrEmpty(card.Query) ? "?" : "&") + query;

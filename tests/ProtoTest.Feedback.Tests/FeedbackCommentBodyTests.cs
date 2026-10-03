@@ -53,9 +53,27 @@ public sealed class FeedbackCommentBodyTests
         var source = body.Split(Environment.NewLine).Single(line => line.Contains("<img ", StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(source, Does.Contain("cov=other:1/2:1/3,graphql-operation:4/4:3/4,rest-traffic:2/2:1/2&amp;"), "three rows at most");
+            Assert.That(source, Does.Contain("cov=other:1/2:1/3%2Cgraphql-operation:4/4:3/4%2Crest-traffic:2/2:1/2&amp;"), "three rows at most");
             Assert.That(source, Does.Not.Contain("web:"));
             Assert.That(source, Does.Not.Contain("Secret").And.Not.Contain("ledger").And.Not.Contain("orders"));
+        }
+    }
+
+    [Test]
+    public void Body_ShouldKeepEveryCoverageRowInTheDarkCardsSrcset()
+    {
+        var body = ProtoFeedbackComment.Body(FeedbackFixtures.FailedDigest(), new ProtoFeedbackTarget
+        {
+            Comparison = Comparison(("orders match their shape", ProtoTestChanges.Broken)),
+            Coverage = Coverage(("Shop:Api", "OpenAPI", 29, 31, 29, 32), ("Shop:Api", "OpenAPI Response", 20, 31, 19, 32)),
+            SummaryCardUrl = Card
+        });
+
+        var srcset = body.Split(Environment.NewLine).Single(line => line.Contains("srcset=", StringComparison.Ordinal));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(srcset, Does.Not.Contain(","), "a comma would end the srcset candidate");
+            Assert.That(srcset, Does.Contain("cov=openapi:29/31:29/32%2Copenapi-response:20/31:19/32&amp;theme=dark"));
         }
     }
 

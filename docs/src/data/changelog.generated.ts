@@ -9,6 +9,12 @@ export interface ChangelogRelease {
 
 export const releases: ChangelogRelease[] = [
   {
+    "version": "1.1.3",
+    "date": "2026-10-03",
+    "summary": "ProtoTest 1.1.3 fixes the summary card of the pull request comment in GitHub's dark mode.",
+    "body": "ProtoTest 1.1.3 fixes the summary card of the pull request comment in GitHub's dark mode.\n\n### Fixes\n\n#### Agent workflows\n\n- the dark summary card keeps every coverage row: the card's address no longer carries a comma, which GitHub reads as the end of the dark image's address and so dropped every row after the first. [CI](https://prototest.dev/docs/continuous-integration#the-summary-card)"
+  },
+  {
     "version": "1.1.2",
     "date": "2026-10-03",
     "summary": "ProtoTest 1.1.2 rewrites the pull request comment around what a reviewer reads first: what the change broke, where, and the coverage it moved, with a summary card on top and the full record folded underneath.",

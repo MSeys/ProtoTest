@@ -7,6 +7,16 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-10-03
+
+ProtoTest 1.1.3 fixes the summary card of the pull request comment in GitHub's dark mode.
+
+### Fixes
+
+#### Agent workflows
+
+- the dark summary card keeps every coverage row: the card's address no longer carries a comma, which GitHub reads as the end of the dark image's address and so dropped every row after the first. [CI](https://prototest.dev/docs/continuous-integration#the-summary-card)
+
 ## [1.1.2] - 2026-10-03
 
 ProtoTest 1.1.2 rewrites the pull request comment around what a reviewer reads first: what the change broke,

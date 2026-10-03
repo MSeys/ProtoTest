@@ -232,6 +232,8 @@ Every channel reports its outcome on stderr. A channel with no target, or nothin
 | `GITHUB_EVENT_PATH` | comment | the event payload file, which the pull request number is read from |
 | `GITHUB_API_URL` | comment | the GitHub REST base URL, by default `https://api.github.com` |
 | `PROTOTEST_FEEDBACK_TRACE_URL` | comment | the artifact URL the comment links to |
+| `PROTOTEST_FEEDBACK_CARD_URL` | comment | the summary card's address, by default `https://api.prototest.dev/evidence/card.svg`. `off`, `none` or `false` leaves the card out. |
+| `GITHUB_SERVER_URL`, `GITHUB_SHA` | comment | with the head commit from the event payload, the base for the source links. A run without a pull request links to `GITHUB_SHA`. |
 | `PROTOTEST_FEEDBACK_WEBHOOK_URL` | webhook | the address the digest JSON is posted to |
 | `PROTOTEST_FEEDBACK_WEBHOOK_SECRET` | webhook | the shared-secret header value. No header is sent without it. |
 | `PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER` | webhook | the shared-secret header name, by default `X-ProtoTest-Secret` |

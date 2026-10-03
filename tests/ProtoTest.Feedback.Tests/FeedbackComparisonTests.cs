@@ -32,10 +32,9 @@ public sealed class FeedbackComparisonTests
 
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(markdown, Does.Contain("**Compared with the base branch**"));
-            Assert.That(markdown, Does.Contain("- broke `orders are listed` at `http.request` `GET /orders`"));
-            Assert.That(markdown, Does.Contain("- fixed `invoices are paid` at `http.request` `POST /invoices`"));
-            Assert.That(markdown.IndexOf("- broke", StringComparison.Ordinal), Is.LessThan(markdown.IndexOf("- fixed", StringComparison.Ordinal)));
+            Assert.That(markdown, Does.Contain("**1 test broke** against the base branch · **1 test fixed**"));
+            Assert.That(markdown, Does.Contain("✅ **Fixed against the base branch:** invoices are paid"));
+            Assert.That(markdown.IndexOf("broke", StringComparison.Ordinal), Is.LessThan(markdown.IndexOf("fixed", StringComparison.Ordinal)));
         }
     }
 
@@ -47,7 +46,7 @@ public sealed class FeedbackComparisonTests
 
         var markdown = ProtoFeedbackComment.Markdown(FeedbackFixtures.FailedDigest(), null, comparison);
 
-        Assert.That(markdown, Does.Contain("no test changed outcome"));
+        Assert.That(markdown, Does.Contain("No test changed outcome against the base branch"));
     }
 
     [Test]
@@ -75,7 +74,7 @@ public sealed class FeedbackComparisonTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(result.Status, Is.EqualTo(ProtoFeedbackStatuses.Posted));
-            Assert.That(body.RootElement.GetProperty("body").GetString(), Does.Contain("- fixed `orders are listed`"));
+            Assert.That(body.RootElement.GetProperty("body").GetString(), Does.Contain("✅ **Fixed against the base branch:** orders are listed"));
         }
     }
 
@@ -97,7 +96,7 @@ public sealed class FeedbackComparisonTests
         }
     }
 
-    private static async Task<ProtoTraceComparison> CompareAsync(RecordedTest[] baseline, RecordedTest[] current)
+    internal static async Task<ProtoTraceComparison> CompareAsync(RecordedTest[] baseline, RecordedTest[] current)
     {
         using var before = new TemporaryTrace("feedback-baseline");
         using var after = new TemporaryTrace("feedback-current");

@@ -35,7 +35,7 @@ The channels are pure functions of the digest and report one outcome each:
 | Channel | Posts | Skips when |
 | --- | --- | --- |
 | `github-annotations` | one `::error` per failing test, with its source location, and one per failed run gate | the run has no failures |
-| `github-pr-comment` | the Markdown digest with the trace link, to `POST /repos/{repo}/issues/{number}/comments` | no token, no repository, no pull request number, or a run with no failures |
+| `github-pr-comment` | the evidence comment: what failed, what the change broke and fixed, the coverage that moved, and the trace link, to `POST /repos/{repo}/issues/{number}/comments` | no token, no repository, no pull request number, or a run with nothing to report |
 | `webhook` | the digest JSON to the configured address, with an optional shared-secret header | no webhook URL |
 
 `prototest feedback <file.prototrace>` runs the same post, reading the targets from the environment;
@@ -52,6 +52,9 @@ see `ProtoTest.Cli`.
   the writer the caller gives. A refused target fails its channel, named, instead of being swallowed.
 - The comment posts only when the digest carries a failure or a failed gate; a green run's status
   check is the report. The webhook posts every digest, because a machine consumer decides.
+- The summary card is an image URL that carries counts and built-in coverage kinds only. The
+  library leaves it out unless `SummaryCardUrl` is set; the CLI sets it unless told not to.
+- The comment shows at most 20 failing tests and 20 coverage rows; the trace has the rest.
 - The shared-secret header carries the secret value; it is not an HMAC signature.
 - A skipped test is not annotated: it did not fail.
 

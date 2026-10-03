@@ -13,22 +13,36 @@ The **evidence loop** is fail, evidence, fix, verify, report. One file carries t
 
 A failing run leaves three things on the pull request. The comment below is illustrative, and its values come from the committed failing fixture:
 
-```markdown
-## ProtoTest run `29e344f9cf54431ca7d8bad3f87a1749`
+````markdown
+<!-- prototest-evidence -->
 
-**2 tests · 1 failed · 1 succeeded**
+**1 of 2 tests failed** · [**Open the full trace ↗**](https://github.com/you/your-repo/actions/runs/1/artifacts/prototest-trace)
 
-- **FAILED `orders match their shape`** (16 ms)
-  - `assert.json.shape` · failed
-  - Shape mismatch failed with 1 error(s):
-    • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
-  - at `artifacts/fixture-gen/Program.cs:65`
-  - mismatch `$.orderId`: expected 7, actual 42
+### What failed
 
-Coverage: 2/4 (50%)
+| | Test | What failed |
+|:-:|---|---|
+| 🔴 | **orders match their shape**<br><sub>`FixtureMethods` · 16 ms</sub> | `$.orderId` expected `7`, got `42`<br><sub>`Program.cs:65`</sub> |
 
-[Full trace](https://github.com/you/your-repo/actions/runs/1/artifacts/prototest-trace)
+**Coverage:** 2 of 4 covered (50 %)
+
+<details>
+<summary><b>Failure details</b> · 1 test</summary>
+
+#### orders match their shape
+```text
+FAILED  orders match their shape  (16 ms)
+assert.json.shape  · failed
+Shape mismatch failed with 1 error(s):
+  • [$.orderId]: Values did not match. (Expected: '7', Actual: '42')
+$.orderId  expected 7  actual 42
+at artifacts/fixture-gen/Program.cs:65
 ```
+
+</details>
+
+<sub>ProtoTest · 2 tests · 1 failed · 1 succeeded · run <code>29e344f9cf54431ca7d8bad3f87a1749</code> · <a href="https://prototest.dev/docs/continuous-integration">what is this?</a></sub>
+````
 
 Next to it are one check annotation per failing test at its source location, one per failed run gate, and one artifact: the `.prototrace` archive with the report inside. A green run posts no comment, and its status check is the report.
 

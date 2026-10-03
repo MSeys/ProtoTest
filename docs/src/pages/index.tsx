@@ -3,6 +3,7 @@ import Link from '@docusaurus/Link';
 import Head from '@docusaurus/Head';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 import CommandBox, {type CommandBoxRunner} from '@site/src/components/CommandBox';
 import CodeSnippet from '@site/src/components/CodeSnippet';
 import CopyCode from '@site/src/components/CopyCode';
@@ -76,12 +77,15 @@ const composition = `app.AddRest(rest => rest
     .AddGraphQL(graphQL => graphQL
         .CaptureAttachments()
         .AddClient("GraphQL", endpoint: "GraphQL"));`;
-const views = ['Test', 'Compose', 'Trace'] as const;
+const views = ['Test', 'Compose', 'Trace', 'Pull request'] as const;
+const evidencePullRequest = 'https://github.com/MSeys/OpenCsms/pull/1';
 function JourneyExample(): ReactNode {
   const id = useId();
   const [active, setActive] = useState(0);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const code = active === 0 ? platformJourney : composition;
+  // The hero is always blueprint, so the comment shows in GitHub's dark style in either theme.
+  const comment = useBaseUrl('/img/evidence/pull-request-comment.webp');
   function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
     const next =
       event.key === 'ArrowRight'
@@ -104,7 +108,7 @@ function JourneyExample(): ReactNode {
       className={styles.heroFrame}
       head={
         <>
-          <div role="tablist" aria-label="One Northstar scenario" className={styles.tabs}>
+          <div role="tablist" aria-label="From a test to its review" className={styles.tabs}>
             {views.map((view, index) => (
               <button
                 key={view}
@@ -132,7 +136,14 @@ function JourneyExample(): ReactNode {
           ? 'PlatformJourney.cs. The class selects the application and provisions a Northstar member.'
           : active === 1
             ? 'Setup.cs. Registered once for the suite, next to its data and authentication.'
-            : 'What this test left in prototest-demo.prototrace, as the viewer lists it.'
+            : active === 2
+              ? 'What this test left in prototest-demo.prototrace, as the viewer lists it.'
+              : (
+                  <>
+                    The Evidence comment on a demo pull request to OpenCSMS, as GitHub shows it.{' '}
+                    <Link href={evidencePullRequest}>Open the pull request ↗</Link>
+                  </>
+                )
       }
     >
       <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${active}`}>
@@ -142,6 +153,15 @@ function JourneyExample(): ReactNode {
             regionLabel={active === 0 ? 'Northstar journey' : 'Northstar composition'}
             scroll
           />
+        ) : active === 3 ? (
+          <div className={styles.comment}>
+            <img
+              src={comment}
+              width={1224}
+              height={2044}
+              alt="The ProtoTest Evidence comment: a card with 5 broke and OpenAPI coverage 29/31 to 29/32, a caution that 4 of the 5 failures share one cause on POST /api/stations/{id}/remote-start, the failing tests with their source lines, the coverage against the base branch and a new endpoint no test covers."
+            />
+          </div>
         ) : (
           <ol className={styles.traceRows}>
             {journeyRows.map((row) => (

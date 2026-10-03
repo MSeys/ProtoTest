@@ -65,6 +65,9 @@
 }
 .tabs button[aria-selected='true'] { border-color: var(--blueprint); color: var(--text); font-weight: var(--weight-bold); }
 .tabs button:hover { color: var(--text); }
+/* The real pull request comment, scrolled inside the frame like the code tabs. */
+.comment { max-height: 30rem; overflow-y: auto; scrollbar-width: thin; }
+.comment img { display: block; width: 100%; height: auto; }
 .traceRows { margin: 0; padding: var(--space-3) var(--space-5); list-style: none; }
 .traceRows li { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: var(--space-3); align-items: baseline; padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
 .traceRows li:last-child { border: 0; }

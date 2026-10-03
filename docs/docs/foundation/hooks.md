@@ -47,6 +47,7 @@ public interface IProtoRunHook
 {
     int Order => 0;
     Task BeforeRunAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    Task AfterInfrastructureAsync(ProtoRunSetupContext context) => Task.CompletedTask;
     Task AfterRunAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 ```
@@ -62,7 +63,24 @@ public sealed class StartDependenciesHook(IDependencyStarter starter) : IProtoRu
 }
 ```
 
-Run hooks run once, before the first test and after the last. They do not receive a context: there is no test yet. For run-scoped pieces that own or start something, prefer [infrastructure](./infrastructure.md), which starts at a defined position and releases with the run.
+Run hooks run once, before the first test and after the last. They do not receive a test context: there is no test yet. For run-scoped pieces that own or start something, prefer [infrastructure](./infrastructure.md), which starts at a defined position and releases with the run.
+
+`AfterInfrastructureAsync` runs once every infrastructure piece started and before the first test. Its `ProtoRunSetupContext` carries the published settings, the configuration, the run's services and token, and `ApplicationClientAsync(name)`: an HTTP client for an application at its configured or published address, or on its in-process server when it has none. The run releases those clients when the phase ends. A hook reads what an application serves here, such as its API description:
+
+```csharp
+public sealed class ContractHook : IProtoRunHook
+{
+    public async Task AfterInfrastructureAsync(ProtoRunSetupContext context)
+    {
+        var client = await context.ApplicationClientAsync("Api");
+        Contract = await client.GetStringAsync("/openapi/v1.json", context.CancellationToken);
+    }
+
+    public string? Contract { get; private set; }
+}
+```
+
+A collector registered with `AddCollector` that implements `IProtoRunHook` runs in this phase too. The OpenAPI and GraphQL schema collectors use it to load a document from a path the application serves.
 
 ### Ordering
 
@@ -154,11 +172,13 @@ Attachments added in `AfterTestAsync` are still published, because publishing ha
 - One `hook.before` operation per test hook and one `hook.after` per hook that completed, each carrying the hook type and its `Order`. The test's `test.setup` operation also records the hook count.
 - A hook that fails during setup stops the sequence and appears in the rollback. The hooks that completed run their `AfterTestAsync` in reverse, and the failing hook does not.
 - A hook that fails during teardown is recorded as an `Error` finding and does not replace the test's outcome.
-- Run hooks are not tied to a test record. Their effects show up in the run entities around the tests, such as a capability or infrastructure state they registered.
+- Run hooks are not tied to a test record. Their effects show up in the run entities around the tests, such as a capability or infrastructure state they registered. Each application client `AfterInfrastructureAsync` opens records a `run.application.client` event with the application, whether it used an address or the in-process server, and the address.
 
 ## Limits
 
 - Test hooks are registered as singletons and resolved from the root container. Per-test state must come from `context.Services` or the context itself.
 - Test hooks receive no token parameter. They read `context.CancellationToken`, which carries the caller's token or the runner's own where its adapter has one: NUnit's test context, the xUnit v2 runner, xUnit v3's `TestContext.Current.CancellationToken`, TUnit's `TestContext.CancellationToken`. MSTest's 4.0.2 floor exposes no token, so those hooks see `CancellationToken.None`.
 - `AddTestHook` and `AddRunHook` do **not** dedupe: every call adds another registration. Register each hook once.
-- Run hooks get no context, since there is no test yet. See [Lifecycle](./lifecycle.md#the-run) for the run sequence and the rollback rule a `BeforeRunAsync` failure follows.
+- Run hooks get no test context, since there is no test yet. See [Lifecycle](./lifecycle.md#the-run) for the run sequence and the rollback rule a `BeforeRunAsync` or `AfterInfrastructureAsync` failure follows.
+- `ApplicationClientAsync` is available only in `AfterInfrastructureAsync`. A run setup step runs at its infrastructure position, before every piece an in-process application reads has started, so it throws there.
+- A per-test ASP.NET Core server starts a server only for this phase and releases it after. A per-run server starts here and the tests reuse it.

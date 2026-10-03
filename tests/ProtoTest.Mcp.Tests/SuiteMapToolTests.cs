@@ -82,7 +82,7 @@ public sealed class SuiteMapToolTests
             Assert.That(gaps.GetProperty("total").GetInt32(), Is.EqualTo(2));
             Assert.That(
                 gaps.GetProperty("units").EnumerateArray().Select(unit => unit.GetProperty("identifier").GetString()),
-                Is.EquivalentTo(new[] { "$.total", "POST /api/v1/orders" }));
+                Is.EquivalentTo(new[] { "GET /api/v1/orders › $.total", "POST /api/v1/orders" }));
         }
     }
 

@@ -52,6 +52,33 @@ public static class ProtoReportItemExtensions
         return items.Where(item => item.IsKind(ProtoReportItemKinds.Coverage) && item.IsCovered is not null);
     }
 
+    /// <summary>
+    /// The coverage units with the path that names each one in its report: a nested unit's identifier
+    /// under its parents' (<c>GET /a › 200 › $.id</c>), so units a collector names per parent stay apart.
+    /// </summary>
+    public static IEnumerable<ProtoCoverageUnitPath> CoverageUnitPaths(this IEnumerable<ProtoReportItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        return items.SelectMany(item => Paths(item, parent: null, parentPath: null));
+    }
+
+    private static IEnumerable<ProtoCoverageUnitPath> Paths(ProtoReportItem item, ProtoReportItem? parent, string? parentPath)
+    {
+        var path = ProtoCoverageUnitPath.Combine(parentPath, parent?.Identifier, item.Identifier);
+        if (item.IsKind(ProtoReportItemKinds.Coverage) && item.IsCovered is not null)
+        {
+            yield return new ProtoCoverageUnitPath(item, path);
+        }
+
+        foreach (var child in item.Children ?? [])
+        {
+            foreach (var unit in Paths(child, item, path))
+            {
+                yield return unit;
+            }
+        }
+    }
+
     /// <summary>Aggregates the coverage units in <paramref name="items"/>; aggregate rows are excluded from every count.</summary>
     public static ProtoCoverageTotals CoverageTotals(this IEnumerable<ProtoReportItem> items)
     {
@@ -77,4 +104,29 @@ public readonly record struct ProtoCoverageTotals(int Total, int Covered)
 
     /// <summary>The covered share, rounded to two decimals as the report summary prints it.</summary>
     public double Percentage => Math.Round(Ratio * 100d, 2);
+}
+
+
+/// <summary>A coverage unit and the path that names it in its report.</summary>
+public readonly record struct ProtoCoverageUnitPath(ProtoReportItem Unit, string Path)
+{
+    /// <summary>Separates a nested unit's identifier from its parent's in a path.</summary>
+    public const string Separator = " › ";
+
+    /// <summary>
+    /// A child's path: its identifier under its parent's path, or the identifier alone when the collector
+    /// already qualified it with the parent's (<c>Query.users</c> under <c>Query</c>).
+    /// </summary>
+    public static string Combine(string? parentPath, string? parentIdentifier, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(identifier);
+        if (string.IsNullOrEmpty(parentPath) || string.IsNullOrEmpty(parentIdentifier))
+        {
+            return identifier;
+        }
+
+        return identifier.StartsWith(parentIdentifier, StringComparison.Ordinal)
+            ? identifier
+            : parentPath + Separator + identifier;
+    }
 }

@@ -29,7 +29,12 @@ public sealed class ProtoHost : IAsyncDisposable
         _rootServiceProvider = rootServiceProvider ?? throw new ArgumentNullException(nameof(rootServiceProvider));
 
         var testHooks = _rootServiceProvider.GetServices<IProtoTestHook>().ToArray();
-        var runHooks = _rootServiceProvider.GetServices<IProtoRunHook>().ToArray();
+        // A collector that loads what an application serves is a run hook too, so it shares the run's order.
+        var runHooks = _rootServiceProvider.GetServices<IProtoRunHook>()
+            .Concat(_rootServiceProvider.GetServices<IProtoCollector>().OfType<IProtoRunHook>())
+            .Distinct(ReferenceEqualityComparer.Instance)
+            .Cast<IProtoRunHook>()
+            .ToArray();
         var testIdGenerator = _rootServiceProvider.GetService<IProtoTestIdGenerator>()
             ?? new NumericProtoTestIdGenerator();
         _trace = _rootServiceProvider.GetService<ProtoTraceSession>() ?? new ProtoTraceSession();

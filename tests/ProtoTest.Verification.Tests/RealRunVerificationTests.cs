@@ -65,7 +65,7 @@ public sealed class RealRunVerificationTests
                 Assert.That(finding.Severity, Is.EqualTo(ProtoVerificationSeverities.Fail));
                 Assert.That(finding.TargetName, Is.EqualTo("Api"));
                 Assert.That(finding.Category, Is.EqualTo("OpenAPI Property"));
-                Assert.That(finding.Identifier, Is.EqualTo("$.name"));
+                Assert.That(finding.Identifier, Is.EqualTo("GET /users/{id} › 200 › $.name"));
 
                 Assert.That(verdict.SpecChecks.Single().Status, Is.EqualTo(ProtoSpecCheckStatuses.Verified),
                     "The candidate file is the specification both runs recorded.");

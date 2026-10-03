@@ -40,6 +40,38 @@ public static class ProtoDocumentSource
         }
     }
 
+    /// <summary>
+    /// Whether <paramref name="source"/> is a path the application serves (<c>/openapi/v1.json</c>) with
+    /// no base address to resolve it against and no file by that name. Such a document loads from the
+    /// application once the run can reach it, through <see cref="LoadTextAsync"/>.
+    /// </summary>
+    public static bool IsApplicationPath(string source, string? baseUrl = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        return string.IsNullOrWhiteSpace(baseUrl)
+            && source.StartsWith('/')
+            && !source.StartsWith("//", StringComparison.Ordinal)
+            && !source.Contains('\n')
+            && !File.Exists(source);
+    }
+
+    /// <summary>Loads a document from an application's client, relative to the client's base address.</summary>
+    public static async Task<string> LoadTextAsync(string source, HttpClient client, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        ArgumentNullException.ThrowIfNull(client);
+        try
+        {
+            return await client.GetStringAsync(source, cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException
+            || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            throw new InvalidOperationException(
+                $"Failed to retrieve document from '{source}' on '{client.BaseAddress}'.", exception);
+        }
+    }
+
     private static bool TryResolveHttpUri(string source, string? baseUrl, out Uri uri)
     {
         if (Uri.TryCreate(source, UriKind.Absolute, out uri!) && IsHttpUri(uri)) return true;

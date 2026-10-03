@@ -48,6 +48,7 @@ public sealed class Program
         var app = builder.Build();
         app.MapControllers();
         app.MapGet("/ping", () => Results.Ok(new { Message = "pong" }));
+        app.MapGet("/schema.graphql", () => Results.Text("type Query { ping: String orders(first: Int): [String] }", "text/plain"));
         app.MapGet("/time", (HttpContext context) =>
             Results.Ok(new { UtcNow = context.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow() }));
         app.UseWebSockets();

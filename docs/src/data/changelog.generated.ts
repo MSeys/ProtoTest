@@ -9,6 +9,12 @@ export interface ChangelogRelease {
 
 export const releases: ChangelogRelease[] = [
   {
+    "version": "1.1.5",
+    "date": "2026-10-03",
+    "summary": "ProtoTest 1.1.5 reads an API description or a GraphQL schema from the application it tests, in process too, and keeps nested coverage units apart when it compares two runs.",
+    "body": "ProtoTest 1.1.5 reads an API description or a GraphQL schema from the application it tests, in process too, and keeps nested coverage units apart when it compares two runs.\n\n### Features\n\n#### Core\n\n- `IProtoRunHook.AfterInfrastructureAsync` runs once every infrastructure piece started and before the first test. Its `ProtoRunSetupContext` now carries the run's `Services` and `ApplicationClientAsync(name)`: a client for an application at its configured or published address, or on its in-process server, released when the phase ends. A collector that is a run hook takes part. [Hooks](https://prototest.dev/docs/foundation/hooks#run-hooks)\n\n#### OpenAPI\n\n- a specification source that is a path the application serves (`/openapi/v1.json`), with no `BaseUrl` to resolve it against, loads from the application before the first test, so an in-process application documents its own coverage without a committed copy. [OpenAPI](https://prototest.dev/docs/integrations/openapi#the-specification-source)\n\n#### GraphQL\n\n- `WithSchemaCoverage(\"/graphql?sdl\")` loads the schema the application serves before the first test, in process too. [Schema coverage](https://prototest.dev/docs/integrations/graphql/coverage#point-at-the-schema)\n\n#### ASP.NET Core\n\n- the in-process server serves the run before its first test: a per-run server starts then and the tests reuse it, a per-test lifetime starts a server only for that read. [Hooks](https://prototest.dev/docs/foundation/hooks#limits)\n\n### Fixes\n\n#### Agent workflows\n\n- run verification names a nested coverage unit by its path under its parents (`GET /orders › 200 › $.id`), so a response or a property that regressed under one endpoint is no longer hidden by the same name under another. The pull request comment, `get_coverage` and `get_suite_map` print the same path, and a coverage suggestion carries it as `Path`. [Verification](https://prototest.dev/docs/agent-workflows/verification#limits)"
+  },
+  {
     "version": "1.1.4",
     "date": "2026-10-03",
     "summary": "ProtoTest 1.1.4 makes what a coding agent reads from the MCP server about a quarter smaller, and fixes the viewer's capability list.",

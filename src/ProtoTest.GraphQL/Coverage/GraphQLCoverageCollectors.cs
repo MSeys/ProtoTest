@@ -3,6 +3,7 @@ namespace ProtoTest.GraphQL;
 using System.Text.Json;
 using HotChocolate.Language;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
 
@@ -17,14 +18,20 @@ public sealed class GraphQLCoverageCollector(string targetName)
     public override string Category => ProtoGraphQLBuilder.Protocol.CoverageCategoryOrName;
 }
 
-public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
+/// <summary>
+/// Collects GraphQL schema coverage: every type, field, argument and input field of the schema, hit or
+/// not. A source that is a path on the application (<c>/graphql?sdl</c>) with no address to resolve it
+/// against loads from the application once the run's infrastructure started.
+/// </summary>
+public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector, IProtoRunHook
 {
     // SDL documents start like one of these; the vocabulary belongs to the format, not to Core.
     private static readonly string[] InlineSchemaPrefixes =
         ["type ", "schema ", "extend ", "directive ", "scalar ", "enum ", "interface ", "union ", "input ", "#"];
 
-    private readonly GraphQLSchemaIndex _schema;
-    private readonly IReadOnlyDictionary<string, object> _specIdentity;
+    private GraphQLSchemaIndex _schema = GraphQLSchemaIndex.Empty;
+    private IReadOnlyDictionary<string, object>? _specIdentity;
+    private (string Source, string? ApplicationName)? _deferred;
     private readonly Dictionary<string, int> _fieldHits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _argumentHits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _inputFieldHits = new(StringComparer.Ordinal);
@@ -40,16 +47,49 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
         var source = application["GraphQL:Schema"];
         if (string.IsNullOrWhiteSpace(source))
             throw new InvalidOperationException(ProtoApplication.MissingSettingMessage(applicationName, "GraphQL:Schema"));
-        var content = ProtoDocumentSource.LoadText(source, application["BaseUrl"], inlinePrefixes: InlineSchemaPrefixes);
-        _specIdentity = ProtoSpecIdentity.Metadata(source, content);
-        _schema = GraphQLSchemaIndex.Parse(content);
+        if (ProtoDocumentSource.IsApplicationPath(source, application["BaseUrl"]))
+        {
+            _deferred = (source, applicationName);
+            return;
+        }
+
+        Use(source, ProtoDocumentSource.LoadText(source, application["BaseUrl"], inlinePrefixes: InlineSchemaPrefixes));
     }
 
     public GraphQLSchemaCoverageCollector(string targetName, string schemaSource) : base(targetName)
     {
-        var content = ProtoDocumentSource.LoadText(schemaSource, inlinePrefixes: InlineSchemaPrefixes);
-        _specIdentity = ProtoSpecIdentity.Metadata(schemaSource, content);
+        if (ProtoDocumentSource.IsApplicationPath(schemaSource))
+        {
+            _deferred = (schemaSource, null);
+            return;
+        }
+
+        Use(schemaSource, ProtoDocumentSource.LoadText(schemaSource, inlinePrefixes: InlineSchemaPrefixes));
+    }
+
+    /// <summary>Loads the schema the application serves, now that the run can reach the application.</summary>
+    async Task IProtoRunHook.AfterInfrastructureAsync(ProtoRunSetupContext context)
+    {
+        if (_deferred is not { } deferred)
+        {
+            return;
+        }
+
+        var application = deferred.ApplicationName
+            ?? ProtoApplicationTargets.ResolveApplication(TargetName, context.Services.GetServices<ProtoApplicationTarget>());
+        var client = await context.ApplicationClientAsync(application);
+        var content = await ProtoDocumentSource.LoadTextAsync(deferred.Source, client, context.CancellationToken);
+        lock (_lock)
+        {
+            Use(deferred.Source, content);
+            _deferred = null;
+        }
+    }
+
+    private void Use(string source, string content)
+    {
         _schema = GraphQLSchemaIndex.Parse(content);
+        _specIdentity = ProtoSpecIdentity.Metadata(source, content);
     }
 
     public override string Category => "GraphQL schema";
@@ -89,6 +129,8 @@ public sealed class GraphQLSchemaCoverageCollector : ProtoCoverageCollector
     {
         lock (_lock)
         {
+            // A schema the application serves is unknown until the run loads it: there is nothing to report.
+            if (_specIdentity is null) return [];
             return [SpecIdentityItem(), .. _schema.Types.Values
                 .Where(type => !type.Name.StartsWith("__", StringComparison.Ordinal))
                 .OrderBy(type => type.Name, StringComparer.Ordinal)
@@ -287,6 +329,9 @@ internal sealed class GraphQLSchemaIndex
         InputTypes = inputTypes;
         RootTypes = rootTypes;
     }
+
+    /// <summary>A schema with nothing in it, until a deferred document loads.</summary>
+    public static GraphQLSchemaIndex Empty { get; } = new([], [], []);
 
     public Dictionary<string, GraphQLSchemaType> Types { get; }
     public Dictionary<string, GraphQLSchemaInputType> InputTypes { get; }

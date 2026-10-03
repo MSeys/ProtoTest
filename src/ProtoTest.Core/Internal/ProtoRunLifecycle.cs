@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
 /// Sequences a run's start and stop: the BeforeRun hooks, the capability records, the skipped
-/// declarations, the infrastructure loop and the trace listener - and the reverse unwind of the hooks a
+/// declarations, the infrastructure loop, the AfterInfrastructure hooks and the trace listener - and the reverse unwind of the hooks a
 /// failed start completed. The host owns the run state machine; this owns the work each transition
 /// performs, the way <see cref="ProtoTestLifecycle"/> owns a test's.
 /// </summary>
@@ -236,6 +236,17 @@ internal sealed class ProtoRunLifecycle
                 state,
                 scope: "run",
                 change: "started");
+        }
+
+        // Every application can be reached now: hooks read what an application serves before the first
+        // test, and the clients they opened are released before it.
+        await using (var applications = new ProtoRunApplications(_services, _trace))
+        {
+            await _runHooks.RunAfterInfrastructureAsync(new ProtoRunSetupContext(settings, configuration, cancellationToken)
+            {
+                Services = _services,
+                Applications = applications
+            });
         }
 
         _trace.StartListening();

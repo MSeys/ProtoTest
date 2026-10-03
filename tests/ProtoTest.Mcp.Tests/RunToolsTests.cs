@@ -179,9 +179,9 @@ public sealed class RunToolsTests
             Assert.That(all.GetProperty("reportArtifact").GetProperty("name").GetString(), Does.EndWith("report.json"));
             Assert.That(
                 all.GetProperty("uncovered").EnumerateArray().Select(unit => unit.GetProperty("identifier").GetString()),
-                Is.EquivalentTo(new[] { "$.total", "POST /api/v1/orders" }));
+                Is.EquivalentTo(new[] { "GET /api/v1/orders › $.total", "POST /api/v1/orders" }));
             Assert.That(filtered.GetProperty("uncoveredTotal").GetInt32(), Is.EqualTo(1));
-            Assert.That(filtered.GetProperty("uncovered")[0].GetProperty("identifier").GetString(), Is.EqualTo("$.total"));
+            Assert.That(filtered.GetProperty("uncovered")[0].GetProperty("identifier").GetString(), Is.EqualTo("GET /api/v1/orders › $.total"));
             Assert.That(paged.GetProperty("uncovered").GetArrayLength(), Is.EqualTo(1));
             Assert.That(paged.GetProperty("truncated").GetBoolean(), Is.True);
             Assert.That(totalsOnly.GetProperty("uncovered").GetArrayLength(), Is.EqualTo(0));

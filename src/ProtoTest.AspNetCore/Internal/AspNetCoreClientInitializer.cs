@@ -12,10 +12,11 @@ using ProtoTest.Core;
 using ProtoTest.Web.Pages;
 
 /// <summary>
-/// Initializes an in-process ASP.NET Core test server and a per-test client for it.
+/// Initializes an in-process ASP.NET Core test server and a per-test client for it, and serves the run
+/// itself before its first test through the same server lifetime.
 /// </summary>
 /// <typeparam name="TProgram">The entry point class of the ASP.NET Core application under test.</typeparam>
-internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitializer<HttpClient>, IAspNetCoreSubstitutionTarget, IAsyncDisposable
+internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitializer<HttpClient>, IAspNetCoreSubstitutionTarget, IProtoRunApplicationTransport, IAsyncDisposable
     where TProgram : class
 {
     private readonly Action<IWebHostBuilder>? _configureWebHost;
@@ -43,6 +44,38 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     public string Name { get; }
 
     string IAspNetCoreSubstitutionTarget.ServerName => Name;
+
+    string IProtoRunApplicationTransport.ApplicationName => Name;
+
+    /// <summary>
+    /// A client for the run's own read, built like a test's client without a test: a per-run server is
+    /// the one the tests then reuse, a per-test lifetime starts a server the run releases after the read.
+    /// </summary>
+    ValueTask<ProtoRunApplicationClient> IProtoRunApplicationTransport.OpenRunClientAsync(ProtoRunSetupContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var configure = CombinedConfigure(
+            context.Settings.Values,
+            context.Services.GetService<TimeProvider>(),
+            context.Services.GetService<ProtoClockRegistry>());
+        var (server, owned) = _serverLifetime.AcquireForRun(configure);
+        try
+        {
+            var clientOptions = new WebApplicationFactoryClientOptions();
+            _configureClientOptions?.Invoke(clientOptions);
+            var client = CreateClient(server.Server.CreateHandler(), clientOptions.BaseAddress, [.. CreateClientHandlers(clientOptions)]);
+            return ValueTask.FromResult(new ProtoRunApplicationClient(client, owned ? server : null));
+        }
+        catch
+        {
+            if (owned)
+            {
+                server.Dispose();
+            }
+
+            throw;
+        }
+    }
 
     /// <summary>
     /// Serves the test from a dedicated server built with its accumulated substitutions. The run's
@@ -358,10 +391,16 @@ internal sealed class AspNetCoreClientInitializer<TProgram> : IProtoClientInitia
     /// own inside <c>configureWebHost</c> runs later and wins.
     /// </summary>
     private Action<IWebHostBuilder>? CombinedConfigure(ProtoExecutionContext context)
+        => CombinedConfigure(
+            context.TryService<ProtoInfrastructureSettings>()?.Values,
+            context.TryService<TimeProvider>(),
+            context.TryService<ProtoClockRegistry>());
+
+    private Action<IWebHostBuilder>? CombinedConfigure(
+        IReadOnlyDictionary<string, string>? settings,
+        TimeProvider? clock,
+        ProtoClockRegistry? clockRegistry)
     {
-        var settings = context.TryService<ProtoInfrastructureSettings>()?.Values;
-        var clock = context.TryService<TimeProvider>();
-        var clockRegistry = context.TryService<ProtoClockRegistry>();
         if ((settings is null || settings.Count == 0) && clock is null && _configureWebHost is null)
         {
             return null;

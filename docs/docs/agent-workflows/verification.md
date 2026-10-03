@@ -74,7 +74,7 @@ The [ProtoTest Evidence action](../continuous-integration/index.md#compare-with-
 ## Limits
 
 - The verdict reads reports, the files or the ones traces embedded. No coverage is recomputed from spans. The arithmetic is the report's own (`CoverageUnits` and `CoverageTotals`).
-- Units are matched by target, category and identifier, so an OpenAPI property, a GraphQL field and a REST route compare by their own vocabulary.
+- Units are matched by target, category and path, so an OpenAPI property, a GraphQL field and a REST route compare by their own vocabulary. A nested unit's path puts its identifier under its parents' (`GET /orders › 200 › $.id`), so the same response or property under two endpoints stays two units; an identifier its collector already qualified (`Query.orders`) stays as it is.
 - A unit or a target that disappeared from the candidate is not a finding. The delta row shows it instead.
 - Unmatched traffic and schema drift are out of scope. Either a collector records them, or Verification does not claim them.
 - Failed candidate run gates are surfaced from the report's gate items. Verification does not add run gates and does not duplicate a suite's single-run coverage threshold, which stays in a run gate.

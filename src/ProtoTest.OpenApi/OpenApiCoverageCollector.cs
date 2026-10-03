@@ -1,6 +1,7 @@
 namespace ProtoTest.OpenApi;
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 using ProtoTest.Http;
 using ProtoTest.OpenApi.Internal;
@@ -10,14 +11,19 @@ using ProtoTest.Rest;
 /// <summary>
 /// Collects OpenAPI coverage from REST responses and shape matches: the route matcher resolves each hit
 /// to a contract path, the typed ledger counts it, and the report builder renders the contract's
-/// endpoints, responses and properties whether or not they were hit.
+/// endpoints, responses and properties whether or not they were hit. A source that is a path on the
+/// application (<c>/openapi/v1.json</c>) with no address to resolve it against loads from the application
+/// once the run's infrastructure started, so an in-process application documents itself.
 /// </summary>
-public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
+public sealed class OpenApiCoverageCollector : ProtoCoverageCollector, IProtoRunHook
 {
-    private readonly OpenApiSpec _document;
-    private readonly OpenApiRouteMatcher _routes;
+    private static readonly OpenApiSpec s_empty = new(new Dictionary<string, OpenApiSpecPath>());
+
+    private OpenApiSpec _document = s_empty;
+    private OpenApiRouteMatcher _routes = new(s_empty);
     private readonly OpenApiCoverageLedger _ledger = new();
-    private readonly IReadOnlyDictionary<string, object>? _specIdentity;
+    private IReadOnlyDictionary<string, object>? _specIdentity;
+    private DeferredSource? _deferred;
 
     public override string Category => "OpenAPI";
 
@@ -39,20 +45,54 @@ public sealed class OpenApiCoverageCollector : ProtoCoverageCollector
                 ProtoApplication.MissingSettingMessage(applicationName, "OpenApi:Specification"));
         }
 
-        var loaded = OpenApiSpecLoader.LoadWithContent(source, application["BaseUrl"]);
-        _document = loaded.Document;
-        _routes = new OpenApiRouteMatcher(_document);
-        _specIdentity = ProtoSpecIdentity.Metadata(source, loaded.Content);
+        if (ProtoDocumentSource.IsApplicationPath(source, application["BaseUrl"]))
+        {
+            _deferred = new DeferredSource(source, applicationName);
+            return;
+        }
+
+        Use(source, OpenApiSpecLoader.LoadWithContent(source, application["BaseUrl"]));
     }
 
     public OpenApiCoverageCollector(string targetName, string openApiSpecSource)
         : base(targetName)
     {
-        var loaded = OpenApiSpecLoader.LoadWithContent(openApiSpecSource);
+        if (ProtoDocumentSource.IsApplicationPath(openApiSpecSource))
+        {
+            _deferred = new DeferredSource(openApiSpecSource, ApplicationName: null);
+            return;
+        }
+
+        Use(openApiSpecSource, OpenApiSpecLoader.LoadWithContent(openApiSpecSource));
+    }
+
+    /// <summary>Loads a document the application serves, now that the run can reach the application.</summary>
+    async Task IProtoRunHook.AfterInfrastructureAsync(ProtoRunSetupContext context)
+    {
+        if (_deferred is not { } deferred)
+        {
+            return;
+        }
+
+        var application = deferred.ApplicationName
+            ?? ProtoApplicationTargets.ResolveApplication(TargetName, context.Services.GetServices<ProtoApplicationTarget>());
+        var client = await context.ApplicationClientAsync(application);
+        var content = await ProtoDocumentSource.LoadTextAsync(deferred.Source, client, context.CancellationToken);
+        lock (_lock)
+        {
+            Use(deferred.Source, (content, OpenApiSpecLoader.Parse(content)));
+            _deferred = null;
+        }
+    }
+
+    private void Use(string source, (string Content, OpenApiSpec Document) loaded)
+    {
         _document = loaded.Document;
         _routes = new OpenApiRouteMatcher(_document);
-        _specIdentity = ProtoSpecIdentity.Metadata(openApiSpecSource, loaded.Content);
+        _specIdentity = ProtoSpecIdentity.Metadata(source, loaded.Content);
     }
+
+    private sealed record DeferredSource(string Source, string? ApplicationName);
 
     public override bool CanCollect(ProtoObservation observation)
         => base.CanCollect(observation)

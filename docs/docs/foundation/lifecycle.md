@@ -90,6 +90,8 @@ sequenceDiagram
     participant RunHooks as Run hooks
     Runner->>Host: StartAsync
     Host->>RunHooks: BeforeRunAsync (ascending Order)
+    Note over Host: infrastructure starts in registration order
+    Host->>RunHooks: AfterInfrastructureAsync (ascending Order)
     Note over Runner,Host: tests run
     Runner->>Host: StopAsync
     Host->>RunHooks: AfterRunAsync (descending Order)
@@ -97,6 +99,7 @@ sequenceDiagram
 ```
 
 - If a `BeforeRunAsync` throws, the hooks that already started get their `AfterRunAsync` in reverse, and startup fails.
+- If an `AfterInfrastructureAsync` throws, startup fails the same way: every hook gets its `AfterRunAsync` in reverse, the started infrastructure releases, and a retry runs the whole start again.
 - `StopAsync` runs every `AfterRunAsync` even if some throw, then reports all failures together.
 - Once stopping has begun, starting a new test throws.
 

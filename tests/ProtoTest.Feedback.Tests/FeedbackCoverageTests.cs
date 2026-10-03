@@ -2,7 +2,9 @@ namespace ProtoTest.Feedback.Tests;
 
 using System.Text.Json;
 using ProtoTest.Cli;
+using ProtoTest.Core;
 using ProtoTest.Diagnosis;
+using ProtoTest.Reporting;
 using ProtoTest.Verification;
 
 /// <summary>
@@ -36,6 +38,26 @@ public sealed class FeedbackCoverageTests
             Assert.That(markdown, Does.Contain("> **New and not covered**" + Environment.NewLine + "> - `DELETE /orders/{id}` · Shop:Api · OpenAPI. No test calls DELETE /orders/{id}."));
             Assert.That(markdown, Does.Contain("write a new test shaped like it."));
         }
+    }
+
+    [Test]
+    public void Markdown_ShouldNameANestedUnitByItsPathWithItsOwnEndpointsHint()
+    {
+        static ProtoReportItem Endpoint(string identifier, bool propertyCovered)
+            => new("Shop:Api", "OpenAPI", identifier, ProtoReportItemKinds.Coverage, ProtoReportStatus.Success, 1, true,
+                Children: [new("Shop:Api", "OpenAPI Property", "$.id", ProtoReportItemKinds.Coverage, IsCovered: propertyCovered)]);
+        var verdict = ProtoVerification.Verify(
+            ProtoReport.Create([Endpoint("GET /a", true), Endpoint("GET /b", true)]),
+            ProtoReport.Create([Endpoint("GET /a", false), Endpoint("GET /b", true)]));
+        ProtoCoverageSuggestion[] suggestions =
+        [
+            new("Shop:Api", "OpenAPI Property", "$.id", "GET /b", ProtoCoverageActions.Extend, "b is read", null, "'b is read' already calls GET /b.") { Path = "GET /b › $.id" },
+            new("Shop:Api", "OpenAPI Property", "$.id", "GET /a", ProtoCoverageActions.Extend, "a is read", null, "'a is read' already calls GET /a.") { Path = "GET /a › $.id" }
+        ];
+
+        var markdown = ProtoFeedbackComment.Markdown(FeedbackFixtures.GreenDigest(), null, null, verdict, suggestions);
+
+        Assert.That(markdown, Does.Contain("> - `GET /a › $.id` · Shop:Api · OpenAPI Property. 'a is read' already calls GET /a."));
     }
 
     [Test]

@@ -349,7 +349,7 @@ internal static partial class FeedbackCommentMarkdown
                 var suggestion = suggestions.FirstOrDefault(candidate =>
                     string.Equals(candidate.Target, finding.TargetName, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(candidate.Category, finding.Category, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(candidate.Identifier, finding.Identifier, StringComparison.Ordinal));
+                    && string.Equals(candidate.Path, finding.Identifier, StringComparison.Ordinal));
                 var hint = suggestion is null ? string.Empty : $" {Text(OneLine(suggestion.Reason))}";
                 var unit = new[] { finding.Identifier is { Length: > 0 } identifier ? Code(identifier) : null, finding.TargetName, finding.Category }
                     .Where(part => !string.IsNullOrEmpty(part))

@@ -173,8 +173,21 @@ All items are coverage items. Covered ones are successful with a hit count, and 
 | File path | `control-plane.openapi.json` | resolved as a file when it exists on disk |
 | Inline document | the JSON or YAML text itself | handy for small test specs |
 | URL | `https://api.example.test/swagger/v1/swagger.json` | a relative URL resolves against the application's `BaseUrl` |
+| Path the application serves | `/openapi/v1.json` | with no `BaseUrl` configured, loads from the application once infrastructure started |
 
-`ProtoTest:Applications:{application}:OpenApi:Specification` takes any of the three. A document that fails to parse throws with the parser's diagnostics.
+`ProtoTest:Applications:{application}:OpenApi:Specification` takes any of these. A document that fails to parse throws with the parser's diagnostics.
+
+A path that starts with `/`, is not a file, and has no configured `BaseUrl` to resolve against is read from the application itself. The collector loads it in the run's [`AfterInfrastructureAsync`](../foundation/hooks.md#run-hooks) phase, before the first test, through the application's published address or its in-process server. A suite that hosts its application in process covers the document the application serves, without a committed copy:
+
+```csharp
+builder.AddApplication("Api", app => app
+    .AddAspNetCoreServer<Program>()
+    .AddRest(rest => rest
+        .AddClient("Api")
+        .AddCollector<OpenApiCoverageCollector>("/openapi/v1.json")));
+```
+
+A document the application does not serve fails the run's start, naming the path.
 
 The application is the one the REST client belongs to. A client registered inside `AddApplication("Api", …)` resolves its specification under `ProtoTest:Applications:Api`. A host-registered client uses its own target name as the application. If the key is missing or blank, the collector fails when it is constructed:
 
@@ -215,7 +228,7 @@ The package has no capability descriptor and no package-specific attributes. `[R
 - **Coverage only, never validation.** It counts endpoints, responses and properties a REST observation touched. It does not verify payloads against the schema.
 - **Receiving a field is not coverage.** Property hits come only from shape-assertion matches, so a test that reads a response without asserting its shape leaves those properties uncovered.
 - **Unmatched routes are silent.** A route the spec does not describe, or a method it does not declare, is ignored rather than reported.
-- **A missing specification fails at construction.** The configuration overload throws when the DI-resolved collector is created, not at report time.
+- **A missing specification fails at construction.** The configuration overload throws when the DI-resolved collector is created, not at report time. A path the application serves fails the run's start instead, since it loads then.
 - **Unknown constraints are assumed to match.** Only the listed constraint names are enforced.
 - **No base-path rewriting or authentication**, and no refetch on retry. The loader reads the source once.
 - **The specification identity row is not coverage.** One aggregate item per target records `spec.source` and `spec.hash`. It carries no verdict, so no total or gate changes because of it.

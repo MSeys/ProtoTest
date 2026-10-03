@@ -499,10 +499,10 @@ public static class ProtoVerification
     private static Dictionary<CoverageUnitKey, CoverageUnit> CoverageUnits(ProtoReport report)
     {
         var units = new Dictionary<CoverageUnitKey, CoverageUnit>(CoverageUnitKeyComparer.Instance);
-        foreach (var item in report.Items.Flatten().CoverageUnits())
+        foreach (var (item, path) in report.Items.CoverageUnitPaths())
         {
-            var key = new CoverageUnitKey(item.TargetName, item.Category, item.Identifier);
-            units.TryAdd(key, new CoverageUnit(item.TargetName, item.Category, item.Identifier, item.IsCovered!.Value));
+            var key = new CoverageUnitKey(item.TargetName, item.Category, path);
+            units.TryAdd(key, new CoverageUnit(item.TargetName, item.Category, path, item.IsCovered!.Value));
         }
 
         return units;

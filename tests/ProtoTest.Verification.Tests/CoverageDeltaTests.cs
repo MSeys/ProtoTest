@@ -41,6 +41,46 @@ public sealed class CoverageDeltaTests
     }
 
     [Test]
+    public void Verify_ShouldKeyANestedUnitByItsPathUnderItsParents()
+    {
+        // OpenAPI names responses and properties per endpoint, so the same "200" and "$.id" appear under every endpoint.
+        static ProtoReportItem Endpoint(string identifier, bool propertyCovered)
+            => Unit("Api", "OpenAPI", identifier, covered: true) with
+            {
+                Children = [Unit("Api", "OpenAPI", "200", covered: true) with { Children = [Unit("Api", "OpenAPI", "$.id", propertyCovered)] }]
+            };
+
+        var baseline = Report(Endpoint("GET /a", propertyCovered: true), Endpoint("GET /b", propertyCovered: true));
+        var current = Report(Endpoint("GET /a", propertyCovered: true), Endpoint("GET /b", propertyCovered: false));
+
+        var verdict = ProtoVerification.Verify(baseline, current);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(verdict.Failed, Is.True);
+            var finding = verdict.Findings.Single();
+            Assert.That(finding.Class, Is.EqualTo(ProtoVerificationFindingClasses.Regressed));
+            Assert.That(finding.Identifier, Is.EqualTo("GET /b › 200 › $.id"));
+            Assert.That(verdict.CoverageDeltas.Single().Regressed, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public void Verify_ShouldKeepAnIdentifierItsCollectorAlreadyQualified()
+    {
+        // GraphQL schema coverage names a field "Type.field" under its type, so the parent is not repeated.
+        static ProtoReportItem Type(bool argumentCovered)
+            => new("Api", "GraphQL", "Query", Kind: ProtoReportItemKinds.Coverage, Status: ProtoReportStatus.Neutral, IsCovered: null)
+            {
+                Children = [Unit("Api", "GraphQL", "Query.users", covered: true) with { Children = [Unit("Api", "GraphQL", "Query.users(first)", argumentCovered)] }]
+            };
+
+        var verdict = ProtoVerification.Verify(Report(Type(argumentCovered: true)), Report(Type(argumentCovered: false)));
+
+        Assert.That(verdict.Findings.Single().Identifier, Is.EqualTo("Query.users(first)"));
+    }
+
+    [Test]
     public void Verify_ShouldWarnOnANewUncoveredUnit()
     {
         var baseline = Report(Unit("Api", "OpenAPI", "GET /a", covered: true));

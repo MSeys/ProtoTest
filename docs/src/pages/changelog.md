@@ -13,6 +13,45 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.5
+
+<p className="changelog-date">3 October 2026</p>
+
+ProtoTest 1.1.5 reads an API description or a GraphQL schema from the application it tests, in process too, and keeps nested coverage units apart when it compares two runs.
+
+<div className="changelog-group changelog-group--features">
+
+### Features
+
+#### Core
+
+- `IProtoRunHook.AfterInfrastructureAsync` runs once every infrastructure piece started and before the first test. Its `ProtoRunSetupContext` now carries the run's `Services` and `ApplicationClientAsync(name)`: a client for an application at its configured or published address, or on its in-process server, released when the phase ends. A collector that is a run hook takes part. <span className="changelog-ref">[Hooks](/docs/foundation/hooks#run-hooks)</span>
+
+#### OpenAPI
+
+- A specification source that is a path the application serves (`/openapi/v1.json`), with no `BaseUrl` to resolve it against, loads from the application before the first test, so an in-process application documents its own coverage without a committed copy. <span className="changelog-ref">[OpenAPI](/docs/integrations/openapi#the-specification-source)</span>
+
+#### GraphQL
+
+- `WithSchemaCoverage("/graphql?sdl")` loads the schema the application serves before the first test, in process too. <span className="changelog-ref">[Schema coverage](/docs/integrations/graphql/coverage#point-at-the-schema)</span>
+
+#### ASP.NET Core
+
+- The in-process server serves the run before its first test: a per-run server starts then and the tests reuse it, a per-test lifetime starts a server only for that read. <span className="changelog-ref">[Hooks](/docs/foundation/hooks#limits)</span>
+
+
+</div>
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+#### Agent workflows
+
+- Run verification names a nested coverage unit by its path under its parents (`GET /orders › 200 › $.id`), so a response or a property that regressed under one endpoint is no longer hidden by the same name under another. The pull request comment, `get_coverage` and `get_suite_map` print the same path, and a coverage suggestion carries it as `Path`. <span className="changelog-ref">[Verification](/docs/agent-workflows/verification#limits)</span>
+
+</div>
+
 ## 1.1.4
 
 <p className="changelog-date">3 October 2026</p>

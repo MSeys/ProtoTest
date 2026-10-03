@@ -25,7 +25,11 @@ public sealed record ProtoCoverageSuggestion(
     string Action,
     string? Test,
     string? SourceFile,
-    string Reason);
+    string Reason)
+{
+    /// <summary>The unit's path in the report, the name run verification gives it (<c>GET /a › 200 › $.id</c>).</summary>
+    public string Path { get; init; } = Identifier;
+}
 
 /// <summary>
 /// Turns a run's uncovered units into suggestions from what the tests recorded. A unit nested under an
@@ -47,7 +51,7 @@ internal static partial class ProtoCoverageSuggester
         var suggestions = new List<ProtoCoverageSuggestion>();
         foreach (var item in report.Items)
         {
-            Walk(item, endpoint: null, calls, suggestions);
+            Walk(item, endpoint: null, parent: null, parentPath: null, calls, suggestions);
         }
 
         return suggestions;
@@ -56,6 +60,8 @@ internal static partial class ProtoCoverageSuggester
     private static void Walk(
         ProtoTraceReportItem item,
         string? endpoint,
+        ProtoTraceReportItem? parent,
+        string? parentPath,
         List<(ProtoTraceTest Test, ProtoTraceOperation Operation)> calls,
         List<ProtoCoverageSuggestion> suggestions)
     {
@@ -64,14 +70,15 @@ internal static partial class ProtoCoverageSuggester
             endpoint = item.Identifier;
         }
 
+        var path = ProtoTraceCoverageUnit.Combine(parentPath, parent?.Identifier, item.Identifier);
         if (string.Equals(item.Kind, "coverage", StringComparison.OrdinalIgnoreCase) && item.IsCovered is false)
         {
-            suggestions.Add(Suggest(item, endpoint, calls));
+            suggestions.Add(Suggest(item, endpoint, calls) with { Path = path });
         }
 
         foreach (var child in item.Children ?? [])
         {
-            Walk(child, endpoint, calls, suggestions);
+            Walk(child, endpoint, item, path, calls, suggestions);
         }
     }
 

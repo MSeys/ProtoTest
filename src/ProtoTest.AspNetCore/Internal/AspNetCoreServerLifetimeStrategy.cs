@@ -17,6 +17,12 @@ internal interface IAspNetCoreServerLifetime<TProgram> : IAsyncDisposable
         ProtoExecutionContext context,
         string name,
         Func<ProtoExecutionContext, Action<IWebHostBuilder>?> configure);
+
+    /// <summary>
+    /// The server the run reads before its first test, and whether the caller owns it: a per-test
+    /// lifetime starts one only for that read.
+    /// </summary>
+    (AspNetCoreServer<TProgram> Server, bool Owned) AcquireForRun(Action<IWebHostBuilder>? configure);
 }
 
 /// <summary>The server one test runs against, and whether the run already had it.</summary>
@@ -55,8 +61,26 @@ internal sealed class PerRunServerLifetime<TProgram> : IAspNetCoreServerLifetime
         return new(server, reused);
     }
 
+    // The run's read starts the shared server early; the first test then reuses it.
+    public (AspNetCoreServer<TProgram> Server, bool Owned) AcquireForRun(Action<IWebHostBuilder>? configure)
+    {
+        lock (_gate)
+        {
+            return (_sharedServer ??= AspNetCoreServer<TProgram>.Start(configure), false);
+        }
+    }
+
     public ValueTask DisposeAsync()
-        => _sharedServer is not null ? _sharedServer.DisposeAsync() : ValueTask.CompletedTask;
+    {
+        AspNetCoreServer<TProgram>? server;
+        lock (_gate)
+        {
+            server = _sharedServer;
+            _sharedServer = null;
+        }
+
+        return server is not null ? server.DisposeAsync() : ValueTask.CompletedTask;
+    }
 }
 
 /// <summary>
@@ -81,6 +105,10 @@ internal sealed class PerTestServerLifetime<TProgram> : IAspNetCoreServerLifetim
             ProtoClientOwnership.Caller);
         return new(server, Reused: false);
     }
+
+    // No test owns this read, so the run releases the server when the read ends.
+    public (AspNetCoreServer<TProgram> Server, bool Owned) AcquireForRun(Action<IWebHostBuilder>? configure)
+        => (AspNetCoreServer<TProgram>.Start(configure), true);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }

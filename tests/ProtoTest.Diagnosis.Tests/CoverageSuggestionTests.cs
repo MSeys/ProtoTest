@@ -31,6 +31,7 @@ public sealed class CoverageSuggestionTests
         {
             Assert.That(suggestion.Identifier, Is.EqualTo("404"));
             Assert.That(suggestion.Endpoint, Is.EqualTo("GET /orders/{id}"), "a nested unit belongs to its endpoint");
+            Assert.That(suggestion.Path, Is.EqualTo("GET /orders/{id} › 404"), "the path names the unit as run verification does");
             Assert.That(suggestion.Action, Is.EqualTo(ProtoCoverageActions.Extend));
             Assert.That(suggestion.Test, Is.EqualTo("an order is read"));
             Assert.That(suggestion.Reason, Does.Contain("already calls GET /orders/{id}"));

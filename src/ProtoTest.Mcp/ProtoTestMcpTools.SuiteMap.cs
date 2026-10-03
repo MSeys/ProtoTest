@@ -138,17 +138,17 @@ public sealed partial class ProtoTestMcpTools
         {
             if (ProtoTraceReport.TryRead(archive, out var report, out var reason))
             {
-                var uncovered = report.Flatten()
-                    .Where(item => string.Equals(item.Kind, "coverage", StringComparison.OrdinalIgnoreCase) && item.IsCovered is false)
+                var uncovered = report.CoverageUnits()
+                    .Where(unit => unit.Item.IsCovered is false)
                     .ToArray();
                 gaps = new
                 {
                     total = uncovered.Length,
-                    units = uncovered.Take(MaxMapGaps).Select(item => new
+                    units = uncovered.Take(MaxMapGaps).Select(unit => new
                     {
-                        target = item.TargetName,
-                        category = item.Category,
-                        identifier = item.Identifier
+                        target = unit.Item.TargetName,
+                        category = unit.Item.Category,
+                        identifier = unit.Path
                     }),
                     truncated = uncovered.Length > MaxMapGaps
                 };

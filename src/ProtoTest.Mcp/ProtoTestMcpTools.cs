@@ -225,9 +225,9 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
 
         // The suggestions walk the report in the same depth-first order, so they pair with the units by position.
         var suggestions = ProtoDiagnosis.SuggestCoverage(run.Archive);
-        var units = report.Flatten()
-            .Where(item => string.Equals(item.Kind, "coverage", StringComparison.OrdinalIgnoreCase) && item.IsCovered is false)
-            .Select((item, index) => (Item: item, Suggestion: index < suggestions.Count ? suggestions[index] : null));
+        var units = report.CoverageUnits()
+            .Where(unit => unit.Item.IsCovered is false)
+            .Select((unit, index) => (unit.Item, unit.Path, Suggestion: index < suggestions.Count ? suggestions[index] : null));
         if (!string.IsNullOrWhiteSpace(target))
         {
             units = units.Where(unit => string.Equals(unit.Item.TargetName, target, StringComparison.OrdinalIgnoreCase));
@@ -265,7 +265,7 @@ public sealed partial class ProtoTestMcpTools(ProtoTestMcpOptions options)
             {
                 target = unit.Item.TargetName,
                 category = unit.Item.Category,
-                identifier = unit.Item.Identifier,
+                identifier = unit.Path,
                 displayName = unit.Item.DisplayName,
                 count = unit.Item.Count,
                 message = unit.Item.Message,

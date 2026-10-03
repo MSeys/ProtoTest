@@ -10,6 +10,7 @@ using global::ProtoTest.Messaging;
 using global::ProtoTest.Messaging.RabbitMq;
 using global::ProtoTest.Messaging.RabbitMq.Testcontainers;
 using global::ProtoTest.NUnit;
+using global::ProtoTest.OpenApi;
 using global::ProtoTest.Reporting;
 using global::ProtoTest.Rest;
 using global::ProtoTest.SampleApp.Domain;
@@ -123,10 +124,14 @@ public sealed class Setup : ProtoTestAssembly
                     .CaptureAttachments()
                     .AddClient(NorthstarTargets.Api)
                     .AddCollector<RestCoverageCollector>()
-                    .AddCollector<RestTrafficCoverageCollector>())
+                    .AddCollector<RestTrafficCoverageCollector>()
+                    // Endpoints, responses and properties of the contract the application serves.
+                    .AddCollector<OpenApiCoverageCollector>("/openapi/v1.json"))
                 .AddGraphQL(graphQL => graphQL
                     .CaptureAttachments()
-                    .AddClient("GraphQL", endpoint: "GraphQL"));
+                    .AddClient("GraphQL", endpoint: "GraphQL")
+                    // Types, fields and arguments of the schema the application serves.
+                    .WithSchemaCoverage("/graphql?sdl"));
         });
 
         if (run.RunsLocalApplications)

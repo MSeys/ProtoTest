@@ -38,6 +38,7 @@ One aggregate item records the schema identity: identifier `spec`, display `Sche
 | File path | `WithSchemaCoverage("control-plane.graphql")` | copy the file to the output directory (see below) |
 | Inline SDL | `WithSchemaCoverage(sdl)` | handy for small test schemas |
 | URL or configuration | `WithSchemaCoverage()` plus the `Schema` key | a relative URL resolves against the application's `BaseUrl` |
+| Path the application serves | `WithSchemaCoverage("/graphql?sdl")` | with no `BaseUrl` configured, loads from the application once infrastructure started |
 
 ```csharp
 builder.AddApplication("Api", app => app
@@ -60,6 +61,18 @@ builder.AddApplication("Api", app => app
 ```
 
 A relative URL in `Schema` resolves against the application's `BaseUrl`. Without a schema from either source, the collector throws `InvalidOperationException` naming the missing `GraphQL:Schema` key.
+
+A path that starts with `/` with no `BaseUrl` to resolve it against is read from the application itself, in the run's [`AfterInfrastructureAsync`](../../foundation/hooks.md#run-hooks) phase before the first test. An in-process application serves its own schema, so no copy is committed:
+
+```csharp
+builder.AddApplication("Api", app => app
+    .AddAspNetCoreServer<Program>()
+    .AddGraphQL(graphQL => graphQL
+        .AddClient("GraphQL")
+        .WithSchemaCoverage("/graphql?sdl")));
+```
+
+A schema the application does not serve fails the run's start, naming the path.
 
 :::tip[Ship the schema with the tests]
 Copy the `.graphql` file to the output directory so `AppContext.BaseDirectory` finds it:

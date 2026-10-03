@@ -22,6 +22,15 @@ internal sealed class ProtoRunHooks(IEnumerable<IProtoRunHook> hooks)
         }
     }
 
+    /// <summary>Runs every hook's AfterInfrastructure in ascending order; the first failure stops the start.</summary>
+    public async Task RunAfterInfrastructureAsync(ProtoRunSetupContext context)
+    {
+        foreach (var hook in _hooks)
+        {
+            await hook.AfterInfrastructureAsync(context);
+        }
+    }
+
     /// <summary>
     /// Runs the completed hooks' AfterRun in reverse, collecting failures instead of stopping at the
     /// first, so one failing hook cannot skip the releases behind it.

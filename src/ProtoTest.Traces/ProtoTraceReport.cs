@@ -21,6 +21,31 @@ public sealed record ProtoTraceReportItem(
     string? DisplayGroup,
     IReadOnlyList<ProtoTraceReportItem>? Children);
 
+/// <summary>A coverage unit of the report and the path that names it.</summary>
+public sealed record ProtoTraceCoverageUnit(ProtoTraceReportItem Item, string Path)
+{
+    /// <summary>Separates a nested unit's identifier from its parent's in a path.</summary>
+    public const string Separator = " › ";
+
+    /// <summary>
+    /// A child's path: its identifier under its parent's path, or the identifier alone when the collector
+    /// already qualified it with the parent's (<c>Query.users</c> under <c>Query</c>). The report model in
+    /// ProtoTest.Core names units by the same rule.
+    /// </summary>
+    public static string Combine(string? parentPath, string? parentIdentifier, string identifier)
+    {
+        ArgumentNullException.ThrowIfNull(identifier);
+        if (string.IsNullOrEmpty(parentPath) || string.IsNullOrEmpty(parentIdentifier))
+        {
+            return identifier;
+        }
+
+        return identifier.StartsWith(parentIdentifier, StringComparison.Ordinal)
+            ? identifier
+            : parentPath + Separator + identifier;
+    }
+}
+
 /// <summary>The totals the report's own summary carries.</summary>
 public sealed record ProtoTraceReportSummary(
     int Total,
@@ -76,6 +101,13 @@ public sealed class ProtoTraceReport
             }
         }
     }
+
+    /// <summary>
+    /// The coverage units depth first, each with the path that names it: a nested unit's identifier under
+    /// its parents' (<c>GET /a › 200 › $.id</c>), the same path run verification keys units by.
+    /// </summary>
+    public IEnumerable<ProtoTraceCoverageUnit> CoverageUnits()
+        => Items.SelectMany(item => CoverageUnits(item, parent: null, parentPath: null));
 
     /// <summary>
     /// Reads the JSON report artifact the run embedded, or returns false when the archive carries none.
@@ -198,6 +230,23 @@ public sealed class ProtoTraceReport
             foreach (var entry in Flatten(child))
             {
                 yield return entry;
+            }
+        }
+    }
+
+    private static IEnumerable<ProtoTraceCoverageUnit> CoverageUnits(ProtoTraceReportItem item, ProtoTraceReportItem? parent, string? parentPath)
+    {
+        var path = ProtoTraceCoverageUnit.Combine(parentPath, parent?.Identifier, item.Identifier);
+        if (string.Equals(item.Kind, "coverage", StringComparison.OrdinalIgnoreCase) && item.IsCovered is not null)
+        {
+            yield return new ProtoTraceCoverageUnit(item, path);
+        }
+
+        foreach (var child in item.Children ?? [])
+        {
+            foreach (var unit in CoverageUnits(child, item, path))
+            {
+                yield return unit;
             }
         }
     }

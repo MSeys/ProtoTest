@@ -118,6 +118,8 @@
 .agentTurns span { color: var(--muted); font-size: var(--text-strong); overflow-wrap: anywhere; }
 
 /* ── Integrations ── */
+/* The integrations loop beside the section's claim, above its cards. */
+.clipRow { margin-bottom: var(--space-7); }
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }
 .card { min-width: 0; display: flex; flex-direction: column; padding: var(--space-6); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); color: var(--text); }
 .card:hover { border-color: var(--blueprint); color: var(--text); text-decoration: none; }

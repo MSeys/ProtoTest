@@ -8,9 +8,12 @@ description: "One portable .prototrace file records every hook, client, request,
 import TraceAnatomy from '@site/src/components/TraceAnatomy';
 import TraceDiff from '@site/src/components/TraceDiff';
 import ViewerWalkthrough from '@site/src/components/ViewerWalkthrough';
+import {Clip} from '@site/src/components/Video';
 
 # ProtoTrace: see what an integration test did
 ProtoTest records each test on its own, with no logging calls. The trace holds hooks, requests, checks, state changes, attachments and cleanup, and the run writes it to one portable `.prototrace` file. Portable has a limit: a reader only opens an archive from its own era. Check [format compatibility](./prototrace-archive.md#format-compatibility) before you archive traces long term.
+
+<Clip name="read-a-failure" label="A pull request's trace in the viewer: the failing test, what it expected and what the page said, the source line and the page as it failed." />
 
 When a test fails in CI, download that file and open it in the [ProtoTrace viewer](https://trace.prototest.dev). You see the failing check with the request, the response and the setup around it. Without a browser, read the same story from a terminal:
 

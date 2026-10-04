@@ -7,11 +7,14 @@ description: "Every ProtoTest integration on one page: protocols, browsers, mess
 
 import StackBuilder from '@site/src/components/StackBuilder';
 import CapabilityIndex from '@site/src/components/CapabilityIndex';
+import {Clip} from '@site/src/components/Video';
 
 # What ProtoTest can test: the integrations
 Every ProtoTest integration on one page, grouped by the kind of system it reaches. Compose the capabilities your scenario needs. Every integration joins the same [host, context and lifecycle](../foundation/overview.md).
 
 **Supported** packages follow the 1.x compatibility promise. **Preview** packages work today, but their surface may change before the next minor release. [Installation](../getting-started/installation.md) explains the stability tiers and framework requirements.
+
+<Clip name="one-test" label="One real test from the OpenCSMS demo reaches a signed-in operator, a charge point, the dashboard, a remote stop and the REST API." />
 
 ## Protocols
 

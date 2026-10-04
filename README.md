@@ -10,6 +10,10 @@
 
 ProtoTest is a foundation for integration testing on .NET 8, 9 and 10. One host per suite, one context per test, one trace per run.
 
+<a href="https://youtu.be/v1r6VHSAzRE"><img width="640" alt="ProtoTest in 70 seconds: one real test, from the failure on CI to the proven fix" src="assets/brand/prototest-intro.jpg" /></a>
+
+[Watch ProtoTest in 70 seconds](https://youtu.be/v1r6VHSAzRE): one real test, from the failure on CI to the proven fix.
+
 ## Try it
 
 ```bash

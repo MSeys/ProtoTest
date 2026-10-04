@@ -5,9 +5,13 @@ sidebar_label: The evidence loop
 description: "The evidence loop end to end: fail, evidence, fix, verify, report, with the pull request comment and the check annotations each step produces."
 ---
 
+import {Clip} from '@site/src/components/Video';
+
 # The evidence loop
 
 The **evidence loop** is fail, evidence, fix, verify, report. One file carries the evidence: the `.prototrace` archive with the embedded report. Every step reads the same archive.
+
+<Clip name="agent" label="From the command line: what broke, the fix, and prototest prove confirming it changed exactly what failed." />
 
 ## What the reviewer sees
 

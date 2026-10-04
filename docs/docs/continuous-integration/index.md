@@ -4,9 +4,13 @@ title: Continuous integration
 description: Run ProtoTest in CI and keep the trace, reports and runner output together as build artifacts on GitHub Actions, Azure Pipelines or GitLab CI.
 ---
 
+import {Clip} from '@site/src/components/Video';
+
 # Continuous integration
 
 Keep the runner result, the HTML report and the `.prototrace` together. The runner names the failed test. The report shows coverage and findings. The trace shows the failing operation.
+
+<Clip name="pull-request" label="The pull request comment says what broke, names the cause the failures share, and links the trace." />
 
 One suite, one results folder, one post-run step:
 

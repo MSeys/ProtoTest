@@ -10,6 +10,7 @@ import CopyCode from '@site/src/components/CopyCode';
 import Frame from '@site/src/components/Frame';
 import ReleaseFeed from '@site/src/components/ReleaseFeed';
 import ViewerMock from '@site/src/components/ViewerMock';
+import {Clip, IntroVideo} from '@site/src/components/Video';
 import {withoutProtoTest, withProtoTest} from '@site/src/data/comparison';
 import styles from './index.module.css';
 
@@ -312,6 +313,21 @@ export default function Home(): ReactNode {
         </div>
       </header>
       <main className={styles.main}>
+        <section className={`container ${styles.section}`} aria-labelledby="film">
+          <div className={styles.feature}>
+            <div className={styles.featureCopy}>
+              <p className={styles.eyebrow}>In 70 seconds</p>
+              <Heading as="h2" id="film">
+                One test, from the failure to the proof.
+              </Heading>
+              <p>
+                Follow one real test from the OpenCSMS demo. A pull request breaks the station screen, the
+                comment names the cause, the trace shows the page as it failed, and one command proves the fix.
+              </p>
+            </div>
+            <IntroVideo />
+          </div>
+        </section>
         <section className={`container ${styles.section}`} aria-labelledby="setup">
           <div className={styles.feature}>
             <div className={styles.featureCopy}>
@@ -436,15 +452,21 @@ export default function Home(): ReactNode {
           </div>
         </section>
         <section className={`container ${styles.section}`} aria-labelledby="integrations">
-          <div className={styles.sectionHead}>
-            <p className={styles.eyebrow}>One model</p>
-            <Heading as="h2" id="integrations">
-              Different boundaries. The same test.
-            </Heading>
-            <p>
-              Choose the integrations your scenario crosses. Each joins the same host, context, cleanup and
-              trace, so one test can write through an API and read back from the database or the browser.
-            </p>
+          <div className={`${styles.feature} ${styles.clipRow}`}>
+            <div className={styles.featureCopy}>
+              <p className={styles.eyebrow}>One model</p>
+              <Heading as="h2" id="integrations">
+                Different boundaries. The same test.
+              </Heading>
+              <p>
+                Choose the integrations your scenario crosses. Each joins the same host, context, cleanup and
+                trace, so one test can write through an API and read back from the database or the browser.
+              </p>
+            </div>
+            <Clip
+              name="hero"
+              label="Every integration ProtoTest covers arrives as its own line and joins the same run."
+            />
           </div>
           <div className={styles.cards}>
             {integrations.map((item) => (

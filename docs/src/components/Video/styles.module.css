@@ -1,0 +1,73 @@
+/* The clips are 16:9 and keep that shape at every width. */
+.video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--pt-navy-abyss);
+}
+
+/* The introduction: its thumbnail as a play button until the reader asks for the player. */
+.intro { min-width: 0; }
+
+.cover,
+.player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  overflow: clip;
+  background: var(--pt-navy-abyss);
+}
+
+.cover {
+  position: relative;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Bottom right, where the thumbnail leaves room, so the button never covers its words. */
+.play {
+  position: absolute;
+  inset: auto 5% 8% auto;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pt-navy-abyss) 82%, transparent);
+  box-shadow: 0 0 0 3px var(--blueprint), 0 18px 40px -12px var(--shadow);
+  transition: scale 120ms ease;
+}
+
+.play::after {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 54%;
+  translate: -50% -50%;
+  border-style: solid;
+  border-width: 16px 0 16px 26px;
+  border-color: transparent transparent transparent var(--pt-white);
+}
+
+.cover:hover .play,
+.cover:focus-visible .play { scale: 1.08; }
+
+.cover:focus-visible { outline: 3px solid var(--blueprint); outline-offset: 3px; }
+
+.note {
+  margin: var(--space-3) 0 0;
+  color: var(--muted);
+  font-size: var(--text-title);
+}
+
+/* On a phone the thumbnail is small; a smaller button keeps its words clear. */
+@media (max-width: 700px) {
+  .play { inset: auto 3% 5% auto; width: 52px; height: 52px; }
+  .play::after { border-width: 10px 0 10px 16px; }
+}

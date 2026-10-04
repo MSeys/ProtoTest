@@ -3,7 +3,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import Frame from '@site/src/components/Frame';
 import styles from './styles.module.css';
 
-const INTRO_ID = 'v1r6VHSAzRE';
+const INTRO_ID = 'mFhMaDeQtm8';
 
 interface ClipProps {
   /** The clip's name under static/video: `name.mp4` and its poster `name.jpg`. */

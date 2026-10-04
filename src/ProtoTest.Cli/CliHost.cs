@@ -434,17 +434,22 @@ public static class CliHost
             WebhookSecret = Value("PROTOTEST_FEEDBACK_WEBHOOK_SECRET"),
             WebhookSecretHeader = Value("PROTOTEST_FEEDBACK_WEBHOOK_SECRET_HEADER"),
             SummaryCardUrl = SummaryCardUrl(),
+            ViewerUrl = ViewerUrl(),
             SourceBaseUrl = SourceBaseUrl()
         };
 
-    // The card is on by default; off, none or false leaves it out, and any other value is the card's address.
-    private static Uri? SummaryCardUrl()
-        => Value("PROTOTEST_FEEDBACK_CARD_URL") is { } value
+    private static Uri? SummaryCardUrl() => OptionalUrl("PROTOTEST_FEEDBACK_CARD_URL", "https://api.prototest.dev/evidence/card.svg");
+
+    private static Uri? ViewerUrl() => OptionalUrl("PROTOTEST_FEEDBACK_VIEWER_URL", "https://trace.prototest.dev/");
+
+    // On by default; off, none or false leaves it out, and any other value is the address to use instead.
+    private static Uri? OptionalUrl(string name, string fallback)
+        => Value(name) is { } value
             && (value.Equals("off", StringComparison.OrdinalIgnoreCase)
                 || value.Equals("none", StringComparison.OrdinalIgnoreCase)
                 || value.Equals("false", StringComparison.OrdinalIgnoreCase))
                 ? null
-                : AbsoluteUrl("PROTOTEST_FEEDBACK_CARD_URL") ?? new Uri("https://api.prototest.dev/evidence/card.svg");
+                : AbsoluteUrl(name) ?? new Uri(fallback);
 
     // Source locations link to the pull request's head commit; a push run falls back to the commit it built.
     private static Uri? SourceBaseUrl()

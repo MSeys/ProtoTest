@@ -20,6 +20,17 @@ describe("openTraceArchive", () => {
       .rejects.toThrow("not declared");
   });
 
+  it("opens the trace inside a downloaded CI artifact ZIP", async () => {
+    const trace = new Uint8Array(traceZip({}, {}));
+    const archive = await openTraceArchive(storedZip({ "run.prototrace": trace }));
+    expect(archive.spans.formatVersion).toBe("2.0");
+
+    await expect(openTraceArchive(storedZip({ "a.prototrace": trace, "b.prototrace": trace })))
+      .rejects.toMatchObject({ problem: "unsupported" });
+    await expect(openTraceArchive(storedZip({ "outer.prototrace": new Uint8Array(storedZip({ "inner.prototrace": trace })) })))
+      .rejects.toMatchObject({ problem: "corrupt" });
+  });
+
   it("classifies non-ZIP and legacy traces", async () => {
     await expect(openTraceArchive(new Uint8Array([1, 2, 3]).buffer))
       .rejects.toMatchObject({ problem: "corrupt" });

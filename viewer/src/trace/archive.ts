@@ -26,7 +26,7 @@ export interface TraceArchive {
   readSource(path: string): Promise<string | undefined>;
 }
 
-export async function openTraceArchive(buffer: ArrayBuffer): Promise<TraceArchive> {
+export async function openTraceArchive(buffer: ArrayBuffer, unwrap = true): Promise<TraceArchive> {
   if (buffer.byteLength > MAX_ARCHIVE_BYTES) throw new TraceOpenError("unsupported", "This trace is larger than the 250 MiB the viewer reads.");
   const bytes = new Uint8Array(buffer);
   const zip = openZip(bytes, {
@@ -46,6 +46,16 @@ export async function openTraceArchive(buffer: ArrayBuffer): Promise<TraceArchiv
       decompressionFailed: name => `${name} could not be decompressed.`
     }
   });
+  // A CI artifact download is a ZIP around the trace: open the one .prototrace inside it, so a trace from a
+  // pull request opens without unpacking it first. The browser reads it locally; nothing is uploaded.
+  if (unwrap && !zip.entries.has("manifest.json")) {
+    const traces = [...zip.entries.keys()].filter(name => name.toLowerCase().endsWith(".prototrace"));
+    if (traces.length === 1) {
+      const inner = await zip.read(traces[0]);
+      return openTraceArchive(inner.buffer.slice(inner.byteOffset, inner.byteOffset + inner.byteLength) as ArrayBuffer, false);
+    }
+    if (traces.length > 1) throw new TraceOpenError("unsupported", "This ZIP holds more than one trace; unpack it and open one.");
+  }
   const manifest = await readJson<WireManifest>(zip, "manifest.json");
   if (!manifest.spansEntry || !manifest.stateEntry) {
     if (manifest.runEntry) throw new TraceOpenError("legacy", "This trace was written by an older ProtoTest version.");

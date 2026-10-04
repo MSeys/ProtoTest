@@ -13,14 +13,8 @@ internal static partial class FeedbackCommentMarkdown
     private const int MaxRows = 20;
     private const int MaxCellText = 160;
     private const int MaxCardRows = 3;
+    private const int MaxCardLabel = 40;
     private const string DocsLink = "https://prototest.dev/docs/continuous-integration";
-
-    // The coverage kinds the card service draws; any other category is sent as "other", so a custom name never leaves.
-    private static readonly HashSet<string> CardKinds = new(StringComparer.Ordinal)
-    {
-        "openapi", "openapi-response", "rest", "rest-traffic", "graphql-operation", "graphql-schema",
-        "grpc", "web", "sheets", "device-operations", "wiremock"
-    };
 
     private static readonly string[] KeptWords =
         ["GraphQL", "OpenAPI", "OAuth", "WebSocket", "JSON", "HTTPS", "HTTP", "REST", "API", "SQL", "URL", "UI", "ID", "CSV", "XML"];
@@ -78,7 +72,7 @@ internal static partial class FeedbackCommentMarkdown
             .Take(MaxCardRows)
             .Select(delta => string.Create(
                 CultureInfo.InvariantCulture,
-                $"{CardKind(delta.Category)}:{delta.Baseline.Covered}/{delta.Baseline.Total}:{delta.Current.Covered}/{delta.Current.Total}"))
+                $"{CardLabel(delta.Category)}:{delta.Baseline.Covered}/{delta.Baseline.Total}:{delta.Current.Covered}/{delta.Current.Total}"))
             .ToArray();
         var query = string.Create(
             CultureInfo.InvariantCulture,
@@ -165,7 +159,9 @@ internal static partial class FeedbackCommentMarkdown
 
         if (target.TraceLink is { Length: > 0 } link)
         {
-            parts.Add($"[**Open the full trace ↗**]({link})");
+            parts.Add(target.ViewerUrl is { } viewer
+                ? $"[**Open the full trace ↗**]({link}) (download it and drop it on [ProtoTrace]({viewer.AbsoluteUri}))"
+                : $"[**Open the full trace ↗**]({link})");
         }
         else if (digest.TraceFile is { Length: > 0 } traceFile)
         {
@@ -611,10 +607,17 @@ internal static partial class FeedbackCommentMarkdown
 
     private static bool IsSkipped(ProtoDiagnosedTest test) => string.Equals(test.Outcome, "skipped", StringComparison.Ordinal);
 
-    private static string CardKind(string category)
+    // The card draws the category as it is named. A comma separates rows and a colon separates a row's fields, so
+    // both become spaces; the rest is escaped, so the URL never carries a bare comma for srcset to split on.
+    private static string CardLabel(string category)
     {
-        var slug = category.Trim().ToLowerInvariant().Replace(' ', '-');
-        return CardKinds.Contains(slug) ? slug : "other";
+        var label = string.Join(' ', category.Split([',', ':', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        if (label.Length > MaxCardLabel)
+        {
+            label = label[..MaxCardLabel].TrimEnd();
+        }
+
+        return Uri.EscapeDataString(label.Length > 0 ? label : "Coverage");
     }
 
     private static string Plural(int count, string noun) => count == 1 ? $"1 {noun}" : $"{count} {noun}s";

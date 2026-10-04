@@ -7,6 +7,22 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-10-04
+
+ProtoTest 1.1.6 opens a pull request's trace artifact in the viewer as downloaded, and names every coverage category on the pull request comment's summary card.
+
+### Features
+
+#### Agent workflows
+
+- the pull request comment points to ProtoTrace beside the trace link, and the viewer opens the downloaded trace artifact as it is, without unpacking it, for a private repository too: the file is read in the browser. `PROTOTEST_FEEDBACK_VIEWER_URL` names another viewer or `off` leaves the pointer out. [ProtoTrace](https://prototest.dev/docs/observability/prototrace)
+
+### Fixes
+
+#### Agent workflows
+
+- the summary card names each coverage row by its category, as the report does, so OpenAPI properties, GraphQL schema fields and arguments and a suite's own categories no longer read as "Other coverage". The card URL carries the category name and the counts, never a target, endpoint or test. [Continuous integration](https://prototest.dev/docs/continuous-integration#the-summary-card)
+
 ## [1.1.5] - 2026-10-03
 
 ProtoTest 1.1.5 reads an API description or a GraphQL schema from the application it tests, in process too, and keeps nested coverage units apart when it compares two runs.

@@ -52,7 +52,7 @@ see `ProtoTest.Cli`.
   the writer the caller gives. A refused target fails its channel, named, instead of being swallowed.
 - The comment posts only when the digest carries a failure or a failed gate; a green run's status
   check is the report. The webhook posts every digest, because a machine consumer decides.
-- The summary card is an image URL that carries counts and built-in coverage kinds only. The
+- The summary card is an image URL that carries counts and coverage category names only. The
   library leaves it out unless `SummaryCardUrl` is set; the CLI sets it unless told not to.
 - The comment shows at most 20 failing tests and 20 coverage rows; the trace has the rest.
 - The shared-secret header carries the secret value; it is not an HMAC signature.

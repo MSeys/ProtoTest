@@ -90,12 +90,12 @@ The comment a reviewer reads, from the action's committed fixtures: a base branc
 <!-- prototest-evidence -->
 <a href="https://github.com/you/your-repo/actions/runs/123/artifacts/456">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.prototest.dev/evidence/card.svg?broke=1&amp;failed=1&amp;fixed=0&amp;passed=1&amp;total=2&amp;uncovered=0&amp;cov=openapi:2/2:1/2&amp;theme=dark">
-  <img src="https://api.prototest.dev/evidence/card.svg?broke=1&amp;failed=1&amp;fixed=0&amp;passed=1&amp;total=2&amp;uncovered=0&amp;cov=openapi:2/2:1/2&amp;theme=light" alt="ProtoTest: 1 broke · 1 failed · 0 fixed · 1 of 2 passed · 0 added without a test" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.prototest.dev/evidence/card.svg?broke=1&amp;failed=1&amp;fixed=0&amp;passed=1&amp;total=2&amp;uncovered=0&amp;cov=OpenAPI:2/2:1/2&amp;theme=dark">
+  <img src="https://api.prototest.dev/evidence/card.svg?broke=1&amp;failed=1&amp;fixed=0&amp;passed=1&amp;total=2&amp;uncovered=0&amp;cov=OpenAPI:2/2:1/2&amp;theme=light" alt="ProtoTest: 1 broke · 1 failed · 0 fixed · 1 of 2 passed · 0 added without a test" width="100%">
 </picture>
 </a>
 
-**1 test broke** against the base branch · **1 no longer covered** · [**Open the full trace ↗**](https://github.com/you/your-repo/actions/runs/123/artifacts/456)
+**1 test broke** against the base branch · **1 no longer covered** · [**Open the full trace ↗**](https://github.com/you/your-repo/actions/runs/123/artifacts/456) (download it and drop it on [ProtoTrace](https://trace.prototest.dev/))
 
 ### What failed
 
@@ -135,7 +135,7 @@ at tests/ProtoTest.TestSupport/RecordedRuns.cs:67
 From the top:
 
 - a summary card with the counts and the coverage that moved, linked to the trace. It appears only when the run was compared with the base branch;
-- one line with what changed: the tests the change broke and fixed, other failures, additions without a test, coverage it lost, failed run gates, and the trace link;
+- one line with what changed: the tests the change broke and fixed, other failures, additions without a test, coverage it lost, failed run gates, and the trace link with the viewer that opens the downloaded artifact (`PROTOTEST_FEEDBACK_VIEWER_URL`, `off` leaves it out);
 - a caution when two or more failures share a cause: the same check failing on the same call, with identifiers in the call path treated as one;
 - a table of the failing tests with the first mismatch or error line and the source line, linked to the pull request's head commit;
 - the tests the change fixed, the coverage table, and warnings for additions without a test and coverage the change lost;
@@ -145,7 +145,7 @@ The comment shows at most 20 failing tests and 20 coverage rows. The trace and t
 
 #### The summary card
 
-The card is an image that `api.prototest.dev` draws from numbers in its URL: tests broken, failed, fixed, passed and in total, additions without a test, and up to three coverage rows. A coverage row names one of ProtoTest's built-in coverage kinds or `other`, and never a target, endpoint or test name. GitHub fetches the image through its own image proxy, so the service never sees the repository or the reader, and it stores nothing.
+The card is an image that `api.prototest.dev` draws from numbers in its URL: tests broken, failed, fixed, passed and in total, additions without a test, and up to three coverage rows. A coverage row carries its coverage category as the report names it (`OpenAPI Property`, or a suite's own category), shortened to 40 characters, and never a target, endpoint or test name. GitHub fetches the image through its own image proxy, so the service never sees the repository or the reader, and it stores nothing.
 
 To leave the card out, set `PROTOTEST_FEEDBACK_CARD_URL` to `off` on the step. Any other value is the address of a card you host:
 

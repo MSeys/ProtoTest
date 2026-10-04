@@ -97,10 +97,16 @@ public sealed record ProtoFeedbackTarget
     public IReadOnlyList<ProtoCoverageSuggestion> CoverageSuggestions { get; init; } = [];
 
     /// <summary>
-    /// The summary card image the comment opens with, drawn from the run's counts and its built-in coverage
-    /// kinds only; null leaves the card out. The CLI sets <c>https://api.prototest.dev/evidence/card.svg</c>.
+    /// The summary card image the comment opens with, drawn from the run's counts and its coverage category
+    /// names only; null leaves the card out. The CLI sets <c>https://api.prototest.dev/evidence/card.svg</c>.
     /// </summary>
     public Uri? SummaryCardUrl { get; init; }
+
+    /// <summary>
+    /// The trace viewer the comment points to beside <see cref="TraceLink"/>: the downloaded artifact opens
+    /// there, in the reader's browser. Null leaves the pointer out. The CLI sets <c>https://trace.prototest.dev/</c>.
+    /// </summary>
+    public Uri? ViewerUrl { get; init; }
 
     /// <summary>
     /// The address a relative source location links under, such as

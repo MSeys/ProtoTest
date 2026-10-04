@@ -412,7 +412,7 @@ const problemTitle = computed(() => ({
           <template v-else>
             <h1>Open a ProtoTest execution</h1>
             <p v-if="dragging">Drop it to open the trace.</p>
-            <p v-else>Drop a <code>.prototrace</code> file here or choose one.</p>
+            <p v-else>Drop a <code>.prototrace</code> file, or the trace artifact a pull request run uploaded, here or choose one. It opens in this browser and is never uploaded.</p>
             <div class="empty-actions">
               <AppButton variant="primary" @click.stop="openPicker">Choose trace file</AppButton>
             </div>

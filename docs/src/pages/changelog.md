@@ -13,6 +13,33 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.6
+
+<p className="changelog-date">4 October 2026</p>
+
+ProtoTest 1.1.6 opens a pull request's trace artifact in the viewer as downloaded, and names every coverage category on the pull request comment's summary card.
+
+<div className="changelog-group changelog-group--features">
+
+### Features
+
+#### Agent workflows
+
+- The pull request comment points to ProtoTrace beside the trace link, and the viewer opens the downloaded trace artifact as it is, without unpacking it, for a private repository too: the file is read in the browser. `PROTOTEST_FEEDBACK_VIEWER_URL` names another viewer or `off` leaves the pointer out. <span className="changelog-ref">[ProtoTrace](/docs/observability/prototrace)</span>
+
+
+</div>
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+#### Agent workflows
+
+- The summary card names each coverage row by its category, as the report does, so OpenAPI properties, GraphQL schema fields and arguments and a suite's own categories no longer read as "Other coverage". The card URL carries the category name and the counts, never a target, endpoint or test. <span className="changelog-ref">[Continuous integration](/docs/continuous-integration#the-summary-card)</span>
+
+</div>
+
 ## 1.1.5
 
 <p className="changelog-date">3 October 2026</p>

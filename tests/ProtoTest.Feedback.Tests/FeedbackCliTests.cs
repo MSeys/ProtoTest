@@ -74,7 +74,8 @@ public sealed class FeedbackCliTests
                 Assert.That(request.Headers["Authorization"], Is.EqualTo("Bearer test-token"));
                 Assert.That(
                     body.RootElement.GetProperty("body").GetString(),
-                    Does.Contain("[**Open the full trace ↗**](https://example.test/artifact)"));
+                    Does.Contain("[**Open the full trace ↗**](https://example.test/artifact) (download it and drop it on [ProtoTrace](https://trace.prototest.dev/))"),
+                    "the artifact opens in the viewer, which the CLI points to by default");
                 Assert.That(error.ToString(), Does.Contain("github-pr-comment posted"));
                 Assert.That(error.ToString(), Does.Contain("webhook skipped"));
             }

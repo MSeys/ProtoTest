@@ -24,7 +24,7 @@ public sealed class FeedbackCommentBodyTests
             SummaryCardUrl = Card
         });
 
-        const string query = "broke=1&amp;failed=1&amp;fixed=1&amp;passed=0&amp;total=1&amp;uncovered=0&amp;cov=openapi:29/31:29/32";
+        const string query = "broke=1&amp;failed=1&amp;fixed=1&amp;passed=0&amp;total=1&amp;uncovered=0&amp;cov=OpenAPI:29/31:29/32";
         var lines = body.Split(Environment.NewLine);
         using (Assert.EnterMultipleScope())
         {
@@ -37,7 +37,7 @@ public sealed class FeedbackCommentBodyTests
     }
 
     [Test]
-    public void Body_ShouldSendOnlyCountsAndBuiltInCoverageKindsToTheCard()
+    public void Body_ShouldSendCountsAndCoverageCategoriesButNoNamesToTheCard()
     {
         var body = ProtoFeedbackComment.Body(FeedbackFixtures.FailedDigest(), new ProtoFeedbackTarget
         {
@@ -53,10 +53,28 @@ public sealed class FeedbackCommentBodyTests
         var source = body.Split(Environment.NewLine).Single(line => line.Contains("<img ", StringComparison.Ordinal));
         using (Assert.EnterMultipleScope())
         {
-            Assert.That(source, Does.Contain("cov=other:1/2:1/3%2Cgraphql-operation:4/4:3/4%2Crest-traffic:2/2:1/2&amp;"), "three rows at most");
-            Assert.That(source, Does.Not.Contain("web:"));
-            Assert.That(source, Does.Not.Contain("Secret").And.Not.Contain("ledger").And.Not.Contain("orders"));
+            Assert.That(source, Does.Contain("cov=Acme%20ledger:1/2:1/3%2CGraphQL%20operation:4/4:3/4%2CREST%20traffic:2/2:1/2&amp;"), "three rows at most");
+            Assert.That(source, Does.Not.Contain("Web:"));
+            Assert.That(source, Does.Not.Contain("Secret").And.Not.Contain("Billing").And.Not.Contain("orders"), "targets and tests never leave");
         }
+    }
+
+    [Test]
+    public void Body_ShouldNameAnyCoverageCategoryOnTheCard()
+    {
+        // A nested built-in category and a suite's own one draw under their names; separators never reach the URL.
+        var body = ProtoFeedbackComment.Body(FeedbackFixtures.FailedDigest(), new ProtoFeedbackTarget
+        {
+            Comparison = Comparison(("orders match their shape", ProtoTestChanges.Broken)),
+            Coverage = Coverage(
+                ("Shop:Api", "OpenAPI Property", 14, 229, 13, 229),
+                ("Shop:Api", "Ledger: entries, totals", 2, 9, 1, 9),
+                ("Shop:Api", new string('x', 60), 1, 2, 0, 2)),
+            SummaryCardUrl = Card
+        });
+
+        var source = body.Split(Environment.NewLine).Single(line => line.Contains("<img ", StringComparison.Ordinal));
+        Assert.That(source, Does.Contain($"cov=OpenAPI%20Property:14/229:13/229%2CLedger%20entries%20totals:2/9:1/9%2C{new string('x', 40)}:1/2:0/2&amp;"));
     }
 
     [Test]
@@ -73,7 +91,7 @@ public sealed class FeedbackCommentBodyTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(srcset, Does.Not.Contain(","), "a comma would end the srcset candidate");
-            Assert.That(srcset, Does.Contain("cov=openapi:29/31:29/32%2Copenapi-response:20/31:19/32&amp;theme=dark"));
+            Assert.That(srcset, Does.Contain("cov=OpenAPI:29/31:29/32%2COpenAPI%20Response:20/31:19/32&amp;theme=dark"));
         }
     }
 

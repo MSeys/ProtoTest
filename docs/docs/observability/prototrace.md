@@ -83,7 +83,7 @@ These excerpts follow test 12 from the run through its four views and into the f
 A run leaves its archive at `TestResults/prototest-{runId}.prototrace` under the test project's output folder, or at the path you set with `trace.OutputPath`. From there:
 
 1. Run the suite once so the file exists.
-2. Open it in the [viewer](https://trace.prototest.dev): drop the file on the page, or press **Open trace** and choose it.
+2. Open it in the [viewer](https://trace.prototest.dev): drop the file on the page, or press **Open trace** and choose it. The trace artifact a pull request run uploaded opens the same way, as downloaded: the viewer reads the one `.prototrace` inside the ZIP.
 3. Without a browser, read the same story from the terminal:
 
 ```bash

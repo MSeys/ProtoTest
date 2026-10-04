@@ -8,6 +8,6 @@
   -->
   <PropertyGroup Condition="'$(IsPackable)' == 'true'">
     <EnablePackageValidation Condition="'$(EnablePackageValidation)' == ''">true</EnablePackageValidation>
-    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == ''">1.1.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == ''">1.1.5</PackageValidationBaselineVersion>
   </PropertyGroup>
 </Project>

@@ -499,3 +499,6 @@ samples/ProtoTest.SampleApp/Ui/dist/
 
 # Generated DocFX metadata (the rendered site already falls under artifacts/).
 docs/api-reference/_generated/
+
+# Video studio (Remotion, captures, voice, renders): local only, see studio/README.md
+/studio/

@@ -50,29 +50,12 @@ You can configure inline in `AddData(data => ...)`. The trace then reports the s
 
 For each member, the first of these that applies wins:
 
-```mermaid
-flowchart TD
-    M[member needs a value] --> W1{With in the test?}
-    W1 -->|yes| S1[Explicit]
-    W1 -->|no| M2{member default on the type or a base type?}
-    M2 -->|yes| S2[MemberDefault]
-    M2 -->|no| T3{type provider for the exact type?}
-    T3 -->|yes| S3[TypeProvider]
-    T3 -->|no| R4{custom resolver claims it?}
-    R4 -->|yes| S4[CustomResolver]
-    R4 -->|no| C5{constructor default on this route?}
-    C5 -->|yes| S5[ConstructorDefault]
-    C5 -->|no| B6{safe built-in?}
-    B6 -->|yes| S6[BuiltIn]
-    B6 -->|no| X[ProtoDataException names the member]
-```
-
-1. **`With(...)`** in the test.
-2. A **member default**: `data.For<T>().Default(x => x.Member, …)`, resolved by walking the target type and its base types.
-3. A **type provider**: `data.Values.Use<TValue>(…)`, matched on the exact type only.
-4. A **custom resolver**: `IProtoDataValueResolver`, in registration order. A throwing resolver is wrapped in `ProtoDataException`.
-5. The constructor parameter's **default value**, on the constructor route only. The declaration's default is the value the author asked for, so a generation never replaces it, including `null` for a nullable parameter.
-6. A **safe built-in**, for a member with no constructor default:
+1. **`With(...)`** in the test. Source: `Explicit`.
+2. A **member default**: `data.For<T>().Default(x => x.Member, …)`, resolved by walking the target type and its base types. Source: `MemberDefault`.
+3. A **type provider**: `data.Values.Use<TValue>(…)`, matched on the exact type only. Source: `TypeProvider`.
+4. A **custom resolver**: `IProtoDataValueResolver`, in registration order. A throwing resolver is wrapped in `ProtoDataException`. Source: `CustomResolver`.
+5. The constructor parameter's **default value**, on the constructor route only. The declaration's default is the value the author asked for, so a generation never replaces it, including `null` for a nullable parameter. Source: `ConstructorDefault`.
+6. A **safe built-in**, for a member with no constructor default. Source: `BuiltIn`:
    - `null` for a nullable member or a nullable-annotated reference
    - a generated string for `string`, and a generated `Guid`
    - an empty array or list for array, `IEnumerable<T>`, `IReadOnlyCollection<T>`, `IReadOnlyList<T>`, `ICollection<T>`, `IList<T>` and `List<T>`.

@@ -6,6 +6,7 @@ description: "How the ProtoTest host is built, started and stopped, and the orde
 
 import TraceAnatomy from '@site/src/components/TraceAnatomy';
 import {lessonTraces} from '@site/src/data/traceSources';
+import SequenceLanes from '@site/src/components/SequenceLanes';
 
 export const orderLayers = [
   {
@@ -83,20 +84,19 @@ Every integration's `Add...` method is an extension on this same builder. A buil
 
 ### The run
 
-```mermaid
-sequenceDiagram
-    participant Runner
-    participant Host as ProtoHost
-    participant RunHooks as Run hooks
-    Runner->>Host: StartAsync
-    Host->>RunHooks: BeforeRunAsync (ascending Order)
-    Note over Host: infrastructure starts in registration order
-    Host->>RunHooks: AfterInfrastructureAsync (ascending Order)
-    Note over Runner,Host: tests run
-    Runner->>Host: StopAsync
-    Host->>RunHooks: AfterRunAsync (descending Order)
-    Note over Host: gates evaluate, report sinks export, run resources release, then the .prototrace is written
-```
+<SequenceLanes
+  participants={['Runner', 'ProtoHost', 'Run hooks']}
+  steps={[
+    {from: 'Runner', to: 'ProtoHost', label: <code>StartAsync</code>},
+    {from: 'ProtoHost', to: 'Run hooks', label: <span><code>BeforeRunAsync</code>, ascending <code>Order</code></span>},
+    {note: 'Infrastructure starts in registration order.'},
+    {from: 'ProtoHost', to: 'Run hooks', label: <span><code>AfterInfrastructureAsync</code>, ascending <code>Order</code></span>},
+    {note: 'The tests run.'},
+    {from: 'Runner', to: 'ProtoHost', label: <code>StopAsync</code>},
+    {from: 'ProtoHost', to: 'Run hooks', label: <span><code>AfterRunAsync</code>, descending <code>Order</code></span>},
+    {note: <span>Gates evaluate, report sinks export, run resources release, then the <code>.prototrace</code> is written.</span>},
+  ]}
+/>
 
 - If a `BeforeRunAsync` throws, the hooks that already started get their `AfterRunAsync` in reverse, and startup fails.
 - If an `AfterInfrastructureAsync` throws, startup fails the same way: every hook gets its `AfterRunAsync` in reverse, the started infrastructure releases, and a retry runs the whole start again.

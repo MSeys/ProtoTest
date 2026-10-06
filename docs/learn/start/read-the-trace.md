@@ -9,6 +9,7 @@ description: "Break your first test on purpose, open its trace in the viewer, an
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
 import Link from '@docusaurus/Link';
+import Screenshot from '@site/src/components/Screenshot';
 
 # See why a test failed
 
@@ -70,15 +71,39 @@ The viewer shows the test as a list of operations. An operation is one recorded 
 
 Find the failed check named `Assert response shape`. The request and the HTTP status check succeeded. The shape check failed because a field in the response differed from the expected value.
 
+<Screenshot
+  name="learn/read-the-trace/steps"
+  width={712}
+  height={557}
+  alt="The failed test's steps, with the failed shape check marked."
+  caption={<span>On the request, the status check <code>200 OK</code> passed and the <code>response shape</code> check failed.</span>}
+/>
+
 ### 4. Read what differed
 
 Select the failed check. The viewer shows the property, `$.name`, with the value the test expected and the value the application returned. These are the same values as in the runner message.
 
 If you opened the recorded time drill, its shape check reads: `[$.status]: Values did not match. (Expected: "past_due", Actual: "active")`.
 
+<Screenshot
+  name="learn/read-the-trace/values"
+  width={632}
+  height={217}
+  alt="The comparison: status expected past_due, got active."
+  caption={<span>The comparison names the field and both values: <code>"status"</code> expected <code>"past_due"</code>, got <code>"active"</code>.</span>}
+/>
+
 ### 5. Jump to the line
 
-On the same check, open the Source block. It shows the code around the line where the check statement starts, with that line marked. In your test, the statement starts with `created`. In the recorded time drill, it starts on line 36 of `FailureDrills.cs`.
+On the same check, open the Source block. It shows the code around the line where the check statement starts, with that line marked. In your test, the statement starts with `created`. In the recorded time drill, it starts on line 39 of `FailureDrills.cs`.
+
+<Screenshot
+  name="learn/read-the-trace/source"
+  width={634}
+  height={199}
+  alt="The Source block with line 39 marked."
+  caption={<span>The Source block marks line 39 of <code>FailureDrills.cs</code>, where the check statement starts.</span>}
+/>
 
 You now have the failing check, the values and the line, without a rerun.
 
@@ -99,7 +124,7 @@ You used those details to find which field differed and where the test checked i
   verify={<>Open <a href="pathname:///lessons/l0-time-drill.prototrace">l0-time-drill.prototrace</a> in the <a href="https://trace.prototest.dev">viewer</a>, select the failed step and read its values.</>}
 >
 
-The status check passed, and the shape check failed. It compared the response field `$.status`: the test expected `"past_due"` and the application returned `"active"`. An HTTP 200 response does not guarantee that the response body is correct. The Source block points to the check statement on line 36 of `FailureDrills.cs`.
+The status check passed, and the shape check failed. It compared the response field `$.status`: the test expected `"past_due"` and the application returned `"active"`. An HTTP 200 response does not guarantee that the response body is correct. The Source block points to the check statement on line 39 of `FailureDrills.cs`.
 
 </Checkpoint>
 

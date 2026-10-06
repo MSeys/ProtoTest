@@ -10,6 +10,7 @@ import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
 import Link from '@docusaurus/Link';
+import Screenshot from '@site/src/components/Screenshot';
 
 # Keep the evidence when CI fails
 
@@ -87,7 +88,17 @@ The evidence action uploads the trace, compares the run with the base branch's l
     trace: ${{ env.PROTOTEST_RESULTS }}/run.prototrace
 ```
 
-The comment names each test the change broke or fixed and the operation where it changed, then the failing tests with their cause and the artifact link. Each failing test also gets a check annotation at its source location. The step fails when a test that passed on the base branch fails now. The workflow needs `actions: read` to fetch the base branch's trace and `pull-requests: write` to comment. The [CI page](/docs/continuous-integration/#the-evidence-action) shows the whole workflow.
+The comment names each test the change broke or fixed and the operation where it changed, then the failing tests with their cause and the artifact link:
+
+<Screenshot
+  name="learn/evidence-in-ci/pull-request-comment.webp"
+  alt="The ProtoTest evidence comment on a pull request: 5 broke, 70 of 75 passed, a caution that 4 of the 5 failures share one cause, and a table of each failed test with what it expected, what it got and its source line."
+  caption={<span>The top of the comment on <a href="https://github.com/MSeys/OpenCsms/pull/1">a pull request of the OpenCSMS demo</a>. Four of the five failures share one cause, and each row links the line that checked it.</span>}
+  width={612}
+  height={675}
+/>
+
+Each failing test also gets a check annotation at its source location. The step fails when a test that passed on the base branch fails now. The workflow needs `actions: read` to fetch the base branch's trace and `pull-requests: write` to comment. The [CI page](/docs/continuous-integration/#the-evidence-action) shows the whole workflow.
 
 ### 4. Name the build in the trace
 

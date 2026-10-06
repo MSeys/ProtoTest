@@ -17,16 +17,7 @@ ProtoTest measures coverage against the *contract*: your OpenAPI document, your 
 
 Coverage is built from **observations**: facts the integrations record while tests run. The integrations record them for you, and you can record your own.
 
-```mermaid
-flowchart LR
-    Test["Test / integration"] -->|RecordObservation| Context["ProtoExecutionContext"]
-    Context --> Collectors["Collectors<br/><small>singletons, whole run</small>"]
-    Collectors -->|GetReportItems| Export["Export at end of run"]
-    Export --> Sinks["Sinks<br/><small>JSON · HTML · yours</small>"]
-    Sinks --> Archive[".prototrace"]
-```
-
-Each edge carries a concrete payload. A REST response produces `http.response` (method, route, status, body). A matched shape assertion produces `http.contract.shape` (the paths it matched). The collector turns those into report items (endpoint, response, property with covered or uncovered). The sink writes the items into `report.json` and `report.html`. The archive embeds both files under `resources/run/`.
+Each step carries a concrete payload. A REST response produces `http.response` (method, route, status, body). A matched shape assertion produces `http.contract.shape` (the paths it matched). The collector turns those into report items (endpoint, response, property with covered or uncovered). The sink writes the items into `report.json` and `report.html`. The archive embeds both files under `resources/run/`.
 
 1. Integrations record **observations** as tests run. REST records `http.response` for every response and `http.contract.shape` for every successful shape assertion. GraphQL records `graphql.response` and `graphql.contract.shape`. gRPC records `grpc.response` per call and `grpc.contract.shape`. Messaging records `messaging.published` and `messaging.receive`, plus `messaging.contract.shape` from a message shape assertion.
 2. Each observation is offered to every registered **collector** whose `CanCollect` accepts it. Collectors live for the whole run, so they aggregate across all tests.

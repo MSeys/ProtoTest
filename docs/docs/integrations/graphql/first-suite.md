@@ -8,11 +8,6 @@ description: "From a fresh test project to a passing query, a mutation whose res
 
 This page goes from a fresh test project to a passing query, a mutation whose result is asserted, and a subscription waiting for an event. It uses NUnit and an in-process server. A deployed endpoint needs one configuration change. Other runners differ only in the setup class ([Test runners](../../runners/overview.md)).
 
-```mermaid
-flowchart LR
-    S1["1. Packages"] --> S2["2. Host"] --> S3["✅ 3. Query\nfirst green run"] --> S4["4. Mutate"] --> S5["5. Subscribe"]
-```
-
 ## 1. Add the packages
 
 ```bash

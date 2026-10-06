@@ -27,13 +27,11 @@ export default async function createConfig(): Promise<Config> {
   trailingSlash: true,
   onBrokenLinks: 'throw',
   markdown: {
-    mermaid: true,
     hooks: {
       onBrokenMarkdownLinks: 'throw',
     },
   },
   themes: [
-    '@docusaurus/theme-mermaid',
     [
       // Offline search: the index is built with the site, so it needs no service and no account.
       '@easyops-cn/docusaurus-search-local',
@@ -231,10 +229,6 @@ export default async function createConfig(): Promise<Config> {
         },
       ],
       copyright: `Copyright © ${new Date().getFullYear()} Matthias Seys. Built with Docusaurus.`,
-    },
-    // Mermaid draws on its neutral base theme; custom.css recolours it from the tokens for both surfaces.
-    mermaid: {
-      theme: {light: 'base', dark: 'base'},
     },
     prism: {
       theme: prototestPrism,

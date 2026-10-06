@@ -78,16 +78,6 @@ The conditional registration kinds answer the address question in both direction
 | `AddCapabilityUnlessConfigured(capability, keys...)` | every key is configured, because the environment provides what the integration would serve | `AddAspNetCoreServer`, the in-process device transport |
 | `AddCapabilityWhenProvided(capability, keys...)` | none of the keys is provided, neither as a configured value nor as a key a registered infrastructure piece declares | an integration that cannot serve without an address. `UseRabbitMq` declares `broker` over its connection string, so a run with neither a configured key nor a broker container skips instead of failing. |
 
-```mermaid
-flowchart TB
-    U["UnlessConfigured:\nevery key configured?"]
-    U -->|yes| UD["drop: the environment\nserves the target"]
-    U -->|no| UK["keep: the integration\nserves the target"]
-    W["WhenProvided:\nany key provided?"]
-    W -->|no| WD["drop: no address\nto serve"]
-    W -->|yes| WK["keep: the address exists"]
-```
-
 A dropped declaration is recorded as a `capability.skipped` event naming the deciding keys (`capability.keys`) and the reason (`capability.reason`: `already configured`, or `no key provided`).
 
 Class-level and method-level conditions accumulate like any other attribute. The first one that applies supplies the reason.

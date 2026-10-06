@@ -4,6 +4,8 @@ title: Hooks
 description: "Run code around every test or around the whole run without touching a test: correlation ids, shared resets, one-off startup."
 ---
 
+import Nesting from '@site/src/components/Nesting';
+
 # Hooks
 
 ## What it is
@@ -84,9 +86,13 @@ A collector registered with `AddCollector` that implements `IProtoRunHook` runs 
 
 ### Ordering
 
-```text
-in (-1000 ... First ... Auth) -> ATTRIBUTES -> out (Auth ... First ... -1000)
-```
+<Nesting
+  layers={[
+    {label: 'Test hooks', detail: <span>ascending <code>Order</code>: -1000 ... <code>First</code> ... <code>Authentication</code></span>},
+    {label: 'Attributes', detail: <span>ascending <code>Order</code>, band by band</span>},
+  ]}
+  core="The test"
+/>
 
 | | Before | After |
 | --- | --- | --- |

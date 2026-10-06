@@ -4,26 +4,25 @@ title: Provisioners
 description: "A provisioner creates a built object in the system under test, returns what the system gave back, and cleans it up afterwards."
 ---
 
+import SequenceLanes from '@site/src/components/SequenceLanes';
+
 # Provisioners
 
 `Build()` gives you an object. `CreateAsync()` gives it to a **provisioner**, which creates it in the system under test and returns what the system gave back.
 
-```mermaid
-sequenceDiagram
-    participant Test
-    participant Builder as Data builder
-    participant Prov as Provisioner
-    participant App as System under test
-    participant Map as Identity map
-    Test->>Builder: CreateAsync
-    Builder->>Builder: Build (defaults pipeline)
-    Builder->>Prov: CreateAsync(request)
-    Prov->>App: POST /api/v1/members
-    App-->>Prov: MembershipResponse
-    Prov-->>Builder: result + identity + Cleanup
-    Builder->>Map: track identity
-    Note over Map: teardown: Cleanup in reverse creation order
-```
+<SequenceLanes
+  participants={['Test', 'Data builder', 'Provisioner', 'Application', 'Identity map']}
+  steps={[
+    {from: 'Test', to: 'Data builder', label: <code>CreateAsync</code>},
+    {from: 'Data builder', to: 'Data builder', label: 'Build, through the defaults'},
+    {from: 'Data builder', to: 'Provisioner', label: <span><code>CreateAsync</code>(request)</span>},
+    {from: 'Provisioner', to: 'Application', label: <code>POST /api/v1/members</code>},
+    {from: 'Application', to: 'Provisioner', label: <code>MembershipResponse</code>, reply: true},
+    {from: 'Provisioner', to: 'Data builder', label: <span>the result, its identity and a <code>Cleanup</code></span>, reply: true},
+    {from: 'Data builder', to: 'Identity map', label: 'tracks the identity'},
+    {note: 'At teardown, the cleanups run in reverse creation order.'},
+  ]}
+/>
 
 ProtoTest does not decide *how* data gets created: through your public API, a test-support endpoint, a repository or raw SQL. That is the provisioner's job, and you write it once. This page shows the contract, how to register and use a provisioner, how `Ref<T>` finds what it created, and how cleanup runs.
 
@@ -134,15 +133,6 @@ var chosen = Proto.Context.Data().Ref<ProjectResponse>(projects[1].Id);
 - Only `CreateAsync` and `CreateManyAsync` results are tracked. `Build()` and `BuildMany()` values are never in the map.
 - `IProtoData` is scoped to one test, so the map cannot reach data provisioned by another test. Defaults get the same lookup through `ProtoDataValueContext.Ref<T>(identity)`.
 
-```mermaid
-stateDiagram-v2
-    [*] --> tracked: CreateAsync returns identity
-    tracked --> resolved: Ref with matching identity
-    tracked --> failed: zero matches → throw
-    tracked --> failed: two or more matches → throw
-    resolved --> [*]: test ends
-```
-
 A sample where two same-typed values are provisioned and then referenced again is [`tests/ProtoTest.Data.Tests/ProtoDataTests.cs`](https://github.com/MSeys/ProtoTest/blob/main/tests/ProtoTest.Data.Tests/ProtoDataTests.cs).
 
 ## Cleaning up
@@ -169,13 +159,12 @@ sealed class DeleteOnDispose(Func<Task> delete) : IAsyncDisposable
 - Each release is a `data.cleanup` operation carrying `data.type`, `data.identity` and `data.provisioner`.
 - If several cleanups fail, they are all attempted and the failures are aggregated as an `AggregateException`.
 
-```mermaid
-gantt
-    title Cleanup at teardown (reverse creation order)
-    section Resources
-    member cleanup (created 1st, released 2nd) :done, c1, 2026-01-01, 1s
-    project cleanup (created 2nd, released 1st) :done, c2, after c1, 1s
-```
+A test that creates a member and then a project releases them the other way round:
+
+| Order | Created in the test | Released at teardown |
+| --- | --- | --- |
+| 1 | member | project |
+| 2 | project | member |
 
 When cleanup happens at a coarser level, for example when an [attribute](../../foundation/attributes.md) deletes the whole tenant, leave `Cleanup` null, as the sample provisioner does.
 

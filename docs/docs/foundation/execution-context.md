@@ -5,6 +5,7 @@ description: "ProtoExecutionContext lives for exactly one test and holds its cli
 ---
 
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
+import FlowStrip from '@site/src/components/FlowStrip';
 
 export const contextCode = `public sealed record MemberContext(string Id, string Email) : IProtoContext;
 
@@ -97,13 +98,6 @@ The error names alternatives for code outside a test. Telemetry can use `ProtoHo
 An `AsyncLocal` gives each parallel test its own current context. Helpers on that async flow can use `Proto.Context` without receiving it as a parameter. Sharing mutable objects between tests still requires care.
 :::
 
-```mermaid
-flowchart LR
-    A["test A flow"] --> CA["context A"]
-    B["test B flow"] --> CB["context B"]
-    E["flow without a context"] --> T["throws: no context on this flow"]
-```
-
 ### Read the test identity \{#test-identity}
 
 | Member | Meaning |
@@ -157,11 +151,13 @@ Fixing `RunPrefix` through `ConfigureTestIds` repeats the prefix, not the associ
 
 Typed state is how attributes, hooks and tests hand information to each other without globals.
 
-```mermaid
-flowchart LR
-    S["attribute: SetContext"] --> R["test: Resolve"]
-    R --> T["teardown: TryResolve,\nearly return when setup stopped short"]
-```
+<FlowStrip
+  steps={[
+    {title: 'An attribute', detail: <span>publishes the state with <code>SetContext</code></span>},
+    {title: 'The test', detail: <span>reads it with <code>Resolve</code></span>},
+    {title: 'Teardown', detail: <span>reads it with <code>TryResolve</code> and returns early when setup stopped short</span>},
+  ]}
+/>
 
 ```csharp
 public sealed record SampleUserContext(

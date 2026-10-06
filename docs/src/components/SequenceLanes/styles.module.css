@@ -1,0 +1,114 @@
+/*
+ * Narrow by default: numbered rows that name their route. From 600px the frame draws the lanes: a grid column per
+ * participant, a dashed lifeline down each, and each message an arrow between two lane centres.
+ */
+.body { padding: var(--space-4); }
+
+.heads { display: none; }
+
+.lanes { position: relative; }
+
+.rows { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
+
+.lifeline { display: none; }
+
+.message, .note { min-width: 0; }
+
+.message {
+  padding: var(--space-2) var(--space-3);
+  display: grid;
+  gap: 2px;
+  border-left: 3px solid var(--blueprint);
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
+}
+
+.reply { border-left-style: dashed; }
+
+.route { color: var(--muted); font: var(--text-meta) var(--font-mono); }
+.label { overflow-wrap: break-word; }
+.number { color: var(--blueprint); font: var(--weight-semibold) var(--text-strong) var(--font-mono); }
+.repeat { color: var(--warning); font: var(--weight-semibold) var(--text-meta) var(--font-mono); }
+.arrow { display: none; }
+
+.note {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--blueprint-line);
+  border-radius: var(--radius-chip);
+  /* Opaque, so the lifelines stop at the note. */
+  background: linear-gradient(var(--blueprint-soft), var(--blueprint-soft)), var(--surface);
+  color: var(--text);
+}
+
+@container (min-width: 600px) {
+  .heads, .rows { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
+
+  .heads { display: grid; margin-bottom: var(--space-2); }
+
+  .head {
+    justify-self: center;
+    max-width: calc(100% - var(--space-2));
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-chip);
+    background: var(--surface-2);
+    font-weight: var(--weight-semibold);
+    text-align: center;
+  }
+
+  .rows { gap: var(--space-3) 0; padding: var(--space-2) 0; }
+
+  .lifeline {
+    display: block;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc((var(--lane) + 0.5) / var(--lanes) * 100%);
+    border-left: 1px dashed var(--border-strong);
+  }
+
+  /* A message spans its lanes; the inline padding puts its arrow between the two lane centres. */
+  .message {
+    position: relative;
+    grid-column: var(--start) / var(--end);
+    padding: 0 calc(50% / var(--span)) 10px;
+    border: 0;
+    background: none;
+    text-align: center;
+  }
+
+  .route { display: none; }
+  .label { position: relative; padding: 0 var(--space-2); }
+  .repeat { justify-self: center; }
+
+  .arrow {
+    display: block;
+    position: absolute;
+    left: calc(50% / var(--span));
+    right: calc(50% / var(--span));
+    bottom: 4px;
+    border-top: 2px solid var(--blueprint);
+  }
+
+  .reply .arrow { border-top-style: dashed; }
+
+  .arrow::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid var(--blueprint);
+    border-right: 2px solid var(--blueprint);
+  }
+
+  .right .arrow::after { right: 0; rotate: 45deg; }
+  .left .arrow::after { left: 0; rotate: -135deg; }
+
+  /* A message to itself: a chip on its own lifeline. */
+  .self { padding: 0; }
+  .self .label { justify-self: center; padding: var(--space-1) var(--space-2); border: 1px solid var(--blueprint-line); border-radius: var(--radius-chip); background: var(--surface); }
+  .self .arrow { display: none; }
+
+  .note { position: relative; grid-column: 1 / -1; text-align: center; }
+}

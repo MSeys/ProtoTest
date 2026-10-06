@@ -5,6 +5,8 @@ sidebar_label: Overview
 description: "Build test objects with deterministic defaults, so a test only states the values it is about, and create them in the system under test."
 ---
 
+import FlowStrip from '@site/src/components/FlowStrip';
+
 # Create test data per test in .NET
 `ProtoTest.Data` builds test objects from deterministic defaults. Write only the values the test is about. Hand the object to your application to create it for real.
 
@@ -51,14 +53,16 @@ builder
 
 The `An_overdue_invoice_of_125` test above is the whole pattern: state the values the test is about, build, assert.
 
-```mermaid
-flowchart LR
-    W[With] --> D[defaults pipeline]
-    D --> B[Build: object in memory]
-    D --> C[CreateAsync: provisioner creates it in the app]
-    C --> M[identity map: Ref resolves it]
-    M --> K[cleanup in reverse order at teardown]
-```
+<FlowStrip
+  steps={[
+    {title: <code>With</code>, detail: 'the values the test is about'},
+    {title: 'Defaults', detail: 'fill every other member'},
+    {title: <span><code>Build</code> or <code>CreateAsync</code></span>, detail: 'an object in memory, or one a provisioner creates in the application'},
+    {title: <code>Ref</code>, detail: 'finds a created value again in the identity map'},
+    {title: 'Teardown', detail: 'cleans up in reverse creation order'},
+  ]}
+  note={<span>Steps 4 and 5 apply to <code>CreateAsync</code> only: a built object is never tracked.</span>}
+/>
 
 ```csharp
 var project = Proto.Context.Data()

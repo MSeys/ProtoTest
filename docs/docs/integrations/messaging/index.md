@@ -5,6 +5,8 @@ sidebar_label: Messaging
 description: "Publish a message, then await the one that matters with a predicate and a timeout, on RabbitMQ or your own broker adapter."
 ---
 
+import SequenceLanes from '@site/src/components/SequenceLanes';
+
 # Test RabbitMQ and message events in .NET
 Each test gets a broker client. Publish a message, then await the matching message with a predicate and a timeout:
 
@@ -88,17 +90,16 @@ A configured adapter is what makes the `Broker` capability true. The in-memory d
 
 The `Paying_an_invoice_publishes_an_event` test above is the whole pattern: publish, await the match, assert the shape.
 
-```mermaid
-sequenceDiagram
-    participant Test
-    participant Broker
-    participant App as System under test
-    Test->>Broker: Tap (setup, pre-bind)
-    Test->>App: act
-    App->>Broker: publish
-    Test->>Broker: AwaitAsync (predicate, timeout)
-    Broker-->>Test: match or TimeoutException
-```
+<SequenceLanes
+  participants={['Test', 'Broker', 'Application']}
+  steps={[
+    {from: 'Test', to: 'Broker', label: <span><code>Tap</code>, in setup, before the act</span>},
+    {from: 'Test', to: 'Application', label: 'acts'},
+    {from: 'Application', to: 'Broker', label: 'publishes'},
+    {from: 'Test', to: 'Broker', label: <span><code>AwaitAsync</code>(predicate, timeout)</span>},
+    {from: 'Broker', to: 'Test', label: <span>the match, or a <code>TimeoutException</code></span>, reply: true},
+  ]}
+/>
 
 The sections below cover what a suite does next:
 

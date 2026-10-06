@@ -1,0 +1,77 @@
+/* Lanes on the page's own surface; events fade in, never move or grow, so nothing jumps while it is read. */
+.body { padding: var(--space-4); display: grid; gap: var(--space-4); }
+
+.badge {
+  justify-self: start;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--warning-line);
+  border-radius: var(--radius-chip);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
+}
+
+.lanes { display: grid; gap: 3.5rem; padding: var(--space-4) 0 var(--space-5); }
+
+.lane {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.laneLabel { color: var(--muted); font: var(--weight-semibold) var(--text-strong) var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+
+.track { position: relative; height: 2px; margin-right: var(--space-5); background: var(--border-strong); }
+
+.event {
+  position: absolute;
+  top: 50%;
+  translate: -50% -7px;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+.event.on { opacity: 1; }
+
+.dot { width: 14px; height: 14px; border-radius: 50%; background: var(--blueprint); box-shadow: 0 0 0 4px var(--blueprint-soft); }
+.eventLabel { color: var(--blueprint); font: var(--weight-semibold) var(--text-strong) var(--font-ui); white-space: nowrap; }
+
+.success .dot { background: var(--success); box-shadow: 0 0 0 4px var(--success-soft); }
+.success .eventLabel { color: var(--success); }
+.danger .dot { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }
+.danger .eventLabel { color: var(--danger); }
+
+.outcomes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-2);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+.outcomes.on { opacity: 1; }
+
+.outcome {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.outcome.success { border-left-color: var(--success); }
+.outcome.danger { border-left-color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) {
+  .event, .outcomes { transition: none; }
+}
+
+/* On a phone the lane label sits above its track. */
+@media (max-width: 600px) {
+  .lane { grid-template-columns: 1fr; gap: var(--space-4); }
+}

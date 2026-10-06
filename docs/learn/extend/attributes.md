@@ -135,7 +135,7 @@ Open `bin/Debug/net8.0/TestResults/prototest-{runId}.prototrace` under the sampl
 
 The host found your attribute on the test and ran its `BeforeTestAsync` before the test body. Attributes run in ascending `Order` before the test, and in reverse afterwards. The last thing set up is the first thing cleaned up.
 
-The committed trace of the first journey, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, shows the sample's attributes the same way:
+The committed trace of the first journey, [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace), shows the sample's attributes the same way:
 
 | Entry | Reading |
 | --- | --- |

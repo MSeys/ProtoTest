@@ -1,0 +1,57 @@
+/* Boxes in boxes on the page's own surfaces; the core is the one solid accent. Padding shrinks on a phone. */
+.body { padding: var(--space-4); display: grid; gap: var(--space-3); }
+
+.key { margin: 0; color: var(--muted); font-size: var(--text-title); }
+
+.layer {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
+}
+
+.layer .layer { background: var(--surface); }
+.layer .layer .layer { background: var(--surface-2); }
+.layer .layer .layer .layer { background: var(--surface); }
+.layer .layer .layer .layer .layer { background: var(--surface-2); }
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+}
+
+.steps { display: inline-flex; gap: 2px; }
+
+.step, .out {
+  min-width: 1.75em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-chip);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
+  text-align: center;
+}
+
+.step { background: var(--blueprint-soft); color: var(--blueprint); }
+.out { background: var(--success-soft); color: var(--success); }
+
+.label { font-weight: var(--weight-semibold); overflow-wrap: break-word; }
+.detail { color: var(--muted); font-size: var(--text-title); overflow-wrap: break-word; }
+
+.core {
+  padding: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid var(--blueprint-line);
+  border-radius: var(--radius-chip);
+  background: var(--blueprint-soft);
+}
+
+@container (max-width: 480px) {
+  .layer { padding: var(--space-2); }
+}

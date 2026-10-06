@@ -4,6 +4,8 @@ title: Extending ProtoTest
 description: "The public extension points behind every built-in integration, and the contract a package of your own follows."
 ---
 
+import Containment from '@site/src/components/Containment';
+
 # Extending ProtoTest
 
 Every built-in integration is built on public types, and a package you write uses the same ones. This page is the contract: which extension point to use, what it guarantees, and how the result reads in the trace.
@@ -19,28 +21,18 @@ Every built-in integration is built on public types, and a package you write use
 
 Start from what you need to say, then take the part of the integration it belongs to. Where each part plugs in:
 
-```mermaid
-flowchart TD
-    tests["tests"] --> hooks["attributes for some · hooks for all"]
-    hooks --> host["host · owns start, stop and release"]
-    host --> clients["clients bring data in · typed state passes it along"]
-    host --> obs["observations"] --> collectors["collectors"] --> sinks["sinks write reports out"]
-    host --> trace["trace writer writes evidence out"] --> viewer["viewer"]
-```
-
-```mermaid
-flowchart TD
-    need["What does your extension do?"] --> when{"Per test, or per run?"}
-    when -->|"per test"| setup["Set something up<br/>ProtoAttribute"]
-    when -->|"around every test or the whole run"| hooks["A hook"]
-    when -->|"per run, for a system"| data["Give tests a new client, or create data<br/>client initializer · provisioner"]
-    when -->|"during the test"| during{"Bring in data, or take it out?"}
-    during -->|"in"| clients["A client initializer + an extension method"]
-    during -->|"out"| trace["The trace writer"]
-    need --> evidence{"Does it produce evidence?"}
-    evidence -->|"numbers or a list"| obs["Observations + a collector"]
-    evidence -->|"a file or a post"| sink["An IProtoSink"]
-```
+<Containment
+  root={{
+    label: 'The host',
+    detail: 'owns start, stop and release',
+    contains: [
+      {label: 'Data in', detail: 'clients bring it in, typed state passes it along'},
+      {label: 'Reports out', detail: 'observations, collected, written by sinks'},
+      {label: 'Evidence out', detail: 'the trace writer, read by the viewer'},
+      {label: 'Around the tests', detail: 'attributes for some tests, hooks for all', contains: [{label: 'The tests'}]},
+    ],
+  }}
+/>
 
 | You want to… | Use | Part |
 | --- | --- | --- |

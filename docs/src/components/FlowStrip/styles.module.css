@@ -1,0 +1,79 @@
+/* Steps in a column by default; a row of up to four once the frame is wide enough to keep every label whole. */
+.body { padding: var(--space-4); display: grid; gap: var(--space-3); }
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-5);
+}
+
+.step {
+  position: relative;
+  min-width: 0;
+  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-content: start;
+  gap: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--blueprint);
+  border-radius: var(--radius-chip);
+  background: var(--surface-2);
+}
+
+.success { border-top-color: var(--success); }
+.danger { border-top-color: var(--danger); }
+
+.number {
+  grid-row: span 2;
+  align-self: start;
+  min-width: 1.5em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-chip);
+  background: var(--blueprint-soft);
+  color: var(--blueprint);
+  font: var(--weight-semibold) var(--text-strong) var(--font-mono);
+  text-align: center;
+}
+
+.success .number { background: var(--success-soft); color: var(--success); }
+.danger .number { background: var(--danger-soft); color: var(--danger); }
+
+.title { font-weight: var(--weight-semibold); overflow-wrap: break-word; }
+.detail { grid-column: 2; color: var(--muted); font-size: var(--text-title); overflow-wrap: break-word; }
+
+/* The arrow to the next step sits in the gap: below in a column, to the right in a row. */
+.step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(-1 * var(--space-5) + 4px);
+  width: 10px;
+  height: 10px;
+  translate: -50% 0;
+  border-right: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--border-strong);
+  rotate: 45deg;
+}
+
+@container (min-width: 720px) {
+  .rowable { grid-template-columns: repeat(var(--steps), minmax(0, 1fr)); gap: var(--space-5); }
+
+  .rowable .step:not(:last-child)::after {
+    left: auto;
+    right: calc(-1 * var(--space-5) + 6px);
+    top: 50%;
+    bottom: auto;
+    translate: 0 -50%;
+    rotate: -45deg;
+  }
+}
+
+.note {
+  margin: 0;
+  padding-left: var(--space-2);
+  border-left: 3px solid var(--border-strong);
+  color: var(--muted);
+}

@@ -11,23 +11,7 @@ ProtoTest does not replace your test runner. It wraps each test in a ProtoTest e
 
 ## Which runner
 
-All five adapters start the same host, evaluate the same skip conditions and write the same trace. Follow the branch that matches your suite:
-
-```mermaid
-flowchart TD
-    start["Your suite today"] --> new{"No suite yet?"}
-    new -->|"yes"| nunit["NUnit · the dotnet new prototest default"]
-    new -->|"no"| which{"Which runner?"}
-    which -->|"xUnit v2"| xv2["xUnit v2 · one collection fixture"]
-    which -->|"xUnit v3 or SDK 10"| xv3["xUnit v3 · one assembly fixture"]
-    which -->|"MSTest"| mst["MSTest · two assembly helpers"]
-    which -->|"TUnit"| tu["TUnit · register the executor"]
-    nunit --> pkg["dotnet add package ProtoTest.NUnit"]
-    xv2 --> pkg2["dotnet add package ProtoTest.Xunit"]
-    xv3 --> pkg3["dotnet add package ProtoTest.Xunit3"]
-    mst --> pkg4["dotnet add package ProtoTest.MSTest"]
-    tu --> pkg5["dotnet add package ProtoTest.TUnit"]
-```
+All five adapters start the same host, evaluate the same skip conditions and write the same trace. Start from the suite you have:
 
 | Your situation | Start with | What changes for you |
 | --- | --- | --- |

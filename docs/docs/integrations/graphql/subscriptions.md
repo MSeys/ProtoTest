@@ -4,6 +4,8 @@ title: Subscriptions
 description: "Test GraphQL subscriptions over WebSocket (graphql-transport-ws) or Server-Sent Events, awaiting the next result with a shape and a timeout."
 ---
 
+import SequenceLanes from '@site/src/components/SequenceLanes';
+
 # Subscriptions
 
 Subscriptions stream results over **WebSocket** (the `graphql-transport-ws` protocol, the default) or **Server-Sent Events**. This page shows how to subscribe, wait for the next event with a shape and a timeout, and choose or supply the transport.
@@ -109,18 +111,16 @@ Without `ConnectionPayload`, `connection_init` is sent with a `null` payload.
 
 Trigger in a loop until the event lands. The timing is where these tests go wrong:
 
-```mermaid
-sequenceDiagram
-    participant Test
-    participant Server
-    Test->>Server: SubscribeAsync (waits for connection ack only)
-    loop trigger until the event lands
-        Test->>Server: createOrder mutation
-    end
-    Server-->>Test: next (event)
-    Test->>Test: ExpectNextAsync returns, cancel the loop
-    Note over Test: A fixed Task.Delay narrows the window but never closes it.
-```
+<SequenceLanes
+  participants={['Test', 'Server']}
+  steps={[
+    {from: 'Test', to: 'Server', label: <span><code>SubscribeAsync</code>, which waits for the connection ack only</span>},
+    {from: 'Test', to: 'Server', label: <span>the <code>createOrder</code> mutation</span>, repeat: 'until the event lands'},
+    {from: 'Server', to: 'Test', label: <span><code>next</code>: the event</span>, reply: true},
+    {from: 'Test', to: 'Test', label: <span><code>ExpectNextAsync</code> returns, the loop stops</span>},
+    {note: <span>A fixed <code>Task.Delay</code> narrows the window but never closes it.</span>},
+  ]}
+/>
 
 | Behaviour | WebSocket (`graphql-transport-ws`, the default) | SSE |
 | --- | --- | --- |

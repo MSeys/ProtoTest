@@ -4,6 +4,8 @@ title: Waits and middleware
 description: "Register your application's notion of ready, such as spinners, in-flight requests or animations, once instead of sleeping in tests."
 ---
 
+import Nesting from '@site/src/components/Nesting';
+
 # Waits and middleware
 
 Real applications have their own notion of "ready": a loading spinner, an in-flight XHR, an animation. Instead of adding `Task.Delay` calls in tests, register the wait once.
@@ -13,31 +15,14 @@ Real applications have their own notion of "ready": a loading spinner, an in-fli
 | The app is not ready around operations (spinner, XHR, animation) | a [wait condition](#wait-conditions) |
 | Logging, timing, retries, or extra diagnostics on every operation | [middleware](#middleware) |
 
-```mermaid
-flowchart TD
-    T[test op] --> M1[first registered middleware: outermost]
-    M1 --> W[wait conditions at first AddWebWait position]
-    W --> M2[later middleware]
-    M2 --> B[backend call]
-    B --> M2
-    M2 --> W
-    W --> M1
-    M1 --> T
-```
-
-```mermaid
-sequenceDiagram
-    participant Op as Operation
-    participant Wait as Wait condition
-    participant MW as Middleware
-    participant BE as Backend
-    Op->>Wait: Before: poll ObserveAsync until Ready
-    Wait->>MW: ready → next
-    MW->>BE: native call
-    BE-->>MW: result
-    MW-->>Op: result
-    Op->>Wait: After: poll until Ready
-```
+<Nesting
+  layers={[
+    {label: 'The middleware registered first', detail: 'outermost'},
+    {label: 'Wait conditions', detail: <span>at the position of the first <code>AddWebWait</code>: before, they poll <code>ObserveAsync</code> until ready, and after, until ready again</span>},
+    {label: 'Middleware registered later'},
+  ]}
+  core="The backend's native call"
+/>
 
 ## Wait conditions
 

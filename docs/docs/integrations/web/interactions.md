@@ -115,12 +115,10 @@ await page.Error.ShouldNot.BeVisibleAsync();
 
 Two tracks, one rule: actions act once, assertions poll.
 
-```mermaid
-flowchart LR
-    A[resolve locator] --> B{action or assertion?}
-    B -->|action| C[wait actionable, act once, never re-issue]
-    B -->|assertion| D[poll every 50 ms, absorb not-found, pass or fail at timeout]
-```
+| After the locator resolves | What happens |
+| --- | --- |
+| an action | waits until the element is actionable, acts once, never re-issues |
+| an assertion | polls every 50 ms, treats "not found" as "not yet", passes or fails at the timeout |
 
 Assertions poll every 50 ms until the condition holds or the timeout passes. The default timeout is 5 seconds. While polling, "element not found yet" and "not actionable yet" are treated as "not yet", not as failures. When time runs out you get a `WebAssertionException` describing the last thing observed.
 

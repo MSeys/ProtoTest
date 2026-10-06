@@ -9,6 +9,8 @@ description: "Line up a passing and a failing run of the same test, find the fir
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
 import Link from '@docusaurus/Link';
+import RunCompare from '@site/src/components/RunCompare';
+import RaceDiagram from '@site/src/components/RaceDiagram';
 
 # Diagnose a flaky test by comparing two runs
 
@@ -86,11 +88,15 @@ Every request got the same status. The durations differ by tens of milliseconds,
 
 Open the response attachment of `GET /api/v1/webhook-deliveries` in each run:
 
-| Field | Passing run | Failing run |
-| --- | --- | --- |
-| `status` | `delivered` | `pending` |
-| `attempts` | `1` | `0` |
-| `deliveredAtUtc` | set | `null` |
+<RunCompare
+  runs={[
+    {label: 'Passing run', outcome: 'succeeded', fields: [['eventType', '"project.created"'], ['status', '"delivered"'], ['attempts', '1'], ['deliveredAtUtc', '"2026-10-02T19:14:13…"']]},
+    {label: 'Failing run', outcome: 'failed', fields: [['eventType', '"project.created"'], ['status', '"pending"'], ['attempts', '0'], ['deliveredAtUtc', 'null']]},
+  ]}
+  focus="attempts"
+  note="Zero attempts: the dispatcher had not tried to deliver yet."
+  source={<span>The first delivery in each run's response to <code>GET /api/v1/webhook-deliveries</code>, from l4-flaky-pass and l4-flaky-fail.</span>}
+/>
 
 The failed check names the same field: `[$.items[0].status]: Values did not match. (Expected: "delivered", Actual: "pending")`.
 
@@ -99,6 +105,18 @@ The failed check names the same field: `[$.items[0].status]: Values did not matc
 ### 4. Name what changed the value
 
 No operation in either trace sets `status`. Something outside the test does. In the sample, a background dispatcher sends queued deliveries every 100 ms on a real timer. The hypothesis: whether it runs before the read decides the outcome.
+
+<RaceDiagram
+  lanes={[
+    {label: 'Test', events: [{label: 'create', at: 0.08, step: 1}, {label: 'read', at: 0.42, step: 2, tone: 'danger'}]},
+    {label: 'Dispatcher', events: [{label: 'deliver', at: 0.72, step: 3, tone: 'success'}]},
+  ]}
+  outcomes={[
+    {text: <span>Dispatcher first: <code>delivered</code>, the test passes</span>, tone: 'success'},
+    {text: <span>Read first: <code>pending</code>, the test fails</span>, tone: 'danger'},
+  ]}
+  caption="The order of the read and the delivery decides the outcome. The spacing shows order, not time."
+/>
 
 ### 5. Confirm it by widening the race
 

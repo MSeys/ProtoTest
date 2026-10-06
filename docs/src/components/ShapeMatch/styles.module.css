@@ -1,0 +1,41 @@
+/* The JSON in the code font, one row per line; the verdict colours the mark and the note, never the JSON itself. */
+.subject { font: var(--weight-semibold) var(--text-strong) var(--font-mono); overflow-wrap: anywhere; }
+
+.lines { margin: 0; padding: var(--space-3) 0; list-style: none; }
+
+.line {
+  padding: 2px var(--space-4);
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: 0 var(--space-2);
+  border-left: 3px solid transparent;
+}
+
+.mark { font: var(--weight-bold) var(--text-strong) var(--font-mono); text-align: center; }
+
+.json {
+  padding: 0 0 0 calc(var(--depth) * 1.25rem);
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--text-strong);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note { grid-column: 2; padding-left: calc(var(--depth) * 1.25rem); color: var(--muted); font-size: var(--text-title); }
+.word { font-weight: var(--weight-semibold); }
+
+.matched .mark, .matched .word { color: var(--success); }
+
+.mismatch { border-left-color: var(--danger); background: var(--danger-soft); }
+.mismatch .mark, .mismatch .word { color: var(--danger); }
+
+.ignored .mark { color: var(--muted); }
+.ignored .json { color: var(--muted); }
+
+/* Wide enough: the note moves beside its line. */
+@container (min-width: 720px) {
+  .line { grid-template-columns: 1.25rem minmax(0, 1fr) minmax(0, 1.1fr); align-items: baseline; }
+  .note { grid-column: 3; padding-left: 0; }
+}

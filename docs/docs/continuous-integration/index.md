@@ -5,6 +5,7 @@ description: Run ProtoTest in CI and keep the trace, reports and runner output t
 ---
 
 import {Clip} from '@site/src/components/Video';
+import FlowStrip from '@site/src/components/FlowStrip';
 
 # Continuous integration
 
@@ -14,16 +15,15 @@ Keep the runner result, the HTML report and the `.prototrace` together. The runn
 
 One suite, one results folder, one post-run step:
 
-```mermaid
-flowchart LR
-    push["push or pull request"] --> test["dotnet test"]
-    test --> folder["PROTOTEST_RESULTS/<br/>run.prototrace · report.json · report.html"]
-    folder --> action["ProtoTest Evidence action"]
-    base["base branch's last green trace"] -.-> action
-    action --> comment["pull request comment: what broke, what was fixed"]
-    action --> annotations["one check annotation per failure"]
-    action --> artifact["trace artifact"]
-```
+<FlowStrip
+  steps={[
+    {title: 'Push or pull request'},
+    {title: <code>dotnet test</code>, detail: 'runs the suite'},
+    {title: <code>PROTOTEST_RESULTS/</code>, detail: <span><code>run.prototrace</code>, <code>report.json</code>, <code>report.html</code></span>},
+    {title: 'The evidence action', detail: "compares the run with the base branch's last green trace"},
+    {title: 'On the pull request', detail: 'a comment with what broke and what was fixed, one check annotation per failure, the trace artifact', tone: 'success'},
+  ]}
+/>
 
 ## Put every artifact in one place
 
@@ -51,21 +51,6 @@ A trace can contain sanitized requests, response bodies, state values and attach
 ## The evidence action
 
 The [*ProtoTest Evidence*](https://github.com/MSeys/prototest-action) action runs after the tests. On a pull request it compares the run with the base branch's last green run, posts what the change broke and fixed, and keeps the trace.
-
-```mermaid
-sequenceDiagram
-    participant job as test job
-    participant action as evidence action
-    participant base as base branch run
-    participant cli as prototest CLI
-    job->>action: run.prototrace
-    action->>action: upload the trace artifact
-    action->>base: download its trace artifact
-    action->>cli: prototest compare, prototest verify
-    action->>cli: prototest feedback --baseline
-    cli->>cli: post the pull request comment
-    Note over action: fails on a broken test or a failed verdict
-```
 
 On a pull request, the action:
 

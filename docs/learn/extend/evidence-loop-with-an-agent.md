@@ -37,7 +37,7 @@ The evidence loop avoids that: fail, evidence, fix, verify, report. One `.protot
 
 ### 1. Summarize the trace with the CLI
 
-Install the CLI and download the time drill archive from <Link to="/learn/understand-failures/read-a-failing-trace">the failure lesson</Link>: <a href="pathname:///lessons/l0-time-drill.prototrace">l0-time-drill.prototrace</a>. Then run:
+Install the CLI and download the time drill archive from <Link to="/learn/understand-failures/read-a-failing-trace">the failure lesson</Link>: [l0-time-drill.prototrace](pathname:///lessons/l0-time-drill.prototrace). Then run:
 
 ```bash
 dotnet tool install --global ProtoTest.Cli
@@ -122,7 +122,7 @@ untraced-gap: 1.0 s of the test body recorded no operation, starting 174 ms in, 
   next: Replace a sleep with a wait that records what it waits for (ProtoPolling, a message await, the test clock), ...
 ```
 
-The drill sleeps for real. Its fixed version, <a href="pathname:///lessons/l0-time-fix.prototrace">l0-time-fix.prototrace</a>, moves the test clock instead, and `prototest review` reads it clean.
+The drill sleeps for real. Its fixed version, [l0-time-fix.prototrace](pathname:///lessons/l0-time-fix.prototrace), moves the test clock instead, and `prototest review` reads it clean.
 
 For your own fix, keep the trace of the failing run and the one after the fix, then ask for the receipt:
 

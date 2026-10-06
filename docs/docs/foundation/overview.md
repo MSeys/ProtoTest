@@ -7,6 +7,7 @@ description: "The handful of ProtoTest.Core concepts every integration builds on
 
 import TraceAnatomy from '@site/src/components/TraceAnatomy';
 import {lessonTraces} from '@site/src/data/traceSources';
+import Containment from '@site/src/components/Containment';
 
 export const lifecycleLayers = [
   {
@@ -48,19 +49,27 @@ export const lifecycleLayers = [
 
 ProtoTest is an integration testing foundation for .NET. Its integrations build on the same concepts from `ProtoTest.Core`. Learn these once and every integration makes sense. There is one host per process and one context per test, and everything else hangs off these two. New to integration testing? The [Learn track](/learn/) starts from why these tests get hard.
 
-```mermaid
-flowchart TB
-    Host["ProtoHost<br/>one per test process"]
-    Host -->|runs once| RunHooks["Run hooks and gates"]
-    Host -->|per test| Context["ProtoExecutionContext<br/>Proto.Context"]
-    Context --> Clients["Clients<br/>Rest, GraphQL, Web, Data"]
-    Context --> State["Typed state<br/>SetContext / Resolve"]
-    Context --> Attachments["Attachments"]
-    Context --> Observations["Observations to collectors to reports"]
-    Context --> Trace["Trace to .prototrace"]
-    TestHooks["Test hooks"] -.->|around every test| Context
-    Attributes["Attributes"] -.->|around decorated tests| Context
-```
+<Containment
+  root={{
+    label: <code>ProtoHost</code>,
+    detail: 'one per test process',
+    contains: [
+      {label: 'Run hooks and gates', detail: 'run once, around the whole run'},
+      {
+        label: <span><code>ProtoExecutionContext</code>, or <code>Proto.Context</code></span>,
+        detail: 'one per test, wrapped by the test hooks and by the attributes on that test',
+        focus: true,
+        contains: [
+          {label: 'Clients', detail: 'Rest, GraphQL, Web, Data'},
+          {label: 'Typed state', detail: <span><code>SetContext</code> and <code>Resolve</code></span>},
+          {label: 'Attachments'},
+          {label: 'Observations', detail: 'to collectors, to reports'},
+          {label: 'The trace', detail: <span>to the <code>.prototrace</code></span>},
+        ],
+      },
+    ],
+  }}
+/>
 
 ## The pieces
 

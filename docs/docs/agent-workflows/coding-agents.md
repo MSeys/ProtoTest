@@ -35,23 +35,13 @@ Each job is also an MCP prompt (`fix_failure`, `cover_change`, `improve_tests`),
 
 ## Fixing a failure, step by step
 
-```mermaid
-flowchart LR
-    a["1 get_failure<br/>the error and the line"] --> b["2 compare_runs<br/>where it left the green run"]
-    b --> c["3 get_diagnosis<br/>ancestors, snippet, state"]
-    c --> d["4 edit<br/>code or test"]
-    d --> e["5 rerun"]
-    e --> f["6 check_fix<br/>proven or the reasons"]
-    f -->|"not proven"| d
-```
-
 | The agent's turn | It calls | It learns |
 | --- | --- | --- |
 | Read the failure | `list_runs`, `get_failure` | which run failed, the error, the source location, the failing operation, the mismatches |
 | Find what changed | `compare_runs` | the operation where this run left the last green one |
 | Read the context | `get_diagnosis` with `detail=context` | the ancestors, the nearest call, the section previews, the source snippet, the artifacts, the state changes |
 | Fix | an editor | the file and line the evidence named |
-| Prove | `check_fix` | proven, or each unmet condition with the run it is about |
+| Prove | a rerun, then `check_fix` | proven, or each unmet condition with the run it is about. Not proven sends the agent back to Fix |
 | Report | the [evidence action](../continuous-integration/index.md#the-evidence-action) | the pull request comment with what broke and what was fixed |
 
 The steps map to the **evidence loop**: fail, evidence, fix, verify, report. [The evidence loop](./loop.md) shows the pull request comment they produce.

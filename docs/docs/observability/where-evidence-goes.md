@@ -19,16 +19,13 @@ One run writes one `.prototrace` archive, and up to five readers consume it. Eac
 
 ## Pick the surface
 
-```mermaid
-flowchart TD
-    q{"What do you need?"}
-    q -->|"It must survive the run"| archive["The archive · everything else is a view"]
-    q -->|"A person decides"| person{"About what?"}
-    person -->|"coverage or findings"| html["The HTML report"]
-    person -->|"the failing story"| viewer["The viewer"]
-    q -->|"A backend watches"| otel["OpenTelemetry spans, plus the archive for run-level facts"]
-    q -->|"An agent works"| cli["The CLI and the MCP server on the archives"]
-```
+| What you need | Where to look |
+| --- | --- |
+| evidence that survives the run | the archive. Everything else is a view of it |
+| a person deciding about coverage or findings | the HTML report |
+| a person reading the failing story | the viewer |
+| a backend that watches | OpenTelemetry spans, plus the archive for run-level facts |
+| an agent at work | the CLI and the MCP server, on the archives |
 
 Two cells in the table surprise people, so they are worth stating:
 

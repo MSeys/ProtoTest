@@ -8,6 +8,7 @@ description: "Poll a read with a deadline when background work updates it, and c
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
+import PollDiagram from '@site/src/components/PollDiagram';
 
 # Wait for a read that lags a write
 
@@ -98,9 +99,28 @@ Download [l3-lagging-read.prototrace](pathname:///lessons/l3-lagging-read.protot
 
 The poll writes no entry of its own. Each probe calls the REST client, so each probe is one entry. One entry means the dispatcher had already sent the delivery when the first read arrived. Two or more mean the read came first, and the same test still passed.
 
+The figure shows three runs of this test. Only the dispatcher's interval differs.
+
+<PollDiagram
+  deadlineMs={5000}
+  runs={[
+    {label: 'Dispatcher every 100 ms', probes: [0], endMs: 22.9, held: true, outcome: 'Passed', trace: 'l3-lagging-read'},
+    {label: 'Dispatcher every second', probes: [0, 140, 253], endMs: 262.3, held: true, outcome: 'Passed', trace: 'l3-lagging-read-late'},
+    {
+      label: 'Dispatcher every 10 seconds',
+      probes: [0, 133, 296, 450, 585, 710, 863, 994, 1141, 1291, 1429, 1550, 1675, 1803, 1945, 2066, 2187, 2355, 2472, 2607, 2719, 2862, 2988, 3118, 3245, 3395, 3518, 3642, 3783, 3906, 4034, 4156, 4281, 4405, 4563, 4680, 4796, 4953, 5028],
+      endMs: 5044,
+      held: false,
+      outcome: 'no delivery after 5044 ms',
+      trace: 'l3-lagging-read-timeout',
+    },
+  ]}
+  caption={<span>Measured from each run's trace. A tick is one <code>GET /api/v1/webhook-deliveries</code> entry. The wait ends at the first probe that sees a delivery, so the deadline costs time only when nothing arrives.</span>}
+/>
+
 ### 5. Make it time out
 
-Change the condition to `deliveries => deliveries.Count > 1`, which this test can never meet, and run it again. After the deadline, the first assertion fails with the time it waited:
+Change the condition to `deliveries => deliveries.Count > 1`, which this test can never meet, and run it again. After the deadline, the first assertion fails with the time it waited. The time is a little over 5000 ms and varies per run:
 
 ```text
 no delivery after 5008 ms
@@ -108,7 +128,7 @@ no delivery after 5008 ms
   But was:  False
 ```
 
-That run's trace held 45 `GET /api/v1/webhook-deliveries` entries, one per probe, all answered 200. A test that times out still shows every question it asked. Change the condition back.
+The trace holds about 45 `GET /api/v1/webhook-deliveries` entries, one per probe, all answered 200. The exact count depends on how fast each probe answers. A test that times out still shows every question it asked. Change the condition back.
 
 ## What happened
 

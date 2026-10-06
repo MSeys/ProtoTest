@@ -1,0 +1,53 @@
+/* Runs share one axis, so the deadline lines up; the waited part of each track is solid, the rest faint. */
+.body { padding: var(--space-4); display: grid; gap: var(--space-2); }
+
+.runs { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-5); }
+
+.run { display: grid; gap: var(--space-2); }
+
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); }
+.label { font-weight: var(--weight-bold); }
+.meta { color: var(--muted); font: var(--text-strong) var(--font-mono); }
+
+/* The track: a faint line to the end of the axis, the waited part solid over it. */
+.track {
+  position: relative;
+  height: 22px;
+  background: linear-gradient(var(--border), var(--border)) left center / 100% 2px no-repeat;
+}
+
+.waited { position: absolute; top: calc(50% - 2px); left: 0; height: 4px; min-width: 4px; border-radius: var(--radius-hairline); background: var(--border-strong); }
+
+.deadline { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px dashed var(--danger-line); }
+
+/* A probe that saw the old state is a short neutral tick; the last one is coloured by what it saw. */
+.probe {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  translate: -1px 0;
+  border-radius: var(--radius-hairline);
+  background: var(--muted);
+}
+
+.hit, .miss { top: 0; bottom: 0; width: 4px; translate: -2px 0; }
+.hit { background: var(--success); box-shadow: 0 0 0 3px var(--success-soft); }
+.miss { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+
+.outcome { justify-self: start; padding-left: var(--space-2); border-left: 3px solid var(--success); font: var(--weight-semibold) var(--text-strong) var(--font-mono); }
+.held .outcome { color: var(--success); }
+.timedOut .outcome { border-left-color: var(--danger); color: var(--danger); }
+
+/* The shared axis under the runs: whole seconds, the deadline named. */
+.axis { position: relative; height: 1.5em; border-top: 1px solid var(--border); color: var(--muted); font: var(--text-meta) var(--font-mono); }
+.second { position: absolute; top: 4px; translate: -50% 0; white-space: nowrap; }
+.second:first-child { translate: 0; }
+.second:last-child { translate: -100% 0; color: var(--danger); }
+
+.meta a { white-space: nowrap; }
+
+/* On a phone the whole seconds crowd the deadline: keep the start and the deadline only. */
+@media (max-width: 600px) {
+  .second:not(:first-child, :last-child) { display: none; }
+}

@@ -42,6 +42,12 @@ $lessonTraces = @(
     @{ Name = "l2-broker-skip"; Filter = "FullyQualifiedName~BrokerJourney.PayingAnInvoicePublishesAnInvoicePaidEvent"; Expect = "Skipped" },
     @{ Name = "l3-clock-window"; Filter = "FullyQualifiedName~ClockJourney.ClosingTheBillingPeriodIssuesTheInvoiceOnTheTestClock"; Expect = "Passed" },
     @{ Name = "l3-lagging-read"; Filter = "FullyQualifiedName~WebhookJourney.CreatingAProjectDeliversItsWebhook"; Expect = "Passed" },
+    # The same test with a slower dispatcher, for the lesson's poll figure. Every second, the first read
+    # almost always comes before the delivery, so the poll asks again and the test still passes. Every ten
+    # seconds, nothing is delivered before the five-second deadline, so the poll times out and the test
+    # fails with its own message. The probe counts vary with the run; the figure quotes these files.
+    @{ Name = "l3-lagging-read-late"; Filter = "FullyQualifiedName~WebhookJourney.CreatingAProjectDeliversItsWebhook"; Expect = "Passed"; Environment = @{ Northstar__WebhookDispatchInterval = "00:00:01" } },
+    @{ Name = "l3-lagging-read-timeout"; Filter = "FullyQualifiedName~WebhookJourney.CreatingAProjectDeliversItsWebhook"; Expect = "Failed"; Environment = @{ Northstar__WebhookDispatchInterval = "00:00:10" } },
     # The flaky drill passes or fails by timing: about a third of the Release runs pass with the
     # dispatcher at its 100 ms default, so waiting for a lucky run is not a plan. Each trace controls the
     # race instead, the way the lesson confirms the cause. The passing trace runs the dispatcher every

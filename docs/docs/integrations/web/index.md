@@ -5,6 +5,8 @@ sidebar_label: Overview
 description: "A driver-independent browser-testing model for pages, components, flows and login, run by Playwright or Selenium underneath."
 ---
 
+import FlowStrip from '@site/src/components/FlowStrip';
+
 # Browser tests with Playwright or Selenium in .NET
 
 `ProtoTest.Web` gives each test a browser session behind page objects, with Playwright or Selenium underneath.
@@ -37,14 +39,16 @@ Run it with `dotnet test`. A green run prints `Passed Valid_credentials_sign_in`
 
 Your page objects and tests stay the same for both. The backends differ underneath, most visibly in [locator translation](./locators.md#how-each-backend-translates-a-locator), but everything in this section is backend-neutral.
 
-```mermaid
-flowchart LR
-    T[test] --> S[WebSession]
-    S --> P[page object]
-    P --> L[WebLocator]
-    L --> B[IWebBackend: Playwright or Selenium]
-    B --> E[trace web.* + artifacts + coverage]
-```
+<FlowStrip
+  steps={[
+    {title: 'The test'},
+    {title: <code>WebSession</code>},
+    {title: 'A page object'},
+    {title: <code>WebLocator</code>},
+    {title: <code>IWebBackend</code>, detail: 'Playwright or Selenium'},
+    {title: 'The trace', detail: <span><code>web.*</code> operations, artifacts and coverage</span>},
+  ]}
+/>
 
 ## Which backend
 
@@ -242,17 +246,14 @@ Options are bound once, the first time a session opens a browser.
 
 Without `application`, `Web(name)` returns a session the test already has under that name: the selected application's first, otherwise the one under another application, such as a session `[WebSession(Application = ...)]` opened. Two or more under other applications throw, naming them. An explicit `application` is exact.
 
-```mermaid
-sequenceDiagram
-    participant Test
-    participant Session as WebSession
-    participant Browser
-    Test->>Session: first operation (lazy create)
-    Session->>Browser: launch + web.session.initialize
-    Test->>Session: ops (navigate, click, assert)
-    Test->>Session: teardown
-    Session->>Browser: artifacts published + dispose (web.session.complete)
-```
+<FlowStrip
+  steps={[
+    {title: 'First operation', detail: 'creates the session'},
+    {title: 'Launch', detail: <span>the browser starts: <code>web.session.initialize</code></span>},
+    {title: 'Operations', detail: 'navigate, click, assert'},
+    {title: 'Teardown', detail: <span>artifacts published, the browser disposed: <code>web.session.complete</code></span>},
+  ]}
+/>
 
 ```csharp
 public sealed class WebSession : IAsyncDisposable

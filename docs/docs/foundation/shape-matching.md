@@ -4,6 +4,8 @@ title: Shape matching
 description: "Describe the JSON you expect with an anonymous object: partial, nested, with value constraints, and every mismatch reported at once with its path."
 ---
 
+import ShapeMatch from '@site/src/components/ShapeMatch';
+
 # Shape matching
 
 REST and GraphQL responses, gRPC replies, consumed messages and sheet rows all use the same matcher from `ProtoTest.Json`. Only the spelling that reaches it differs. This page lists the matching rules, the constraints and what the trace records.
@@ -16,13 +18,36 @@ response.Should.MatchShape(new
     id = JsonValue.GreaterThan(0),
     status = "pending",
     customer = new { email = JsonValue.StringEndingWith("@example.test") },
-    lines = new[]
+    lines = new object[]
     {
         new { product = "notebook", quantity = 2 },
         new { product = "pen", quantity = JsonValue.Between(1, 10) }
     }
 });
 ```
+
+Matched against an order that breaks three of its rules, the shape gives this verdict on each line:
+
+<ShapeMatch
+  subject="GET /api/orders/42"
+  lines={[
+    {text: '{'},
+    {text: '"id": 42,', depth: 1, verdict: 'matched', note: <span>greater than 0</span>},
+    {text: '"status": "cancelled",', depth: 1, verdict: 'mismatch', note: <span>expected <code>"pending"</code></span>},
+    {text: '"customer": {', depth: 1},
+    {text: '"name": "Jane",', depth: 2, verdict: 'ignored', note: 'objects are partial'},
+    {text: '"email": "jane@example.org"', depth: 2, verdict: 'mismatch', note: <span>does not end with <code>@example.test</code></span>},
+    {text: '},', depth: 1},
+    {text: '"lines": [', depth: 1, verdict: 'mismatch', note: 'three elements, the shape lists two'},
+    {text: '{ "product": "notebook", "quantity": 2 },', depth: 2, verdict: 'matched', note: 'compared by position'},
+    {text: '{ "product": "pen", "quantity": 3 },', depth: 2, verdict: 'matched', note: <span>quantity between 1 and 10</span>},
+    {text: '{ "product": "eraser", "quantity": 1 }', depth: 2, verdict: 'ignored', note: 'no element at this position in the shape'},
+    {text: '],', depth: 1},
+    {text: '"createdAtUtc": "2026-10-06T09:00:00Z"', depth: 1, verdict: 'ignored', note: 'objects are partial'},
+    {text: '}'},
+  ]}
+  caption="Verdicts from a run of the matcher on this order: three mismatches, reported together, and the fields the shape does not list left alone."
+/>
 
 A failure names the subject, then every mismatch with its path:
 
@@ -110,9 +135,9 @@ The matcher collects all mismatches, then throws one `JsonShapeMismatchException
 
 ```
 Shape mismatch failed with 3 error(s):
-  • [$.lines]: Array lengths did not match. (Expected: '2', Actual: '3')
   • [$.status]: Values did not match. (Expected: "pending", Actual: "cancelled")
   • [$.customer.email]: Expected ends with "@example.test", but found 'jane@example.org'. (Expected: "ends with "@example.test"", Actual: "jane@example.org")
+  • [$.lines]: Array lengths did not match. (Expected: '2', Actual: '3')
 ```
 
 ```csharp

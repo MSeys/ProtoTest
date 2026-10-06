@@ -104,16 +104,11 @@ Playwright reports that the browser executable does not exist when the browser w
 
 Parallel tests share the application and its data. If two tests create the same customer, order number or email address, one of them fails. It fails only when the two happen to run at the same time.
 
-```mermaid
-flowchart TB
-    Q["Fails only in a full run?"]
-    Q -->|no| F["Read the failure on its own."]
-    Q -->|yes| N{"Do two tests create\nthe same name?"}
-    N -->|yes| U["Derive it from the test id:\nProto.Context.UniqueName."]
-    N -->|no| S{"Must they run\none at a time?"}
-    S -->|yes| R["Use the runner tool:\nNonParallelizable, a collection."]
-    S -->|no| C["Check the shared client:\na Caller-owned client is concurrent."]
-```
+| What the tests share | What to do |
+| --- | --- |
+| a name, number or address they both create | derive it from the test id with `Proto.Context.UniqueName` |
+| something only one test may use at a time | let the runner run them one at a time |
+| a client registered with `ProtoClientOwnership.Caller` | make sure it is safe to use from parallel tests: they all get the same instance ([Clients](../foundation/clients.md)) |
 
 Make every value a test creates unique to that test. `Proto.Context.UniqueName("customer")` builds a name from the test id, so the same test gets the same name on every run. See [Execution context](../foundation/execution-context.md#unique-names) for the rerun rule:
 

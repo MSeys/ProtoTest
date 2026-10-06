@@ -296,39 +296,17 @@ The secret header rules:
 
 ## Exit codes
 
-```mermaid
-flowchart TD
-    start["prototest finished"] --> input{"Did the input exist<br/>and read?"}
-    input -->|"no"| one["exit 1 · the reason is on stderr"]
-    input -->|"yes"| verb{"Which verb?"}
-    verb -->|"index"| idx{"Any readable archive,<br/>and a writable page?"}
-    idx -->|"no"| one
-    idx -->|"yes"| zero["exit 0"]
-    verb -->|"compare"| broke{"A test that passed<br/>in the baseline fails?"}
-    broke -->|"yes"| one
-    broke -->|"no"| zero
-    verb -->|"prove"| proven{"Is the fix<br/>proven?"}
-    proven -->|"no"| one
-    proven -->|"yes"| zero
-    verb -->|"verify"| verdict{"A finding<br/>with severity fail?"}
-    verdict -->|"yes"| one
-    verdict -->|"no"| zero
-    verb -->|"feedback"| channel{"A channel that reached<br/>its target failed?"}
-    channel -->|"yes"| one
-    channel -->|"no"| zero
-    verb -->|"summary"| zero
-    verb -->|"review"| zero
-```
+A verb exits `0` when it did its job, and `1` in these cases:
 
-| Code | Meaning |
+| Verb | Exits `1` when |
 | --- | --- |
-| `0` | the verb did its job |
-| `1` | the input was missing or unreadable |
-| `1` | `index` found no readable archive or could not write the page |
-| `1` | the verdict has a fail finding |
-| `1` | `compare` found a broken test |
-| `1` | `prove` could not prove the fix |
-| `1` | a feedback channel that reached its target failed |
+| every verb | the arguments were wrong, or the input was missing or unreadable. The reason or the usage is on stderr |
+| `index` | it found no readable archive or could not write the page |
+| `compare` | a test that passed in the baseline fails |
+| `prove` | it could not prove the fix |
+| `verify` | the verdict has a finding with severity fail |
+| `feedback` | a channel that reached its target failed |
+| `summary`, `review` | never, once the input reads |
 
 ## Limits
 

@@ -77,13 +77,6 @@ Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs, so `Pro
 
 xUnit v3 is the mirror image: its constructor runs before the context.
 
-```mermaid
-flowchart TD
-    miss["class without [Collection]"] --> host["fixture never runs · Host throws InvalidOperationException"]
-    host --> crash["test-host crash · run aborts · other results lost"]
-    fix["class with [Collection]"] --> ok["fixture starts the host · test gets a context and a trace"]
-```
-
 ## Bring an existing suite
 
 Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps running unchanged. A class that joins the collection can mix converted and plain tests, because only `[ProtoTestFact]` and `[ProtoTestTheory]` start a context. Convert a class when its tests need a host, a trace or capability skips. Add the collection attribute in the same change, because the fixture starts the host. [Bring an existing xUnit suite](./bring-your-existing-suite.md) walks the order.

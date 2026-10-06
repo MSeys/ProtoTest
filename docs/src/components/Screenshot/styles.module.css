@@ -1,0 +1,11 @@
+/* A figure keeps its own size on a wide page (the component sets its max-width) and shrinks with a narrow one. */
+.figure {
+  width: 100%;
+  margin: var(--space-5) 0;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+}

@@ -1,0 +1,48 @@
+/* Two runs as TraceDiff draws them: the passing run on the success edge, the failing run on the danger edge. */
+.body { padding: var(--space-4); display: grid; gap: var(--space-3); }
+
+.runs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-3);
+}
+
+.run {
+  min-width: 0;
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--success);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+}
+
+.failed { border-top-color: var(--danger); }
+
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.label { font-size: var(--text-title); font-weight: var(--weight-bold); }
+.outcome { font: var(--weight-semibold) var(--text-strong) var(--font-ui); color: var(--success); }
+.failed .outcome { color: var(--danger); }
+
+.fields { margin: 0; display: grid; gap: 2px; }
+
+.field {
+  padding: var(--space-1) var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-chip);
+  font: var(--text-strong) var(--font-mono);
+}
+
+.field dt { color: var(--muted); }
+.field dd { margin: 0; color: var(--text); font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+
+/* The field that explains the difference: the warning colour, as a cause. */
+.focus { border-left-color: var(--warning); background: var(--warning-soft); }
+
+.note { margin: 0; color: var(--warning); font-weight: var(--weight-semibold); }

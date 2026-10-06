@@ -115,20 +115,6 @@ You rarely need this section. It matters when two parts of a setup call the same
 | `AddData` | composes onto one registry, and every call's callback runs |
 | `AddCollector<TCollector>` | the same collector type for the same target registers once |
 
-```mermaid
-flowchart TB
-    Q["Called Add twice. What registers?"]
-    Q --> H{"Hook, gate,\nor options callback?"}
-    H -->|yes| A["Appends. Every call adds one."]
-    H -->|no| S{"Same instance\nunder the same id?"}
-    S -->|yes| B["No-op. Infrastructure also merges the repeated keys."]
-    S -->|no| D{"Same id,\ndifferent instance?"}
-    D -->|yes| C["Throws. The run is already owned."]
-    D -->|no| F{"Client, sink,\nor first-wins piece?"}
-    F -->|yes| E["First wins. Sink and collector callbacks still append."]
-    F -->|no| G["Accumulates. Data, response and attachment callbacks compose."]
-```
-
 Some repeats fail instead:
 
 - A different run resource under an existing id throws.

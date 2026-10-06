@@ -4,20 +4,22 @@ title: Page coverage
 description: "Which pages a browser suite visited and verified, and where the inventory comes from."
 ---
 
+import FlowStrip from '@site/src/components/FlowStrip';
+
 # Page coverage
 
 Page coverage tells you which pages of your application a browser suite checked. It is reported per page path, in
 the same run report as every other collector. A page counts as covered only when a test **verified** something on
 it: reaching a page is not checking it.
 
-```mermaid
-stateDiagram-v2
-    [*] --> available: inventory, discovery, server
-    available --> visited: navigation succeeds
-    visited --> verified: Should assertion passes
-    verified --> [*]: covered
-    visited --> [*]: never asserted, reported uncovered
-```
+<FlowStrip
+  steps={[
+    {title: <code>available</code>, detail: 'from the inventory, discovery or the server'},
+    {title: <code>visited</code>, detail: 'a navigation succeeded'},
+    {title: <code>covered</code>, detail: <span>a <code>Should</code> assertion passed</span>, tone: 'success'},
+  ]}
+  note={<span>A page that was visited but never asserted stays <code>visited</code>. Only <code>covered</code> counts.</span>}
+/>
 
 A report row names the page, its state, and how many verifications landed on it:
 

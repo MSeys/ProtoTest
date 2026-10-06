@@ -35,6 +35,8 @@ var useMessagingContainer = run.OwnsMessagingBroker;
 | Store | file SQLite under `TestResults/Northstar.ProtoTest` | `PostgresDatabase.Container()` | `ConnectionStrings:Northstar` |
 | Broker | none configured; broker journeys skip | `RabbitMqBroker.Container()` | `ProtoTest:Messaging:RabbitMq:ConnectionString` |
 | Browser journeys | a loopback listener the run starts | the same | the configured `BaseUrl` |
+| Infrastructure chain | `UseConfigured` loses, the fallback serves | `UseConfigured` loses, the containers serve | `UseConfigured` wins, nothing starts |
+| Tests read the address from | infrastructure settings | infrastructure settings | configuration |
 
 ## In-process
 
@@ -55,13 +57,6 @@ The loopback instance is its **own application**, named `Northstar web`. The run
 ```csharp
 builder.AddLoopbackApplication(NorthstarTargets.Web, NorthstarProgram.CreateApp);
 builder.AddHttpReadiness(NorthstarTargets.Web, "/health");
-```
-
-```mermaid
-flowchart LR
-    K["keys: none set"] --> C["chain: UseConfigured loses,\nfallback serves"]
-    C --> W["winner: in-process server\nand loopback listener start"]
-    W --> R["tests read the address\nfrom infrastructure settings"]
 ```
 
 The tests' own domain code uses the same database, so `DomainAccessJourney` runs. No broker is configured, so `BrokerJourney` skips.
@@ -91,13 +86,6 @@ Once the containers start, the host publishes their connection strings. Tests re
 
 The loopback instance follows the suite's configuration. The browser test therefore runs in every local mode and skips only when the browser is not installed. A published run starts no loopback instance and follows the configured `ProtoTest:Applications:{application}:BaseUrl` instead.
 
-```mermaid
-flowchart LR
-    K["keys: Database=postgres,\nBroker=container"] --> C["chain: UseConfigured loses,\ncontainer serves"]
-    C --> W["winner: Postgres and RabbitMQ\ncontainers start"]
-    W --> R["tests read the address\nfrom infrastructure settings"]
-```
-
 ## Published
 
 Set `ProtoTest:TargetUrl` to point the suite at a deployed system:
@@ -120,13 +108,6 @@ The run does not start the application, so it may not be ready when the first te
 
 ```csharp
 builder.AddHttpReadiness(NorthstarTargets.Api);   // waits for ProtoTest:Applications:{app}:BaseUrl
-```
-
-```mermaid
-flowchart LR
-    K["keys: TargetUrl set,\nconnection strings set"] --> C["chain: UseConfigured wins,\nnothing starts"]
-    C --> W["winner: the deployed\nenvironment serves"]
-    W --> R["tests read the address\nfrom configuration"]
 ```
 
 :::warning[Readiness probes run in registration order]

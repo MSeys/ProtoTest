@@ -79,14 +79,6 @@ select it:
 Even when selected, a configured address wins. If every key the AppHost would fill is already configured, it does
 not start. If some are, it starts and fills only the missing ones.
 
-```mermaid
-flowchart LR
-    C[configured BaseUrl] -->|wins| T[target]
-    S[selected AppHost resource] --> T
-    O[other providers] --> T
-    U[unselected] -.->|never starts| T
-```
-
 :::caution[Selection keys must reach the host]
 Setting the selection keys in a shell is not enough on its own: the host starts with an empty configuration, so `ProtoTest__Aspire__Enabled=true` reaches it only when the suite added `.AddEnvironmentVariables()` (or the runner supplied its own sources). A key that never arrives reads as unset and the AppHost stays off even though the shell shows it set; see [Adding configuration sources](../getting-started/configuration.md#adding-configuration-sources).
 :::

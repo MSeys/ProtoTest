@@ -6,6 +6,7 @@ description: "Declare a database, broker or emulator on the host; it starts once
 
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
 import TabbedCode from '@site/src/components/TabbedCode';
+import FlowStrip from '@site/src/components/FlowStrip';
 
 export const chainCode = `builder.AddInfrastructure(
     "NorthstarDatabase",
@@ -58,12 +59,14 @@ export const chainTabs = [
 
 Infrastructure is what the run provides for itself: a database, a broker, a storage emulator. Declare it on the host builder, and the host starts it once before any test, records it, and releases it with the run. You need no `BeforeRun` hook and no manual start and stop.
 
-```mermaid
-flowchart LR
-    T["target with keys"] --> C{"chain in order:\nconfigured? container? …"}
-    C --> W["ONE winner starts\nand fills every key"]
-    C --> L["losers recorded skipped\nwith the reason"]
-```
+<FlowStrip
+  steps={[
+    {title: 'A target', detail: 'names the settings keys it fills'},
+    {title: 'Its chain', detail: 'asks each provider in order: configured? a container? ...'},
+    {title: 'One winner starts', detail: 'and fills every key', tone: 'success'},
+  ]}
+  note="The providers that lose are recorded as skipped, with the reason."
+/>
 
 ## Run a container
 

@@ -118,7 +118,7 @@ A test creates a project with the extension method the sample keeps for it:
 var project = await Proto.Context.Data().CreateProjectAsync($"provision-{Proto.Context.TestId}");
 ```
 
-One call writes a chain of entries. This one is from the first journey's trace, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, where the tenant attribute from the last lesson made the same kind of call:
+One call writes a chain of entries. This one is from the first journey's trace, [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace), where the tenant attribute from the last lesson made the same kind of call:
 
 | Entry | Reading |
 | --- | --- |

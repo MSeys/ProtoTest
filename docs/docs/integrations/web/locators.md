@@ -31,15 +31,6 @@ By.TableCellAt(int index)                   // zero-based
 
 In order of preference:
 
-```mermaid
-flowchart TD
-    R[Role] --> L[Label]
-    L --> P[Placeholder]
-    P --> T[Text]
-    T --> I[TestId]
-    I --> A[Attribute or Css: last resort]
-```
-
 | Locator | Use it for | Selenium limit |
 | --- | --- | --- |
 | `Role` | buttons, links, headings, checkboxes, rows: anything with an ARIA role and an accessible name | implicit HTML mappings instead of ARIA resolution |

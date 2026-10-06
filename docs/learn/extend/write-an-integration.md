@@ -131,7 +131,7 @@ Your own run lists `first-milestone` beside the sample's two.
 
 You did not change the framework. The host resolved your initializer at setup, so `Client<ScenarioProbe>` found the client. The hook ran around the test, wrote the events and attached the milestone trail.
 
-The committed trace of the first journey, <a href="pathname:///lessons/l1-first-journey.prototrace">l1-first-journey.prototrace</a>, shows the sample's own entries:
+The committed trace of the first journey, [l1-first-journey.prototrace](pathname:///lessons/l1-first-journey.prototrace), shows the sample's own entries:
 
 | Entry | Reading |
 | --- | --- |

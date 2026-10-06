@@ -57,19 +57,6 @@ Register `AddMessaging` **after** the application's server, because the messagin
 server exists. The bridge is the run's only adapter: one run has one broker, and a repeated `AddMessaging` keeps
 the first adapter.
 
-```mermaid
-flowchart LR
-    subgraph Harness["harness lane"]
-        P1[PublishAsync] --> Bus[ITestHarness bus]
-        Bus --> H1[history]
-        H1 --> A1[AwaitAsync]
-    end
-    subgraph Envelope["envelope lane"]
-        W[MassTransitEnvelope.Wrap] --> B[RabbitMQ exchange Namespace:Type]
-        B --> U[MassTransitEnvelope.Unwrap]
-    end
-```
-
 ## Destinations
 
 A destination names a **message contract type**, which is how a MassTransit bus addresses messages:

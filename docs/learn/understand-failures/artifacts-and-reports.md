@@ -10,6 +10,7 @@ import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
 import Link from '@docusaurus/Link';
+import Screenshot from '@site/src/components/Screenshot';
 
 # What is inside the file CI uploads?
 
@@ -66,7 +67,15 @@ A local run also writes the files next to the archive:
 | JSON report | `TestResults/Northstar.ProtoTest/report.json` |
 | HTML report | `TestResults/Northstar.ProtoTest/report.html` |
 
-Open `report.html` in a browser for the readable version of the report.
+Open `report.html` in a browser for the readable version of the report:
+
+<Screenshot
+  name="learn/artifacts-and-reports/report"
+  alt="The HTML report of the lesson's run: Nothing needs attention, 3 of 3 units covered, with the run gate no error findings passed."
+  caption={<span>The report inside <a href="pathname:///lessons/l4-artifacts.prototrace">l4-artifacts.prototrace</a>: nothing needs attention, and the one run gate passed.</span>}
+  width={860}
+  height={391}
+/>
 
 ## What happened
 

@@ -4,6 +4,8 @@ title: Reporting
 description: "Write collected observations and coverage out once per run, as JSON or as a self-contained HTML report."
 ---
 
+import Screenshot from '@site/src/components/Screenshot';
+
 # Reporting
 
 Report sinks write out what [collectors](./coverage.md) gathered, once, when the run ends. `ProtoTest.Reporting` ships two: a JSON report for tooling and a self-contained HTML report for people.
@@ -45,12 +47,13 @@ Items arrive sorted by target, category and identifier. Only top-level items are
 
 The HTML report is one self-contained page, laid out like the run view of the [ProtoTrace viewer](./prototrace.md):
 
-```text
-1 gate failed, 1 uncovered, 2 findings, 151 of 198 units covered     the headline: what needs attention
-Shop · Generated 2026-10-02 07:12 UTC · 214 entries                  the meta line
-▂▂█▂▂▂█▂▂▂▂                                                          the strip: one tick per entry
-Needs attention · Gates · Findings · Coverage · Traffic · … · All     one tab per kind
-```
+<Screenshot
+  name="docs/reporting/report"
+  alt="The top of a ProtoTest HTML report: the headline 255 uncovered, 1 finding, 46 of 301 units covered; the meta line; a strip of ticks; tabs Needs attention, Gates, Findings, Coverage, Traffic, Resources and All; and the first entries that need attention."
+  caption={<span>The report the Northstar suite wrote with its drills on, from the viewer's <a href="https://trace.prototest.dev">demo trace</a>: the headline, the meta line, the strip and one tab per kind.</span>}
+  width={860}
+  height={501}
+/>
 
 The headline names failed gates, errors, uncovered units, findings and warnings, then the coverage figure when the run measured coverage. A run where nothing needs attention says so. Each tick in the strip is one entry; the ones that failed or warned stand up, and a click opens that entry.
 

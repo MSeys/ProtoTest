@@ -5,6 +5,8 @@ sidebar_label: Devices
 description: "Talk to devices over WebSocket, MQTT, TCP or a serial port, build their data strings as typed messages, and keep every exchange in the trace."
 ---
 
+import SequenceLanes from '@site/src/components/SequenceLanes';
+
 # Test devices over WebSocket, MQTT, TCP or serial
 `ProtoTest.Devices` talks to devices the way other integrations talk to APIs: a typed device class per kind of device, one instance per test, and every exchange in the same trace.
 
@@ -235,16 +237,15 @@ A second client with the topics swapped acts as the other side of an MQTT device
 receives, and receives what the device publishes, so the whole conversation stays in the suite. Both clients use
 the same `{deviceId}` and the run's broker:
 
-```mermaid
-sequenceDiagram
-    participant Meter as Meter (meters/M-001/out)
-    participant Broker as Broker
-    participant Peer as Peer (subscribes meters/M-001/out)
-    Meter->>Broker: publish "120" to meters/M-001/out
-    Broker->>Peer: deliver "120" on meters/M-001/out
-    Peer->>Broker: publish reply to meters/M-001/in
-    Broker->>Meter: deliver reply on meters/M-001/in
-```
+<SequenceLanes
+  participants={['Meter', 'Broker', 'Peer']}
+  steps={[
+    {from: 'Meter', to: 'Broker', label: <span>publishes <code>120</code> to <code>meters/M-001/out</code></span>},
+    {from: 'Broker', to: 'Peer', label: <span>delivers <code>120</code> on <code>meters/M-001/out</code></span>},
+    {from: 'Peer', to: 'Broker', label: <span>publishes a reply to <code>meters/M-001/in</code></span>},
+    {from: 'Broker', to: 'Meter', label: <span>delivers the reply on <code>meters/M-001/in</code></span>},
+  ]}
+/>
 
 ```csharp
 public sealed class FlowMeter : ProtoDevice

@@ -59,20 +59,100 @@ export function readingWords(text) {
 /** A Learn lesson, not the Learn index or a page at the Learn root. */
 export const isLesson = (path) => /[\\/]learn[\\/][^\\/]+[\\/](?!index\.mdx?$)[^\\/]+$/.test(path);
 
-/** The prose of a page: paragraphs and list items, without code, front matter, imports, JSX or tables. */
+// A component tag in MDX is JSX, and its props can hold anything: strings, template-literal code with `>` and `=>`
+// in it, fragments, nested elements. Reading it line by line cannot tell where the tag ends, so these scan it the
+// way a JSX parser would, just far enough to find the end. Each returns the index after what it skipped.
+const skipString = (s, i, quote) => {
+  for (i += 1; i < s.length && s[i] !== quote; i += 1) if (s[i] === '\\') i += 1;
+  return i + 1;
+};
+
+const skipTemplate = (s, i) => {
+  for (i += 1; i < s.length && s[i] !== '`'; ) {
+    if (s[i] === '\\') i += 2;
+    else if (s[i] === '$' && s[i + 1] === '{') i = skipExpression(s, i + 1);
+    else i += 1;
+  }
+  return i + 1;
+};
+
+/** From `{` to its matching `}`, past strings, comments and JSX inside. */
+function skipExpression(s, i) {
+  let depth = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '"' || c === "'") i = skipString(s, i, c);
+    else if (c === '`') i = skipTemplate(s, i);
+    else if (c === '/' && s[i + 1] === '/') i = s.includes('\n', i) ? s.indexOf('\n', i) : s.length;
+    else if (c === '/' && s[i + 1] === '*') i = s.includes('*/', i + 2) ? s.indexOf('*/', i + 2) + 2 : s.length;
+    else if (c === '<' && /[A-Za-z>]/.test(s[i + 1] ?? '')) i = skipElement(s, i);
+    else {
+      if (c === '{') depth += 1;
+      if (c === '}' && --depth === 0) return i + 1;
+      i += 1;
+    }
+  }
+  return i;
+}
+
+/** An opening tag or fragment opener, from `<` to its `>` or `/>`. */
+export function skipTag(s, i) {
+  i += 1;
+  if (s[i] === '>') return {end: i + 1, selfClosing: false};
+  while (i < s.length && /[\w.:-]/.test(s[i])) i += 1;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '/' && s[i + 1] === '>') return {end: i + 2, selfClosing: true};
+    if (c === '>') return {end: i + 1, selfClosing: false};
+    if (c === '"' || c === "'") i = skipString(s, i, c);
+    else if (c === '{') i = skipExpression(s, i);
+    else i += 1;
+  }
+  return {end: i, selfClosing: true};
+}
+
+/** A whole element inside an expression, children included; its text is literal, so quotes in it are not strings. */
+function skipElement(s, i) {
+  const {end, selfClosing} = skipTag(s, i);
+  if (selfClosing) return end;
+  for (i = end; i < s.length; ) {
+    if (s[i] === '<' && s[i + 1] === '/') return s.includes('>', i) ? s.indexOf('>', i) + 1 : s.length;
+    if (s[i] === '<' && /[A-Za-z>]/.test(s[i + 1] ?? '')) i = skipElement(s, i);
+    else if (s[i] === '{') i = skipExpression(s, i);
+    else i += 1;
+  }
+  return i;
+}
+
+/**
+ * The prose of a page: paragraphs and list items, without code, front matter, imports, tables or component tags.
+ * A component's props are code; what it wraps (a checkpoint's answer, a tab's text) is prose.
+ */
 export function prose(text) {
-  const lines = text.replace(/^---\n[\s\S]*?\n---\n/, '').split('\n');
+  const body = text.replace(/^---\n[\s\S]*?\n---\n/, '');
   const blocks = [];
   let current = [];
   let fence = false;
-  let jsx = 0;
   let block = false;
+  // The end of the component tag being skipped, as an index into body.
+  let tagEnd = 0;
+  let offset = 0;
   const flush = () => {
     if (current.length) blocks.push(current.join(' '));
     current = [];
   };
-  for (const raw of lines) {
-    const line = raw.trim();
+  for (const raw of body.split('\n')) {
+    const start = offset;
+    offset += raw.length + 1;
+    let line = raw.trim();
+    if (tagEnd > start) {
+      if (tagEnd >= start + raw.length) continue;
+      // The tag ended on this line: what follows it is the component's own text, up to a closing tag.
+      line = body.slice(tagEnd, start + raw.length).replace(/<\/[A-Z][\w.]*>\s*$/, '').trim();
+      flush();
+      if (line) current.push(line);
+      continue;
+    }
     if (/^(```|~~~)/.test(line)) {
       fence = !fence;
       flush();
@@ -89,11 +169,17 @@ export function prose(text) {
       flush();
       continue;
     }
-    if (jsx > 0 || /^<[A-Z]/.test(line) || /^(import|export) /.test(line)) {
-      jsx += (line.match(/<[A-Z][^/]*?(?<!\/)>/g) ?? []).length + (/^<[A-Z][^>]*$/.test(line) ? 1 : 0);
-      jsx -= (line.match(/<\/[A-Z]\w*>|\/>/g) ?? []).length;
-      if (jsx < 0) jsx = 0;
+    if (/^(import|export) /.test(line)) {
       flush();
+      continue;
+    }
+    if (/^<[A-Z]/.test(line)) {
+      tagEnd = skipTag(body, start + raw.indexOf('<')).end;
+      flush();
+      if (tagEnd < start + raw.length) {
+        const rest = body.slice(tagEnd, start + raw.length).replace(/<\/[A-Z][\w.]*>\s*$/, '').trim();
+        if (rest) current.push(rest);
+      }
       continue;
     }
     if (!line || /^(#|\||:::|<\/?\w|!\[)/.test(line)) {

@@ -366,41 +366,6 @@ div[class*='codeBlockTitle'] {
 .pagination-nav__sublabel { color: var(--muted); font-size: var(--text-meta); }
 .pagination-nav__label { font-size: var(--text-title); font-family: var(--font-display); }
 
-/* ── Diagrams ─────────────────────────────────────────────────────────────────────────────────
-   Mermaid writes its colours into an id-scoped stylesheet inside each SVG, which outranks any class rule;
-   !important is the only way to recolour it from the tokens. It is confined to this block. */
-.docusaurus-mermaid-container svg {
-  font-family: var(--font-ui) !important;
-}
-.docusaurus-mermaid-container :is(.node rect, .node polygon, .node circle, .node path) {
-  fill: var(--surface) !important;
-  stroke: var(--blueprint-line) !important;
-  stroke-width: 1px !important;
-}
-.docusaurus-mermaid-container :is(.cluster rect) {
-  fill: var(--surface-2) !important;
-  stroke: var(--border-strong) !important;
-}
-.docusaurus-mermaid-container :is(.nodeLabel, .cluster-label, .label, text) {
-  color: var(--text) !important;
-  fill: var(--text) !important;
-  font-family: var(--font-ui) !important;
-}
-.docusaurus-mermaid-container :is(.edgePath path, .flowchart-link, path.relation) {
-  stroke: var(--muted) !important;
-}
-.docusaurus-mermaid-container :is(marker path, .arrowheadPath) {
-  fill: var(--muted) !important;
-  stroke: var(--muted) !important;
-}
-.docusaurus-mermaid-container :is(.edgeLabel, .edgeLabel rect, .edgeLabel p) {
-  background: var(--bg) !important;
-  fill: var(--bg) !important;
-  color: var(--muted) !important;
-  font-family: var(--font-mono) !important;
-  font-size: var(--text-micro) !important;
-}
-
 /* ── Footer ───────────────────────────────────────────────────────────────────────────────── */
 .footer--dark {
   --ifm-footer-background-color: var(--surface-2);

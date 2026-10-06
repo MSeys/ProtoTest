@@ -4,6 +4,9 @@ title: Attributes
 description: "Turn setup into a named, reusable capability with a ProtoTest attribute, and compose it onto any test that needs it."
 ---
 
+import FlowStrip from '@site/src/components/FlowStrip';
+import Nesting from '@site/src/components/Nesting';
+
 # Attributes
 
 ## What it is
@@ -56,19 +59,16 @@ public abstract class ProtoAttribute : Attribute
 
 Attributes run in ascending `Order` before the test and in reverse afterwards. Give a capability that others depend on a **lower** order. Hooks and attributes share one lane: every test hook runs before every attribute, and teardown walks the lane back.
 
-```mermaid
-flowchart LR
-    H["hooks: First … Authentication"] --> I["infra band −300 … −201"]
-    I --> E["environment band −200 … −101"]
-    E --> D["identity band −100 … −1"]
-    D --> S["scenario band 0 and above"]
-    S --> B["body"]
-    B --> SR["scenario back"]
-    SR --> DR["identity back"]
-    DR --> ER["environment back"]
-    ER --> IR["infra back"]
-    IR --> HR["hooks back"]
-```
+<Nesting
+  layers={[
+    {label: 'Test hooks', detail: <span>from <code>First</code> to <code>Authentication</code></span>},
+    {label: 'Infrastructure band', detail: '-300 to -201'},
+    {label: 'Environment band', detail: '-200 to -101'},
+    {label: 'Identity band', detail: '-100 to -1'},
+    {label: 'Scenario band', detail: '0 and above'},
+  ]}
+  core="The test body"
+/>
 
 `[SampleEnvironment]` sits in the environment band at -200, `[SampleUser]` in the identity band at -100, `[WebSession]` at -10, `[LoginAs<T>]` at 0. The same lane with the hook positions is in [Hooks](./hooks.md#reserved-order-bands): one lane, two pages, so they cannot drift apart.
 
@@ -114,12 +114,7 @@ public sealed class BillingJourney
 }
 ```
 
-```mermaid
-flowchart TB
-    M["NorthstarMember at Order 0"] --> T["NorthstarTenant at −200:\nprovisions the tenant"]
-    M --> A["Auth at 0:\ncarries the member token"]
-    M --> O["own behavior at 0:\nsees both dependencies"]
-```
+Expanded, `NorthstarTenant` runs first at its `Order` of -200. `Auth` and the composite's own behavior follow at 0, the composed `Auth` first on the tie, so the composite sees both.
 
 The expansion dedupes by declaration: same type plus same public property values runs once, so an explicit `NorthstarTenant` and the composed copy collapse into one. `Order` differs means different, and the explicit declaration wins.
 
@@ -197,12 +192,13 @@ public sealed class SampleUserAttribute : ProtoAttribute
 
 The sample suite's environment and user attributes are `SampleEnvironmentAttribute` and `SampleUserAttribute` (see below). The sample suite groups its pair as `NorthstarMemberAttribute` in `samples/Northstar.ProtoTest`.
 
-```mermaid
-flowchart LR
-    E["environment at −200:\nSetContext"] --> ST["typed state"]
-    ST --> U["user at −100:\nResolve"]
-    U --> TD["teardown:\nTryResolve, early return\nwhen setup never got that far"]
-```
+<FlowStrip
+  steps={[
+    {title: 'Environment attribute, at -200', detail: <span>publishes typed state with <code>SetContext</code></span>},
+    {title: 'User attribute, at -100', detail: <span>reads it with <code>Resolve</code></span>},
+    {title: 'Teardown', detail: <span>reads it with <code>TryResolve</code> and returns early when setup never got that far</span>},
+  ]}
+/>
 
 What makes these work well:
 

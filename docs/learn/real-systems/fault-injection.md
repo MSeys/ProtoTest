@@ -110,7 +110,7 @@ FAILED OpenCsms.Suite.Journeys.IdleFeeAfterTariffChange.TheIdleFeeStillAppliesAf
 
 Download the trace and open it in the [viewer](https://trace.prototest.dev):
 
-<a href="pathname:///traces/opencsms-showpiece.prototrace">opencsms-showpiece.prototrace</a>
+[opencsms-showpiece.prototrace](pathname:///traces/opencsms-showpiece.prototrace)
 
 ![The ProtoTrace viewer on the idle-fee failure: the failed test, the assertion message and the execution entry.](/images/opencsms/trace-viewer.png)
 

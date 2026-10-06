@@ -115,16 +115,13 @@ Three steps, none of which needs a suite of your own.
 
 ## Where it reads
 
-```mermaid
-flowchart TD
-    start{"How did the server start?"}
-    start -->|"--trace file"| one["Reads exactly that archive<br/>a folder argument is refused"]
-    start -->|"--project folder"| pr{"TestResults/ holds a readable trace?"}
-    start -->|"neither"| env["PROTOTEST_PROJECT, else the working directory"]
-    env --> pr
-    pr -->|"yes"| stop["Use it and stop there"]
-    pr -->|"no"| walk["Walk the tree, skipping obj, .git, node_modules<br/>inside bin, only TestResults"]
-```
+| The server started with | It reads |
+| --- | --- |
+| `--trace <file>` | exactly that archive. A folder argument is refused |
+| `--project <folder>` | that folder's `TestResults/` when it holds a readable trace, and stops there. Otherwise it walks the folder's tree |
+| neither | the same, from `PROTOTEST_PROJECT`, else from the working directory |
+
+The walk skips `obj`, `.git` and `node_modules`, and inside `bin` it reads only `TestResults` folders.
 
 "Newest" is the run's recorded start time, never a file timestamp. An archive the reader cannot open is skipped with a reason in `list_runs` and never guessed at.
 

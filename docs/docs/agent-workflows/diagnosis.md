@@ -45,7 +45,7 @@ FAILED orders match their shape (16 ms)
   foot={<>A failed run gate gets its own block at the end, with the gate's message and details. The output above is the committed MCP test fixture. A run with nothing to report prints the header, the counts and <code>All green.</code></>}
 />
 
-The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other three commands.
+The [CLI reference](./cli.md) lists the verb's arguments, the exit codes and the other six commands.
 
 ## The same document for an agent
 

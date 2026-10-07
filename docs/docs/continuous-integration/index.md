@@ -329,5 +329,5 @@ Keep the same retention as other test results, and shorter for sensitive suites.
 - [Reporting](../observability/reporting.md) configures the JSON and HTML sinks.
 - [Attachments](../foundation/attachments.md) explains what runners publish.
 - [The evidence loop](../agent-workflows/loop.md) turns the same artifacts into a pull request comment and a verdict.
-- [CLI reference](../agent-workflows/cli.md) documents the four verbs, the environment targets and the exit codes.
+- [CLI reference](../agent-workflows/cli.md) documents the seven verbs, the environment targets and the exit codes.
 - [Troubleshooting](../getting-started/troubleshooting.md#the-ci-artifact-is-empty) covers missing CI output.

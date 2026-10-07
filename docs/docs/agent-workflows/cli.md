@@ -1,12 +1,12 @@
 ---
 sidebar_position: 6
 title: CLI reference
-description: "The prototest CLI: the four verbs, their arguments, the environment targets and the exit codes."
+description: "The prototest CLI: the seven verbs, their arguments, the environment targets and the exit codes."
 ---
 
 # CLI reference
 
-`prototest` reads ProtoTest evidence from a terminal. It prints a run summary, builds a page over a folder of runs, checks two reports, and posts the feedback digest. It needs no agent and no browser. The [evidence action](../continuous-integration/index.md#the-evidence-action) installs it and calls the same commands in CI, so a local run and a CI step read the same archive the same way.
+`prototest` reads ProtoTest evidence from a terminal. It prints a run summary, builds a page over a folder of runs and checks two reports. It also compares two runs, proves a fix, reviews what each test proves and posts the feedback digest. It needs no agent and no browser. The [evidence action](../continuous-integration/index.md#the-evidence-action) installs it and calls the same commands in CI, so a local run and a CI step read the same archive the same way.
 
 ## Install
 

@@ -16,6 +16,10 @@ using ProtoTest.Core;
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
 public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
 {
+    // NUnit's own reset of recorded assertions; not public, so a later NUnit may not have it.
+    internal static readonly MethodInfo? ClearResult =
+        typeof(TestResult).GetMethod("ClearResult", BindingFlags.Instance | BindingFlags.NonPublic, Type.EmptyTypes);
+
     /// <summary>Wraps the test so the lifecycle encloses setup, the body and teardown.</summary>
     public TestCommand Wrap(TestCommand command)
     {
@@ -124,9 +128,9 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
             ? result.ResultState
             : ResultState.Error;
         // ClearResult is NUnit's own reset of recorded assertions. It is not public, and SetResult
-        // does not remove an assertion an earlier command already stored.
-        typeof(TestResult).GetMethod("ClearResult", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(result, null);
+        // does not remove an assertion an earlier command already stored. A later NUnit without it
+        // reports the body's assertion beside this message rather than losing the cleanup failure.
+        ClearResult?.Invoke(result, null);
         result.SetResult(state, cleanup.Message, cleanup.StackTrace ?? string.Empty);
     }
 

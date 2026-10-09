@@ -88,6 +88,14 @@ public sealed class ProbeFailureTests
     }
 
     [Test]
+    public void ClearResult_ShouldExistInTheNUnitThisAdapterIsBuiltAgainst()
+    {
+        // The adapter reaches a non-public NUnit method to drop an assertion the cleanup replaces; an
+        // NUnit upgrade that renames it must fail here, not degrade silently.
+        Assert.That(ProtoTestAttribute.ClearResult, Is.Not.Null);
+    }
+
+    [Test]
     public void BodyAndTeardownFailure_ShouldReportOnlyTheCleanupException()
     {
         // Arrange

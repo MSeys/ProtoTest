@@ -12,3 +12,4 @@ permissions:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+    secrets: inherit

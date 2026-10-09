@@ -17,6 +17,7 @@ permissions:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+    secrets: inherit
     with:
       upload_packages: true
 

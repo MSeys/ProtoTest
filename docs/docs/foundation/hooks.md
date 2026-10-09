@@ -177,7 +177,7 @@ Attachments added in `AfterTestAsync` are still published, because publishing ha
 
 - One `hook.before` operation per test hook and one `hook.after` per hook that completed, each carrying the hook type and its `Order`. The test's `test.setup` operation also records the hook count.
 - A hook that fails during setup stops the sequence and appears in the rollback. The hooks that completed run their `AfterTestAsync` in reverse, and the failing hook does not.
-- A hook that fails during teardown is recorded as an `Error` finding and does not replace the test's outcome.
+- A hook that fails during teardown is recorded as an `Error` finding. By default that fails the test when the body passed; the body's own failure stays primary when the body failed. Set `CleanupFailures` to `Report` to record the finding without changing the result. See [Lifecycle](./lifecycle.md#a-test).
 - Run hooks are not tied to a test record. Their effects show up in the run entities around the tests, such as a capability or infrastructure state they registered. Each application client `AfterInfrastructureAsync` opens records a `run.application.client` event with the application, whether it used an address or the in-process server, and the address.
 
 ## Limits

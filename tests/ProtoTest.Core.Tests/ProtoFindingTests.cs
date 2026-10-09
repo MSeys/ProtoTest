@@ -199,8 +199,8 @@ public class ProtoFindingTests
     public async Task TeardownFailure_ShouldReachTheReportAndTheRunGate()
     {
         // A teardown failure is recorded through AddFinding, so it is
-        // visible to sinks and run gates exactly like a failure the test reports itself. The test's own
-        // result is still untouched.
+        // visible to sinks and run gates exactly like a failure the test reports itself. The finding
+        // is what the gate fails the run on; the trace records the test itself as failed too.
         var sink = new CapturingSink();
         var builder = new ProtoHostBuilder();
         builder.AddSink(sink);

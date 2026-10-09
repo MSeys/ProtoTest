@@ -142,7 +142,7 @@ Every entry belongs to a **phase**:
 
 Every entry also ends with an **outcome**: `Succeeded`, `Failed`, `Partial`, `Cancelled`, `Skipped` or `Unknown`.
 
-A test can pass while something inside it failed (a diagnostic step that is not allowed to fail the run, a best-effort capture). That test is recorded as **Partial**, not Passed.
+A test can pass while something inside it failed (a diagnostic step that is not allowed to fail the run, a best-effort capture). That test is recorded as **Partial**, not Passed. A cleanup failure is not one of those steps: by default it fails the test, and the trace outcome is **Failed**. `CleanupFailures` set to `Report` restores the older reading, where that same test is **Partial** and the runner still shows it as passed. See [Lifecycle](../foundation/lifecycle.md#a-test).
 
 Tracked values are items with kind `value` and an id of the form `{type}:{identity}`. Test-side provisioning uses the result type in snake_case as the type segment. `InvoiceLine` becomes `invoice_line`, and the item reads `invoice_line:42`. The identity is what the provisioner returned. An application's own instrumentation writes the prefix of its identity-shaped attribute instead (`invoice.id = 42` contributes `invoice:42`). The two are the same item only when the attribute prefix matches the type segment and the values match. Name a type's identity attribute after the type (`invoice_line.number`) to correlate them.
 

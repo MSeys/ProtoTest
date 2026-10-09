@@ -45,11 +45,17 @@ public sealed class ProtoHost : IAsyncDisposable
         _clockRegistry = _rootServiceProvider.GetService<ProtoClockRegistry>() ?? new ProtoClockRegistry();
 
         _runLifecycle = new ProtoRunLifecycle(_rootServiceProvider, runHooks, _trace, _clock);
+        // A provider assembled by hand has no options registration; failing the test is the default.
+        CleanupFailureMode = _rootServiceProvider.GetService<ProtoCleanupOptions>()?.CleanupFailures
+            ?? ProtoCleanupFailureMode.Fail;
         _testLifecycle = new ProtoTestLifecycle(
-            this, _rootServiceProvider, testHooks, testIdGenerator, _trace, _clock, _clockRegistry);
+            this, _rootServiceProvider, testHooks, testIdGenerator, _trace, _clock, _clockRegistry, CleanupFailureMode);
         _clock.Advanced += OnRunClockAdvanced;
         ProtoHostRegistry.Register(this);
     }
+
+    /// <summary>Whether a failing cleanup fails the test. The scope applies it; the lifecycle records it.</summary>
+    internal ProtoCleanupFailureMode CleanupFailureMode { get; }
 
     /// <summary>
     /// Gets the run's clock. Tests get their own clock seeded from it, so advancing time inside a test

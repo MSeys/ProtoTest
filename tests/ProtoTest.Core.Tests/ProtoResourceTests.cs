@@ -316,11 +316,10 @@ public class ProtoResourceTests
     }
 
     [Test]
-    public async Task EarlyReleaseFailure_IsATeardownFindingAndDoesNotFailTheRun()
+    public async Task EarlyReleaseFailure_FailsTheTestTraceAndDoesNotFailTheRun()
     {
         // The failure reaches cleanup the same way a release that fails during dispose does. The
-        // test outcome becomes Partial, which is the existing teardown policy, and the run stays
-        // green unless a gate is configured.
+        // test is recorded as failed. Stopping the host still succeeds: nothing here installs a run gate.
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
         await host.StartAsync();
@@ -336,8 +335,9 @@ public class ProtoResourceTests
         using (Assert.EnterMultipleScope())
         {
             Assert.That(teardown!.InnerExceptions.Single().Message, Is.EqualTo("release failed"));
-            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial));
-            Assert.That(test.Error, Is.Null, "the cleanup failure is not the test's own error");
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(test.Error!.Message, Does.Contain("The test body passed, but cleanup failed:"));
+            Assert.That(test.Error.Message, Does.Contain("release failed"));
             Assert.That(
                 test.Record!.Findings,
                 Has.Some.Matches<ProtoTraceFindingRecord>(finding =>

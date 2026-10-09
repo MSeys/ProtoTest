@@ -164,6 +164,7 @@ A `configure` callback that throws is not remembered. A later successful call ca
 | `ProtoTest:Web:Playwright`, `ProtoTest:Web:Selenium`, `ProtoTest:Web:Pages` | one per integration | [Web](../integrations/web/index.md) |
 | `ProtoTest:Reporting:Json`, `ProtoTest:Reporting:Html` | one per integration | [Reporting](../observability/reporting.md) |
 | `ProtoTest:Readiness` | one per run | [Infrastructure](../foundation/infrastructure.md) (host probes and containers) |
+| `ProtoTest:CleanupFailures` | one per run | [Lifecycle](../foundation/lifecycle.md#a-test) (`Fail` or `Report`; `Fail` reports a passing test as failed when cleanup fails) |
 
 Each integration reads its options from one section named `ProtoTest:<Integration>`. Some add a second segment for the area they cover, for example `ProtoTest:Rest:Responses` or `ProtoTest:Grpc:Client`.
 

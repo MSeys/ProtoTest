@@ -38,7 +38,8 @@ public sealed class ProtoHostComposerTests
             new ProtoTraceOptions(),
             runResources,
             new ProtoReadinessOptions(),
-            new ProtoRedactionOptions());
+            new ProtoRedactionOptions(),
+            new ProtoCleanupOptions());
 
         composer.Compose();
 
@@ -81,7 +82,8 @@ public sealed class ProtoHostComposerTests
             new ProtoTraceOptions(),
             new ProtoRunResourceStore(),
             readiness,
-            new ProtoRedactionOptions());
+            new ProtoRedactionOptions(),
+            new ProtoCleanupOptions());
 
         composer.Compose();
 

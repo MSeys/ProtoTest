@@ -8,7 +8,7 @@ using ProtoTest.Core;
 /// <summary>
 /// Characterization for the MSTest setup and teardown failure paths.
 /// The adapter surfaces a setup failure with its original exception and records exactly one failed
-/// trace; a teardown failure keeps the reported result and lands as a Partial trace with a finding.
+/// trace; a teardown failure fails the returned result and lands as a failed trace with a finding.
 /// </summary>
 [TestClass]
 public sealed class ProbeFailureTests
@@ -43,21 +43,28 @@ public sealed class ProbeFailureTests
     }
 
     [TestMethod]
-    public async Task TeardownFailure_ShouldKeepTheResultAndRecordAPartialTrace()
+    public async Task TeardownFailure_ShouldFailTheResultAndNameTheCleanup()
     {
         // Arrange
         var method = ProbeSubjects.TeardownProbeMethod;
 
-        // Act: the teardown failure is swallowed by the scope, exactly as a runner's per-test cleanup is.
+        // Act
+        TestResult[] results;
         using (AdapterFailureProbe.BeginTeardownFailure(nameof(ProbeSubjects.TeardownProbe)))
         {
-            await new ProtoTestAttribute().ExecuteAsync(new FakeTestMethod(method));
+            results = await new ProtoTestAttribute().ExecuteAsync(new FakeTestMethod(method));
         }
 
         // Assert
         var trace = AdapterLifecycle.FindTrace(ProtoTestAssembly.Host, method);
-        Assert.AreEqual(ProtoTraceOutcome.Partial, trace.Outcome);
-        Assert.IsNull(trace.Error, "a teardown failure is not the test's own error");
+        Assert.HasCount(1, results);
+        Assert.AreEqual(UnitTestOutcome.Failed, results[0].Outcome);
+        var reported = results[0].TestFailureException;
+        Assert.IsNotNull(reported);
+        StringAssert.Contains(reported.Message, "The test body passed, but cleanup failed:");
+        StringAssert.Contains(reported.Message, AdapterFailureProbe.TeardownMessage);
+        Assert.AreEqual(ProtoTraceOutcome.Failed, trace.Outcome);
+        StringAssert.Contains(trace.Error?.Message, "The test body passed, but cleanup failed:");
         Assert.IsTrue(
             trace.Record!.Findings!.Any(finding => finding.Message.Contains(AdapterFailureProbe.TeardownMessage)));
     }

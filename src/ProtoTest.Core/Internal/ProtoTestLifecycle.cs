@@ -12,6 +12,7 @@ internal sealed class ProtoTestLifecycle
     private readonly ProtoTraceSession _trace;
     private readonly ProtoClock _clock;
     private readonly ProtoClockRegistry _clockRegistry;
+    private readonly ProtoCleanupFailureMode _cleanupFailures;
 
     public ProtoTestLifecycle(
         ProtoHost host,
@@ -20,7 +21,8 @@ internal sealed class ProtoTestLifecycle
         IProtoTestIdGenerator testIdGenerator,
         ProtoTraceSession trace,
         ProtoClock clock,
-        ProtoClockRegistry clockRegistry)
+        ProtoClockRegistry clockRegistry,
+        ProtoCleanupFailureMode cleanupFailures)
     {
         _host = host;
         _rootServiceProvider = rootServiceProvider;
@@ -29,6 +31,7 @@ internal sealed class ProtoTestLifecycle
         _trace = trace;
         _clock = clock;
         _clockRegistry = clockRegistry;
+        _cleanupFailures = cleanupFailures;
     }
 
     public static ProtoExecutionContext CurrentContext => ProtoAmbient.Test?.Context
@@ -130,7 +133,7 @@ internal sealed class ProtoTestLifecycle
         }
 
         var exceptions = new List<Exception>();
-        await TeardownAsync(state, exceptions, result, isRollback: false);
+        await TeardownAsync(state, exceptions, result, isRollback: false, _cleanupFailures);
         LifecycleExceptionHelper.ThrowIfAny(
             "One or more test lifecycle components failed during teardown.", exceptions);
     }
@@ -196,7 +199,8 @@ internal sealed class ProtoTestLifecycle
                 state,
                 exceptions,
                 ProtoTestResult.Failed(exception),
-                isRollback: true);
+                isRollback: true,
+                _cleanupFailures);
             LifecycleExceptionHelper.ThrowIfAny(
                 "Test setup failed and completed lifecycle components were rolled back.", exceptions);
             throw;
@@ -245,7 +249,8 @@ internal sealed class ProtoTestLifecycle
         ProtoTestLifecycleState state,
         List<Exception> exceptions,
         ProtoTestResult result,
-        bool isRollback)
+        bool isRollback,
+        ProtoCleanupFailureMode cleanupFailures)
     {
         var context = state.Context!;
         var phase = isRollback ? ProtoTracePhase.Rollback : ProtoTracePhase.Teardown;
@@ -349,9 +354,9 @@ internal sealed class ProtoTestLifecycle
 
         exceptions.AddRange((await releaseFlow.RunAsync(context.Trace)).Failures);
 
-        // Capturing artifacts is one teardown step among several: its failure is recorded like any
-        // other, but it never replaces the result the test reported. Completing the test still runs
-        // after it, so the ambient context is always cleared.
+        // Capturing artifacts is one teardown step among several: its failure joins the same aggregate
+        // as a hook or a release. Completing the test still runs after it, so the ambient context is
+        // always cleared.
         if (recorder is not null)
         {
             try
@@ -366,9 +371,9 @@ internal sealed class ProtoTestLifecycle
 
         if (exceptions.Count > exceptionCountBeforeTeardown)
         {
-            // The teardown exception is evidence, not a replacement for the result the test reported:
-            // the original outcome stands, so a failed assertion is not hidden by a cleanup error. The
-            // failing teardown operation and the findings below carry the teardown error instead.
+            // The teardown exception is evidence on the teardown operation and a finding. It does not
+            // replace a body failure: that result is what CompleteTest records, unless the body passed
+            // and cleanup failures fail the test, which ResultAfterCleanup applies below.
             lifecycleOperation.Fail(exceptions[^1]);
             foreach (var failure in exceptions.Skip(exceptionCountBeforeTeardown))
             {
@@ -388,12 +393,28 @@ internal sealed class ProtoTestLifecycle
         }
         lifecycleOperation.Dispose();
 
-        recorder?.CompleteTest(result);
+        var teardownFailures = exceptions.Skip(exceptionCountBeforeTeardown).ToArray();
+        recorder?.CompleteTest(ResultAfterCleanup(result, teardownFailures, cleanupFailures));
 
         if (ReferenceEquals(ProtoAmbient.Test, state))
         {
             state.Context = null;
             ProtoAmbient.ClearTest(state);
         }
+    }
+
+    private static ProtoTestResult ResultAfterCleanup(
+        ProtoTestResult result,
+        IReadOnlyList<Exception> teardownFailures,
+        ProtoCleanupFailureMode cleanupFailures)
+    {
+        if (teardownFailures.Count == 0
+            || cleanupFailures != ProtoCleanupFailureMode.Fail
+            || result.Outcome is not (ProtoTraceOutcome.Succeeded or ProtoTraceOutcome.Partial))
+        {
+            return result;
+        }
+
+        return ProtoTestResult.Failed(ProtoCleanupException.ForPassedBody(teardownFailures));
     }
 }

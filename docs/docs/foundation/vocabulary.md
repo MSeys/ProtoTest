@@ -141,6 +141,6 @@ Three different things, three different destinations:
 | What it is | a fact a test learned | something worth reporting that is not a failure | a file a test produced |
 | Who records it | integrations; you with `RecordObservation` | you with `AddFinding`; a teardown failure becomes one | integrations; you with `AddAttachment` |
 | Where it goes | collectors, then reports, and the trace | reports and run gates, and the trace | the runner, and the archive |
-| What it does not do | fail a test or a gate | replace the test's outcome | count as coverage |
+| What it does not do | fail a test or a gate | replace a body failure. A passing test whose cleanup failed is reported as failed unless `CleanupFailures` is `Report` | count as coverage |
 
 Coverage is built from observations, which is why this distinction matters: a fact a test did not state is not coverage. See [Coverage and observations](../observability/coverage.md) and [Attachments](./attachments.md).

@@ -1,12 +1,14 @@
 namespace ProtoTest.Core.Tests;
 
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ProtoTest.Core;
 
 [TestFixture]
 public sealed class ProtoTestScopeTests
 {
     [Test]
-    public async Task DisposeAsync_WhenTeardownFails_ShouldNotThrowAndTraceTheFailure()
+    public async Task DisposeAsync_WhenTeardownFails_ShouldFailTheTestAndNameTheCleanup()
     {
         var builder = new ProtoHostBuilder();
         builder.AddTestHook<FailingTeardownHook>();
@@ -17,13 +19,124 @@ public sealed class ProtoTestScopeTests
         var scope = await ProtoTestScope.StartAsync(preparation, host);
         scope.Result = ProtoTestResult.Passed;
 
-        Assert.DoesNotThrowAsync(
-            async () => await scope.DisposeAsync(),
-            "a teardown failure is a finding, never the test's result");
+        var failure = Assert.ThrowsAsync<ProtoCleanupException>(async () => await scope.DisposeAsync());
 
-        var teardown = host.Trace.Snapshot().Tests.Single().Entries
-            .Single(entry => entry.Kind == "test.teardown");
-        Assert.That(teardown.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+        var test = host.Trace.Snapshot().Tests.Single();
+        var teardown = test.Entries.Single(entry => entry.Kind == "test.teardown");
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure!.BodyPassed, Is.True);
+            Assert.That(
+                failure.Message,
+                Is.EqualTo("The test body passed, but cleanup failed: InvalidOperationException: teardown failed."));
+            Assert.That(failure.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(test.Error!.Message, Is.EqualTo(failure.Message));
+            Assert.That(teardown.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+        });
+    }
+
+    [Test]
+    public async Task DisposeAsync_WhenCleanupFailuresAreReported_ShouldKeepThePassingResult()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureCleanup(options => options.CleanupFailures = ProtoCleanupFailureMode.Report);
+        builder.AddTestHook<FailingTeardownHook>();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var preparation = ProtoTestAdapter.Prepare(TestMethods.Placeholder, host);
+        var scope = await ProtoTestScope.StartAsync(preparation, host);
+        scope.Result = ProtoTestResult.Passed;
+
+        Assert.DoesNotThrowAsync(async () => await scope.DisposeAsync());
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial));
+            Assert.That(test.Error, Is.Null);
+            Assert.That(
+                test.Record!.Findings,
+                Has.Some.Matches<ProtoTraceFindingRecord>(finding =>
+                    finding.Category == "Teardown" && finding.Message.Contains("teardown failed")));
+        });
+    }
+
+    [Test]
+    public async Task DisposeAsync_WhenConfigurationReportsCleanupFailures_ShouldKeepThePassingResult()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ProtoTest:CleanupFailures"] = "Report"
+            }));
+        builder.AddTestHook<FailingTeardownHook>();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var preparation = ProtoTestAdapter.Prepare(TestMethods.Placeholder, host);
+        var scope = await ProtoTestScope.StartAsync(preparation, host);
+        scope.Result = ProtoTestResult.Passed;
+
+        Assert.DoesNotThrowAsync(async () => await scope.DisposeAsync());
+
+        Assert.That(
+            host.Trace.Snapshot().Tests.Single().Outcome,
+            Is.EqualTo(ProtoTraceOutcome.Partial));
+    }
+
+    [Test]
+    public async Task DisposeAsync_WhenTheBodyFailed_ShouldKeepThatFailureAndAttachCleanup()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.AddTestHook<FailingTeardownHook>();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var preparation = ProtoTestAdapter.Prepare(TestMethods.Placeholder, host);
+        var scope = await ProtoTestScope.StartAsync(preparation, host);
+        var assertion = new InvalidOperationException("the assertion failed");
+        scope.Result = ProtoTestResult.Failed(assertion);
+
+        var failure = Assert.ThrowsAsync<ProtoCleanupException>(async () => await scope.DisposeAsync());
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure!.BodyPassed, Is.False);
+            Assert.That(failure.Message, Does.StartWith("the assertion failed"));
+            Assert.That(failure.Message, Does.Contain("Cleanup also failed: InvalidOperationException: teardown failed."));
+            Assert.That(failure.InnerException, Is.SameAs(assertion));
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(test.Error!.Message, Is.EqualTo("the assertion failed"));
+        });
+    }
+
+    [Test]
+    public async Task DisposeAsync_WhenSeveralCleanupsFail_ShouldNameTheFirstAndCountTheRest()
+    {
+        var builder = new ProtoHostBuilder();
+        builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IProtoTestHook>(new FailingTeardownHook("alpha") { Order = 10 });
+            services.AddSingleton<IProtoTestHook>(new FailingTeardownHook("beta") { Order = 20 });
+        });
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var preparation = ProtoTestAdapter.Prepare(TestMethods.Placeholder, host);
+        var scope = await ProtoTestScope.StartAsync(preparation, host);
+        scope.Result = ProtoTestResult.Passed;
+
+        var failure = Assert.ThrowsAsync<ProtoCleanupException>(async () => await scope.DisposeAsync());
+
+        // Teardown runs in reverse order, so beta fails first and alpha is the one left to count.
+        Assert.Multiple(() =>
+        {
+            Assert.That(failure!.CleanupFailures, Has.Count.EqualTo(2));
+            Assert.That(
+                failure.Message,
+                Is.EqualTo(
+                    "The test body passed, but cleanup failed: InvalidOperationException: beta. 1 more cleanup failure."));
+        });
     }
 
     [Test]
@@ -196,11 +309,13 @@ public sealed class ProtoTestScopeTests
         });
     }
 
-    private sealed class FailingTeardownHook : IProtoTestHook
+    private sealed class FailingTeardownHook(string message = "teardown failed") : IProtoTestHook
     {
+        public int Order { get; init; }
+
         public Task BeforeTestAsync(ProtoExecutionContext context) => Task.CompletedTask;
 
         public Task AfterTestAsync(ProtoExecutionContext context)
-            => throw new InvalidOperationException("teardown failed");
+            => throw new InvalidOperationException(message);
     }
 }

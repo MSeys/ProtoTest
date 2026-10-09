@@ -2,9 +2,10 @@ namespace ProtoTest.Core;
 
 /// <summary>
 /// One test's lifecycle as a scope: start it from a prepared test, run the framework's body, then let
-/// the scope complete the lifecycle. Teardown failures are already recorded as findings by the
-/// lifecycle; the scope never lets them replace the result the test reported, so every adapter shares
-/// one policy instead of four.
+/// the scope complete the lifecycle. Teardown failures are recorded as findings by the lifecycle. By
+/// default the scope then fails the test: a body that passed is reported as failed, and a body that
+/// failed keeps that failure with the cleanup attached. <see cref="ProtoCleanupFailureMode.Report"/>
+/// records the finding and leaves the reported result alone, so every adapter shares one policy.
 /// </summary>
 public sealed class ProtoTestScope : IAsyncDisposable
 {
@@ -69,9 +70,10 @@ public sealed class ProtoTestScope : IAsyncDisposable
     /// flow that started it and while that test is the active one, because completion reads the ambient
     /// context. Disposing off-flow, or under another test, would complete nothing (or someone else's
     /// test), so the scope records that as a finding on its own test and reports it instead of
-    /// silently no-oping. A teardown failure is already recorded by the lifecycle as a finding and on
-    /// the failing teardown operation; it is swallowed here so cleanup can never replace the test's own
-    /// outcome.
+    /// silently no-oping. A teardown failure is already recorded by the lifecycle. Unless cleanup
+    /// failures are set to <see cref="ProtoCleanupFailureMode.Report"/>, disposing then throws
+    /// <see cref="ProtoCleanupException"/> so the runner fails this test. A body that failed stays the
+    /// primary error inside that exception.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -110,9 +112,25 @@ public sealed class ProtoTestScope : IAsyncDisposable
         {
             await _host.CompleteTestAsync(Result);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            // Recorded as a finding by ProtoTestLifecycle.TeardownAsync; nothing left to do here.
+            // Recorded as a finding by ProtoTestLifecycle.TeardownAsync. Report mode stops there.
+            // Fail mode surfaces it on this test: the developer sees which test leaked, and a body
+            // failure stays the message the runner shows.
+            if (_host.CleanupFailureMode == ProtoCleanupFailureMode.Report)
+            {
+                return;
+            }
+
+            if (Result.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Cancelled)
+            {
+                throw ProtoCleanupException.ForBodyFailure(Result, exception);
+            }
+
+            if (Result.Outcome is ProtoTraceOutcome.Succeeded or ProtoTraceOutcome.Partial)
+            {
+                throw ProtoCleanupException.ForPassedBody(exception);
+            }
         }
     }
 }

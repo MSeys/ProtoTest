@@ -137,7 +137,8 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder, IProtoComposableBuilde
             _traceOptions,
             _runResources,
             ProtoReadinessExtensions.ResolveOptions(this),
-            ProtoRedactionExtensions.ResolveOptions(this));
+            ProtoRedactionExtensions.ResolveOptions(this),
+            ProtoCleanupExtensions.ResolveOptions(this));
         composer.Compose();
 
         var rootProvider = _services.BuildServiceProvider();
@@ -150,6 +151,7 @@ public sealed class ProtoHostBuilder : IProtoHostBuilder, IProtoComposableBuilde
             // build rather than the first probe.
             _ = rootProvider.GetServices<IProtoCollector>().ToArray();
             _ = rootProvider.GetRequiredService<ProtoReadinessOptions>();
+            _ = rootProvider.GetRequiredService<ProtoCleanupOptions>();
             return new ProtoHost(rootProvider);
         }
         catch

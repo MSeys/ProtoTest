@@ -1,6 +1,7 @@
 namespace ProtoTest.MSTest;
 
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ProtoTest.Core;
 
@@ -37,24 +38,73 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
 
         var attachmentPublisher = new MSTestAttachmentPublisher();
         TestResult[]? results = null;
+        Exception? bodyEscape = null;
         var scope = await ProtoTestScope.StartAsync(preparation, ProtoTestAssembly.Host, attachmentPublisher);
         try
         {
             results = await base.ExecuteAsync(testMethod);
             scope.Result = ToProtoTestResult(results.Length == 0 ? null : results[0]);
-            return results;
         }
-        finally
+        catch (Exception exception)
+        {
+            bodyEscape = exception;
+            scope.Result = ProtoTestResult.FromException(exception);
+        }
+
+        ProtoCleanupException? cleanup = null;
+        try
         {
             await scope.DisposeAsync();
+        }
+        catch (ProtoCleanupException exception)
+        {
+            // MSTest reports the TestResult this method returns. Writing the cleanup onto that result
+            // keeps a body failure as the message instead of discarding the result for the dispose throw.
+            cleanup = exception;
+        }
+
+        if (results is { Length: > 0 })
+        {
+            var primary = results[0];
+            if (cleanup is not null)
+            {
+                ApplyCleanup(primary, cleanup);
+            }
 
             // One invocation is one row, so this row's files belong on this row's result.
-            if (results is { Length: > 0 } && attachmentPublisher.Files.Count > 0)
+            if (attachmentPublisher.Files.Count > 0)
             {
-                var primary = results[0];
                 primary.ResultFiles = [.. primary.ResultFiles ?? [], .. attachmentPublisher.Files];
             }
+
+            return results;
         }
+
+        if (bodyEscape is not null)
+        {
+            ExceptionDispatchInfo.Capture(cleanup ?? bodyEscape).Throw();
+        }
+
+        if (cleanup is not null)
+        {
+            throw cleanup;
+        }
+
+        return results ?? [];
+    }
+
+    /// <summary>
+    /// Writes the cleanup failure onto the result MSTest will return. A body that already failed keeps
+    /// its outcome; the cleanup exception's message leads with that failure.
+    /// </summary>
+    private static void ApplyCleanup(TestResult result, ProtoCleanupException cleanup)
+    {
+        if (result.Outcome is not (UnitTestOutcome.Failed or UnitTestOutcome.Error))
+        {
+            result.Outcome = UnitTestOutcome.Failed;
+        }
+
+        result.TestFailureException = cleanup;
     }
 
     /// <summary>

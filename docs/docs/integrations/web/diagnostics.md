@@ -118,7 +118,7 @@ Other event kinds worth knowing when you read a trace: `web.page.discovery.faile
 
 ## When artifacts are finalised
 
-Web sessions complete during teardown, in reverse order: after the teardown hooks, before attachments are published and before the browser is disposed. The Playwright trace and the Selenium diagnostics are written then. A failure there is recorded on the session's `web.session.complete` entry and counts as a teardown failure. This order is what gets the native trace and diagnostics into the runner's output and the `.prototrace` archive.
+Web sessions complete during teardown, in reverse order: after the teardown hooks, before attachments are published and before the browser is disposed. The Playwright trace and the Selenium diagnostics are written then. A failure there is recorded on the session's `web.session.complete` entry and counts as a teardown failure, so by default the test fails. This order is what gets the native trace and diagnostics into the runner's output and the `.prototrace` archive.
 
 ## Where it lands and how to open it
 

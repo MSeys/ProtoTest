@@ -1,6 +1,7 @@
 namespace ProtoTest.TUnit;
 
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using global::TUnit.Core.Extensions;
 using global::TUnit.Core.Interfaces;
 using ProtoTest.Core;
@@ -38,6 +39,7 @@ public class ProtoTestExecutor : ITestExecutor
             context.Execution.CancellationToken);
         var result = ProtoTestResult.Unknown;
         Exception? failure = null;
+        ProtoCleanupException? cleanup = null;
         try
         {
             await action();
@@ -59,12 +61,26 @@ public class ProtoTestExecutor : ITestExecutor
         finally
         {
             scope.Result = result;
-            await scope.DisposeAsync();
+            try
+            {
+                await scope.DisposeAsync();
+            }
+            catch (ProtoCleanupException exception)
+            {
+                // Captured here so a dispose failure cannot replace the body exception. When the body
+                // failed, this exception is what TUnit sees: its message leads with that failure.
+                cleanup = exception;
+            }
+        }
+
+        if (cleanup is not null)
+        {
+            ExceptionDispatchInfo.Capture(cleanup).Throw();
         }
 
         if (failure is not null)
         {
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+            ExceptionDispatchInfo.Capture(failure).Throw();
         }
     }
 

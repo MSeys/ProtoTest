@@ -124,7 +124,15 @@ When the runner completes the test:
 4. `context.DisposeAsync` releases owned resources in reverse registration order, then disposes the DI scope.
 5. The test's trace artifacts are captured and the recorder is completed with its outcome. `Proto.Context` is cleared.
 
-**Teardown attempts each step**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding and does not replace the outcome the test already reported, so a cleanup error never hides a failed assertion. `CompleteTestAsync` rethrows one failure as-is and aggregates several. The runner adapters complete through `ProtoTestScope`, which keeps the test's own outcome.
+**Teardown attempts each step**, even when an earlier one throws. A teardown failure is recorded as an `Error` finding. By default it also fails the test when the body passed: the runner reports that test as failed, and the message says the test body passed and names the cleanup failure (the first exception, then how many more). A body that already failed keeps that failure as the message the runner shows; the cleanup failures are attached after it, so a cleanup error never hides a failed assertion. The trace agrees: a passing body whose cleanup failed is `Failed`, with that same message.
+
+`CleanupFailures` selects the behaviour. `Fail` is the default. `Report` is the previous behaviour: the finding is recorded, the runner result stays what the body produced, and a passing body reads as `Partial` in the trace.
+
+```csharp
+builder.ConfigureCleanup(options => options.CleanupFailures = ProtoCleanupFailureMode.Report);
+```
+
+Configuration binds the same choice from `ProtoTest:CleanupFailures` (`Fail` or `Report`) and wins over the code value. `CompleteTestAsync` still rethrows one cleanup failure as-is and aggregates several. The runner adapters complete through `ProtoTestScope`, which applies this rule, so the failure belongs to the test that leaked rather than to the run as a whole.
 
 ### When setup fails
 
@@ -212,12 +220,12 @@ builder.AddRunGate("no error findings", context => context
 - Attachments land on the record of the operation that produced them. Resources appear as entities, and each release writes a `resource.release` operation. A framework-managed client records only a failed release, as an event ([Clients](./clients.md)).
 - Run-level pieces are entities: capabilities, infrastructure with its state, and readiness probes. Run gates evaluate report items after the last test and before the reports export.
 - The trace archive is written last, after the reports, so a report's coverage is inside the archive.
-- A teardown failure is recorded as an `Error` finding without changing the test's outcome.
+- A teardown failure is recorded as an `Error` finding. By default it also fails a test whose body passed. `CleanupFailures` set to `Report` leaves the test's own outcome unchanged and records a passing body as `Partial`.
 
 ## Limits
 
 - **One context per async flow.** Starting a second test on the same flow before completing the first throws, and completing a test from a different host throws. `Proto.Context` is flow-local, so work that escapes the test's flow cannot read it. See [Execution context](./execution-context.md) and [Concurrency](./concurrency.md).
 - **One build per builder.** `Build()` can only run once, and once stopping has begun, starting a new test throws.
 - **A skipped test never reaches the lifecycle.** It never creates a context. See [Skip conditions](./skip-conditions.md).
-- **A teardown failure does not replace the outcome.** It is recorded as an `Error` finding while the test's own outcome stands.
+- **A teardown failure does not replace a body failure.** The body's error stays the one the runner shows, with the cleanup failures attached. A body that passed is reported as failed unless `CleanupFailures` is `Report`. The finding is recorded either way.
 - **Ids cannot grow past 18 digits.** Running out of sequence numbers throws.

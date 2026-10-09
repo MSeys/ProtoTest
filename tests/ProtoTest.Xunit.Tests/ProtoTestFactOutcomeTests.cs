@@ -98,7 +98,7 @@ public sealed class ProtoTestFactOutcomeTests
     }
 
     [Fact]
-    public async Task TeardownFailure_ShouldReportPassedToTheRunnerAndRecordPartial()
+    public async Task TeardownFailure_ShouldReportFailedToTheRunnerAndNameTheCleanup()
     {
         var testCase = new ProtoXunitTestCase(
             new NullMessageSink(),
@@ -113,12 +113,16 @@ public sealed class ProtoTestFactOutcomeTests
         }
 
         var trace = TraceFor(testCase.DisplayName);
-        Assert.Equal(ProtoTraceOutcome.Partial, trace.Outcome);
-        Assert.Null(trace.Error);
+        var failed = Assert.Single(bus.Messages.OfType<ITestFailed>());
+        Assert.Equal(ProtoTraceOutcome.Failed, trace.Outcome);
+        Assert.Contains("The test body passed, but cleanup failed:", trace.Error?.Message);
+        Assert.Contains(AdapterFailureProbe.TeardownMessage, trace.Error?.Message);
         Assert.Contains(
             trace.Record!.Findings!,
             finding => finding.Message.Contains(AdapterFailureProbe.TeardownMessage));
-        Assert.Contains(bus.Messages, message => message is ITestPassed);
+        Assert.Contains("The test body passed, but cleanup failed:", failed.Messages[0]);
+        Assert.Contains(AdapterFailureProbe.TeardownMessage, failed.Messages[0]);
+        Assert.DoesNotContain(bus.Messages, message => message is ITestPassed);
     }
 
     [Fact]

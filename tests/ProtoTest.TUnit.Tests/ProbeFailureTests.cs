@@ -9,7 +9,7 @@ using ProtoTest.Core;
 /// <summary>
 /// Characterization for the TUnit setup and teardown failure paths.
 /// The executor surfaces a setup failure with its original exception and records one failed trace; a
-/// teardown failure keeps the reported result and lands as a Partial trace with a finding.
+/// teardown failure is rethrown so TUnit fails the test, and the trace records that failure.
 /// </summary>
 public sealed class ProbeFailureTests
 {
@@ -29,14 +29,17 @@ public sealed class ProbeFailureTests
 
     [Test]
     [TestExecutor<PassthroughTestExecutor>]
-    public async Task TeardownFailure_ShouldKeepTheResultAndRecordAPartialTrace()
+    public async Task TeardownFailure_ShouldFailTheTestAndNameTheCleanup()
     {
-        // Act: the teardown failure is swallowed by the scope, so the executor completes normally.
-        var trace = await RunTeardownProbeAsync();
+        // Act
+        var (trace, failure) = await RunTeardownProbeAsync();
 
         // Assert
-        await Assert.That(trace.Outcome).IsEqualTo(ProtoTraceOutcome.Partial);
-        await Assert.That(trace.Error).IsNull();
+        await Assert.That(failure).IsNotNull();
+        await Assert.That(failure!.Message).Contains("The test body passed, but cleanup failed:");
+        await Assert.That(failure.Message).Contains(AdapterFailureProbe.TeardownMessage);
+        await Assert.That(trace.Outcome).IsEqualTo(ProtoTraceOutcome.Failed);
+        await Assert.That(trace.Error!.Message).Contains("The test body passed, but cleanup failed:");
         await Assert.That(
             trace.Record!.Findings!.Any(finding => finding.Message.Contains(AdapterFailureProbe.TeardownMessage)))
             .IsTrue();
@@ -62,14 +65,23 @@ public sealed class ProbeFailureTests
         return (AdapterLifecycle.FindTrace(ProtoTestAssembly.Host, method), failure);
     }
 
-    private static async Task<ProtoTestTrace> RunTeardownProbeAsync([CallerMemberName] string caller = "")
+    private static async Task<(ProtoTestTrace Trace, ProtoCleanupException? Failure)> RunTeardownProbeAsync(
+        [CallerMemberName] string caller = "")
     {
         var method = typeof(ProbeFailureTests).GetMethod(caller, BindingFlags.Instance | BindingFlags.Public)!;
+        ProtoCleanupException? failure = null;
         using (AdapterFailureProbe.BeginTeardownFailure(caller))
         {
-            await new ProtoTestExecutor().ExecuteTest(global::TUnit.Core.TestContext.Current!, () => default);
+            try
+            {
+                await new ProtoTestExecutor().ExecuteTest(global::TUnit.Core.TestContext.Current!, () => default);
+            }
+            catch (ProtoCleanupException caught)
+            {
+                failure = caught;
+            }
         }
 
-        return AdapterLifecycle.FindTrace(ProtoTestAssembly.Host, method);
+        return (AdapterLifecycle.FindTrace(ProtoTestAssembly.Host, method), failure);
     }
 }

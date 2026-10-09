@@ -8,7 +8,7 @@ using Xunit.v3;
 /// <summary>
 /// Characterization for the xUnit v3 setup and teardown failure paths.
 /// The adapter surfaces a setup failure with its original exception and records one failed trace; a
-/// teardown failure keeps the reported result and lands as a Partial trace with a finding. Driven through
+/// teardown failure fails the test and lands as a failed trace with a finding. Driven through
 /// the real lifecycle handler so a deliberate failure cannot make the suite red.
 /// </summary>
 public sealed class ProbeFailureTests
@@ -37,22 +37,26 @@ public sealed class ProbeFailureTests
     }
 
     [Fact]
-    public void TeardownFailure_ShouldKeepTheResultAndRecordAPartialTrace()
+    public void TeardownFailure_ShouldFailTheTestAndNameTheCleanup()
     {
         // Arrange
         var method = ProbeSubjects.TeardownProbeMethod;
         var scope = ProtoTestLifecycleHandler.Before(method, test: null);
 
         // Act
+        ProtoCleanupException? failure;
         using (AdapterFailureProbe.BeginTeardownFailure(nameof(ProbeSubjects.TeardownProbe)))
         {
-            ProtoTestLifecycleHandler.Complete(scope, TestResultState.ForPassed(0m));
+            failure = Assert.Throws<ProtoCleanupException>(
+                () => ProtoTestLifecycleHandler.Complete(scope, TestResultState.ForPassed(0m)));
         }
 
-        // Assert
+        // Assert: After throws, which is how xUnit v3 fails a test whose body already passed.
         var trace = AdapterLifecycle.FindTrace(ProtoTestAssembly.Host, method);
-        Assert.Equal(ProtoTraceOutcome.Partial, trace.Outcome);
-        Assert.Null(trace.Error);
+        Assert.Contains("The test body passed, but cleanup failed:", failure.Message);
+        Assert.Contains(AdapterFailureProbe.TeardownMessage, failure.Message);
+        Assert.Equal(ProtoTraceOutcome.Failed, trace.Outcome);
+        Assert.Contains("The test body passed, but cleanup failed:", trace.Error?.Message);
         Assert.Contains(
             trace.Record!.Findings!,
             finding => finding.Message.Contains(AdapterFailureProbe.TeardownMessage));

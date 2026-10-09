@@ -1,5 +1,6 @@
 namespace ProtoTest.NUnit;
 
+using System.Runtime.ExceptionServices;
 using global::NUnit.Framework;
 using global::NUnit.Framework.Interfaces;
 using global::NUnit.Framework.Internal;
@@ -64,9 +65,10 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
                     NUnitAttachmentPublisher.Instance,
                     context.CancellationToken)));
             Exception? failure = null;
+            TestResult? result = null;
             try
             {
-                return innerCommand.Execute(context);
+                result = innerCommand.Execute(context);
             }
             catch (Exception exception)
             {
@@ -75,14 +77,45 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
                 // only after this scope completed. Keep it, unwrapped as NUnit would, so the trace maps
                 // the failure NUnit will report instead of the result's initial Inconclusive state.
                 failure = exception.Unwrap();
-                throw;
             }
-            finally
+
+            scope.Result = MapResult(context, failure);
+            ProtoCleanupException? cleanup = null;
+            try
             {
-                scope.Result = MapResult(context, failure);
                 ProtoTestAsync.RunSync(() => scope.DisposeAsync());
             }
+            catch (ProtoCleanupException exception)
+            {
+                cleanup = exception;
+            }
+
+            // A body exception still in flight has to be the one that leaves this command: a throw from
+            // Dispose would replace it. The cleanup exception keeps that body failure as its message.
+            if (failure is not null)
+            {
+                ExceptionDispatchInfo.Capture(cleanup ?? failure).Throw();
+            }
+
+            if (cleanup is not null)
+            {
+                ApplyCleanup(context.CurrentResult, cleanup);
+            }
+
+            return result ?? context.CurrentResult;
         }
+    }
+
+    /// <summary>
+    /// Writes the cleanup failure onto the result NUnit will return. A body that already failed keeps
+    /// its result state; the cleanup exception's message leads with that failure.
+    /// </summary>
+    private static void ApplyCleanup(TestResult result, ProtoCleanupException cleanup)
+    {
+        var state = result.ResultState.Status == TestStatus.Failed
+            ? result.ResultState
+            : ResultState.Error;
+        result.SetResult(state, cleanup.Message, cleanup.StackTrace ?? string.Empty);
     }
 
     /// <summary>

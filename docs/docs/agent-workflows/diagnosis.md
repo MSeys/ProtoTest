@@ -34,7 +34,7 @@ FAILED orders match their shape (16 ms)
   mismatch: \$.orderId: expected 7, actual 42`}
   callouts={[
     {line: 1, title: 'The document', note: 'Trace format, run id, and the recorded time range of the run.'},
-    {line: 2, title: 'The counts', note: 'Every test by outcome. A partial test passed its runner outcome but something inside it failed, and the summary does not hide it.'},
+    {line: 2, title: 'The counts', note: 'Every test by outcome. A partial test passed its runner outcome but something inside it failed, and the summary does not hide it. A cleanup failure is failed, not partial, unless cleanup failures are set to report.'},
     {line: 4, title: 'The test', note: 'Outcome, name and duration. Every test that did not fully succeed gets a block like this one.'},
     {line: 5, title: 'The recorded error', note: 'The message the run recorded, so it points at the code that failed.'},
     {line: 7, title: 'The source location', note: 'The file and line of the selected failure.'},

@@ -346,7 +346,18 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
         }
         finally
         {
-            await scope.DisposeAsync();
+            try
+            {
+                await scope.DisposeAsync();
+            }
+            catch (ProtoCleanupException exception)
+            {
+                // xUnit fails the test from this aggregator after InvokeTestMethodAsync returns. Replacing
+                // its contents keeps one failure: a passing body becomes the cleanup failure, and a body
+                // that already failed stays the message (the cleanup exception leads with it).
+                aggregator.Clear();
+                aggregator.Add(exception);
+            }
         }
     }
 }

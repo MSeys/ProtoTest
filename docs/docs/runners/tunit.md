@@ -104,7 +104,7 @@ public class OrderTests
 | The host | `ProtoTestAssembly` gives you `InitializeAsync` and `CleanupAsync` for TUnit's `[Before(Assembly)]` and `[After(Assembly)]`. |
 | The test attribute | None. You keep TUnit's `[Test]`, and `ProtoTestExecutor` intercepts the execution. |
 | The lifecycle | `ExecuteTest` resolves the test's `MethodInfo` and attributes, starts the context, awaits the test action, then completes the context. |
-| Failure handling | If the body throws, the executor records the outcome, completes the context, and rethrows with `ExceptionDispatchInfo`, so TUnit still sees the exception. A teardown failure never replaces the body's outcome. |
+| Failure handling | If the body throws, the executor records the outcome, completes the context, and rethrows with `ExceptionDispatchInfo`, so TUnit still sees the exception. A teardown failure on a passing body is rethrown too, so TUnit fails that test. A body that already failed stays the message; the cleanup failures are attached to it. |
 | Scheduling | Fully async, like xUnit v2 and MSTest. |
 | Cancellation | The live `TestContext.CancellationToken` is passed into the lifecycle, so the test, its hooks and the SQL connect wait observe TUnit's per-test token. |
 | Outcomes | A completed body is `Passed`. A thrown `SkipTestException` (a body-level `Skip.Test`) is `Skipped`. A thrown `OperationCanceledException` is `Cancelled`. Anything else is `Failed` with the exception, rethrown to TUnit. |
@@ -118,7 +118,7 @@ public class OrderTests
 - Register the executor for the assembly. `[TestExecutor<T>]` on a class or a method is not part of the supported surface.
 - **Runs unwrapped.** A source-generated test without a reflection `MethodInfo` runs unwrapped. The executor has no method data to build a context.
 - The per-test token comes from `TestContext.CancellationToken`. The executor has no token of its own, so a test with no live context (see the `MethodInfo` limit) starts from `CancellationToken.None`.
-- A teardown failure is recorded but can never change the body's outcome.
+- A teardown failure is recorded as a finding. By default it fails a test whose body passed. It does not replace a body failure. `CleanupFailures` set to `Report` leaves the body's outcome unchanged.
 
 ## Learn more
 

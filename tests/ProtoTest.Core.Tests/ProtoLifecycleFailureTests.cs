@@ -85,15 +85,15 @@ public sealed class ProtoLifecycleFailureTests
             Assert.That(exception, Is.Not.Null);
             Assert.That(
                 host.Trace.Snapshot().Tests.Single().Outcome,
-                Is.EqualTo(ProtoTraceOutcome.Succeeded),
-                "a capture failure is teardown evidence, not the test's result");
+                Is.EqualTo(ProtoTraceOutcome.Failed),
+                "a capture failure is cleanup, so a passing body is recorded as failed");
             Assert.Throws<InvalidOperationException>(() => _ = ProtoHost.CurrentContext);
         });
         await host.StopAsync();
     }
 
     [Test]
-    public async Task ArtifactCaptureFailure_ShouldRecordPartialWithoutReplacingTheResult()
+    public async Task ArtifactCaptureFailure_ShouldFailThePassingTestAndKeepTheTeardownFinding()
     {
         var builder = new ProtoHostBuilder();
         await using var host = builder.Build();
@@ -108,9 +108,9 @@ public sealed class ProtoLifecycleFailureTests
         Assert.Multiple(() =>
         {
             Assert.That(exception, Is.Not.Null);
-            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial),
-                "the test passed but its teardown failed");
-            Assert.That(test.Error, Is.Null, "the capture failure is not the test's own error");
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(test.Error!.Message, Does.StartWith("The test body passed, but cleanup failed:"));
+            Assert.That(test.Error.Message, Does.Contain(nameof(ArgumentNullException)));
             Assert.That(
                 test.Entries.Single(entry => entry.Kind == "test.teardown").Outcome,
                 Is.EqualTo(ProtoTraceOutcome.Failed));
@@ -187,7 +187,7 @@ public sealed class ProtoLifecycleFailureTests
     }
 
     [Test]
-    public async Task FailingTeardown_OnAPassingTest_ShouldRecordPartialWithoutAnError()
+    public async Task FailingTeardown_OnAPassingTest_ShouldRecordFailedWithTheCleanup()
     {
         var events = new List<string>();
         var services = new ServiceCollection();
@@ -202,8 +202,9 @@ public sealed class ProtoLifecycleFailureTests
         Assert.Multiple(() =>
         {
             Assert.That(exception!.Message, Is.EqualTo("FailingHook failed"));
-            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial));
-            Assert.That(test.Error, Is.Null, "a teardown failure is not the test's own error");
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(test.Error!.Message, Does.Contain("The test body passed, but cleanup failed:"));
+            Assert.That(test.Error.Message, Does.Contain("FailingHook failed"));
             Assert.That(
                 test.Record!.Findings,
                 Has.Some.Matches<ProtoTraceFindingRecord>(finding =>

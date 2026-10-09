@@ -36,6 +36,10 @@
       "reason": "the per-resource selection key ProtoTest.Aspire's chain providers read; the resource name is the identity the AppHost registered it under and the run script sets the key, not an options section"
     },
     {
+      "key": "ProtoTest:CleanupFailures",
+      "reason": "a property of the root ProtoTest section (ProtoCleanupOptions binds from \"ProtoTest\"), not its own section constant"
+    },
+    {
       "key": "ProtoTest:Data",
       "reason": "named in the docs and the fact sheet only to say ProtoTest.Data has no configuration section"
     },

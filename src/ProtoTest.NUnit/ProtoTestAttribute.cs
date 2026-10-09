@@ -1,5 +1,6 @@
 namespace ProtoTest.NUnit;
 
+using System.Reflection;
 using System.Runtime.ExceptionServices;
 using global::NUnit.Framework;
 using global::NUnit.Framework.Interfaces;
@@ -90,16 +91,22 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
                 cleanup = exception;
             }
 
-            // A body exception still in flight has to be the one that leaves this command: a throw from
-            // Dispose would replace it. The cleanup exception keeps that body failure as its message.
-            if (failure is not null)
-            {
-                ExceptionDispatchInfo.Capture(cleanup ?? failure).Throw();
-            }
-
             if (cleanup is not null)
             {
+                // An assertion records itself before its exception leaves the test. SetResult replaces
+                // the message but leaves that assertion, and rethrowing the cleanup exception makes the
+                // work item record a second one, which NUnit reports as "Multiple failures". The result
+                // keeps only the cleanup exception: its message already leads with the body failure.
                 ApplyCleanup(context.CurrentResult, cleanup);
+                return context.CurrentResult;
+            }
+
+            // A fixture without setup or teardown has no command that records a body exception, so the
+            // exception leaves before NUnit writes it to the result; the work item records it only after
+            // this scope completed.
+            if (failure is not null)
+            {
+                ExceptionDispatchInfo.Capture(failure).Throw();
             }
 
             return result ?? context.CurrentResult;
@@ -107,14 +114,19 @@ public class ProtoTestAttribute : TestAttribute, IWrapSetUpTearDown
     }
 
     /// <summary>
-    /// Writes the cleanup failure onto the result NUnit will return. A body that already failed keeps
-    /// its result state; the cleanup exception's message leads with that failure.
+    /// Writes the cleanup failure onto the result NUnit will return, with no earlier failure left
+    /// beside it. A body that already failed keeps its result state; the cleanup exception's message
+    /// leads with that failure.
     /// </summary>
     private static void ApplyCleanup(TestResult result, ProtoCleanupException cleanup)
     {
         var state = result.ResultState.Status == TestStatus.Failed
             ? result.ResultState
             : ResultState.Error;
+        // ClearResult is NUnit's own reset of recorded assertions. It is not public, and SetResult
+        // does not remove an assertion an earlier command already stored.
+        typeof(TestResult).GetMethod("ClearResult", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(result, null);
         result.SetResult(state, cleanup.Message, cleanup.StackTrace ?? string.Empty);
     }
 

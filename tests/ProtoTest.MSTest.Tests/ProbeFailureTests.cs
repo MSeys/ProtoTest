@@ -69,6 +69,30 @@ public sealed class ProbeFailureTests
             trace.Record!.Findings!.Any(finding => finding.Message.Contains(AdapterFailureProbe.TeardownMessage)));
     }
 
+    [TestMethod]
+    public async Task BodyAndTeardownFailure_ShouldReportOnlyTheCleanupException()
+    {
+        // Arrange
+        var method = ProbeSubjects.BodyAndTeardownProbeMethod;
+
+        // Act
+        TestResult[] results;
+        using (AdapterFailureProbe.BeginTeardownFailure(nameof(ProbeSubjects.BodyAndTeardownProbe)))
+        {
+            results = await new ProtoTestAttribute().ExecuteAsync(new FakeTestMethod(method));
+        }
+
+        // Assert
+        Assert.HasCount(1, results);
+        Assert.AreEqual(UnitTestOutcome.Failed, results[0].Outcome);
+        var reported = results[0].TestFailureException;
+        Assert.IsNotNull(reported);
+        Assert.IsInstanceOfType<ProtoCleanupException>(reported);
+        StringAssert.StartsWith(reported.Message, "Assert.Fail failed. the assertion failed");
+        StringAssert.Contains(reported.Message, "Cleanup also failed:");
+        StringAssert.Contains(reported.Message, AdapterFailureProbe.TeardownMessage);
+    }
+
     private static bool TryGetContext()
     {
         try
@@ -88,6 +112,8 @@ public sealed class ProbeFailureTests
     {
         public static readonly MethodInfo SetupProbeMethod = typeof(ProbeSubjects).GetMethod(nameof(SetupProbe))!;
         public static readonly MethodInfo TeardownProbeMethod = typeof(ProbeSubjects).GetMethod(nameof(TeardownProbe))!;
+        public static readonly MethodInfo BodyAndTeardownProbeMethod =
+            typeof(ProbeSubjects).GetMethod(nameof(BodyAndTeardownProbe))!;
 
         [ProtoTest]
         public void SetupProbe()
@@ -97,6 +123,12 @@ public sealed class ProbeFailureTests
         [ProtoTest]
         public void TeardownProbe()
         {
+        }
+
+        [ProtoTest]
+        public void BodyAndTeardownProbe()
+        {
+            Assert.Fail("the assertion failed");
         }
     }
 #pragma warning restore MSTEST0030

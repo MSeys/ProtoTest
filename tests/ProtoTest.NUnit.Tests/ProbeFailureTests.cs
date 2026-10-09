@@ -87,6 +87,42 @@ public sealed class ProbeFailureTests
         });
     }
 
+    [Test]
+    public void BodyAndTeardownFailure_ShouldReportOnlyTheCleanupException()
+    {
+        // Arrange
+        const string body = "the assertion failed";
+        var subject = SubjectTest(nameof(BodyAndTeardownFailure_ShouldReportOnlyTheCleanupException));
+        var command = new ProtoTestAttribute().Wrap(new FailingCommand(subject, body));
+        var context = TestExecutionContext.CurrentContext;
+        var previousResult = context.CurrentResult;
+        var subjectResult = subject.MakeTestResult();
+        context.CurrentResult = subjectResult;
+
+        // Act
+        try
+        {
+            using (AdapterFailureProbe.BeginTeardownFailure(subject.Method!.MethodInfo.Name))
+            {
+                command.Execute(context);
+            }
+        }
+        finally
+        {
+            context.CurrentResult = previousResult;
+        }
+
+        // Assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(subjectResult.ResultState.Status, Is.EqualTo(TestStatus.Failed));
+            Assert.That(subjectResult.AssertionResults, Is.Empty);
+            Assert.That(subjectResult.Message, Does.StartWith(body));
+            Assert.That(subjectResult.Message, Does.Contain("Cleanup also failed:"));
+            Assert.That(subjectResult.Message, Does.Contain(AdapterFailureProbe.TeardownMessage));
+        });
+    }
+
     private static TestMethod SubjectTest(string methodName)
         => new(new MethodWrapper(typeof(ProbeFailureTests), methodName));
 
@@ -100,6 +136,19 @@ public sealed class ProbeFailureTests
         {
             context.CurrentResult.SetResult(ResultState.Success);
             return context.CurrentResult;
+        }
+    }
+
+    /// <summary>
+    /// Stands in for an assertion: NUnit records the failure and then the exception leaves the command.
+    /// </summary>
+    private sealed class FailingCommand(Test subject, string message) : TestCommand(subject)
+    {
+        public override TestResult Execute(TestExecutionContext context)
+        {
+            context.CurrentResult.RecordAssertion(AssertionStatus.Failed, message);
+            context.CurrentResult.RecordTestCompletion();
+            throw new AssertionException(message);
         }
     }
 }

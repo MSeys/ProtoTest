@@ -166,6 +166,8 @@ A `configure` callback that throws is not remembered. A later successful call ca
 | `ProtoTest:Readiness` | one per run | [Infrastructure](../foundation/infrastructure.md) (host probes and containers) |
 | `ProtoTest:CleanupFailures` | one per run | [Lifecycle](../foundation/lifecycle.md#a-test) (`Fail` or `Report`; `Fail` reports a passing test as failed when cleanup fails) |
 
+`ProtoTest:CleanupFailures` is read the same way as the other `ProtoTest:` keys, including `ProtoTest:Readiness`: only from sources the suite adds with `ConfigureAppConfiguration` (a JSON file, `AddEnvironmentVariables()`, or an in-memory collection), and the environment variable is `ProtoTest__CleanupFailures`.
+
 Each integration reads its options from one section named `ProtoTest:<Integration>`. Some add a second segment for the area they cover, for example `ProtoTest:Rest:Responses` or `ProtoTest:Grpc:Client`.
 
 When a section is renamed, the old key keeps working as a deprecated fallback. See [Migrating from 1.0](migrating-from-1-0.md) for the gRPC rename.

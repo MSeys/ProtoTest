@@ -58,22 +58,24 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
         }
         catch (ProtoCleanupException exception)
         {
-            // MSTest reports the TestResult this method returns. Writing the cleanup onto that result
-            // keeps a body failure as the message instead of discarding the result for the dispose throw.
             cleanup = exception;
+        }
+
+        if (cleanup is not null)
+        {
+            // The TestFailureException setter aggregates a second assignment with the exception already
+            // stored, so writing the cleanup onto a failed result reports the assertion and the cleanup
+            // as two errors. A new result carries only the cleanup exception. Its message already leads
+            // with the body failure, and its inner exception is that failure.
+            return [ReportCleanup(results is { Length: > 0 } ? results[0] : null, cleanup, attachmentPublisher)];
         }
 
         if (results is { Length: > 0 })
         {
-            var primary = results[0];
-            if (cleanup is not null)
-            {
-                ApplyCleanup(primary, cleanup);
-            }
-
             // One invocation is one row, so this row's files belong on this row's result.
             if (attachmentPublisher.Files.Count > 0)
             {
+                var primary = results[0];
                 primary.ResultFiles = [.. primary.ResultFiles ?? [], .. attachmentPublisher.Files];
             }
 
@@ -82,29 +84,40 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
 
         if (bodyEscape is not null)
         {
-            ExceptionDispatchInfo.Capture(cleanup ?? bodyEscape).Throw();
-        }
-
-        if (cleanup is not null)
-        {
-            throw cleanup;
+            ExceptionDispatchInfo.Capture(bodyEscape).Throw();
         }
 
         return results ?? [];
     }
 
     /// <summary>
-    /// Writes the cleanup failure onto the result MSTest will return. A body that already failed keeps
-    /// its outcome; the cleanup exception's message leads with that failure.
+    /// A result whose only failure is the cleanup exception. A body that already failed keeps its
+    /// outcome; the cleanup exception's message leads with that failure.
     /// </summary>
-    private static void ApplyCleanup(TestResult result, ProtoCleanupException cleanup)
+    private static TestResult ReportCleanup(
+        TestResult? source,
+        ProtoCleanupException cleanup,
+        MSTestAttachmentPublisher attachmentPublisher)
     {
-        if (result.Outcome is not (UnitTestOutcome.Failed or UnitTestOutcome.Error))
+        var reported = new TestResult
         {
-            result.Outcome = UnitTestOutcome.Failed;
+            Outcome = source?.Outcome is UnitTestOutcome.Failed or UnitTestOutcome.Error
+                ? source.Outcome
+                : UnitTestOutcome.Failed,
+            DisplayName = source?.DisplayName,
+            LogOutput = source?.LogOutput,
+            LogError = source?.LogError,
+            DebugTrace = source?.DebugTrace,
+            TestContextMessages = source?.TestContextMessages,
+            Duration = source?.Duration ?? TimeSpan.Zero,
+            TestFailureException = cleanup
+        };
+        if (source?.ResultFiles is { Count: > 0 } || attachmentPublisher.Files.Count > 0)
+        {
+            reported.ResultFiles = [.. source?.ResultFiles ?? [], .. attachmentPublisher.Files];
         }
 
-        result.TestFailureException = cleanup;
+        return reported;
     }
 
     /// <summary>

@@ -102,6 +102,44 @@ public sealed class ProtoHostComposerTests
         }
     }
 
+    [Test]
+    public void Compose_ShouldBindCleanupFailuresConfigurationOverTheCodeValues()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ProtoTest:CleanupFailures"] = "Report"
+            })
+            .Build();
+        var cleanup = new ProtoCleanupOptions { CleanupFailures = ProtoCleanupFailureMode.Fail };
+        var services = new ServiceCollection();
+        var composer = new ProtoHostComposer(
+            services,
+            configuration,
+            new ProtoTestIdOptions(),
+            new ProtoTraceOptions(),
+            new ProtoRunResourceStore(),
+            new ProtoReadinessOptions(),
+            new ProtoRedactionOptions(),
+            cleanup);
+
+        composer.Compose();
+
+        using var provider = services.BuildServiceProvider();
+        var resolved = provider.GetRequiredService<ProtoCleanupOptions>();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(
+                resolved,
+                Is.SameAs(cleanup),
+                "the scope's instance is the one the registrar resolves");
+            Assert.That(
+                resolved.CleanupFailures,
+                Is.EqualTo(ProtoCleanupFailureMode.Report),
+                "ProtoTest:CleanupFailures binds over the code value");
+        }
+    }
+
     private sealed class StubInfrastructure(string id) : IProtoInfrastructure
     {
         public string Id => id;

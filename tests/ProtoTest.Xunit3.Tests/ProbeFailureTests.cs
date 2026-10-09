@@ -62,6 +62,31 @@ public sealed class ProbeFailureTests
             finding => finding.Message.Contains(AdapterFailureProbe.TeardownMessage));
     }
 
+    [Fact]
+    public void BodyAndTeardownFailure_ShouldThrowOnlyTheCleanup()
+    {
+        // Arrange
+        var method = ProbeSubjects.TeardownProbeMethod;
+        var scope = ProtoTestLifecycleHandler.Before(method, test: null);
+        var body = new InvalidOperationException("the body failed");
+
+        // Act
+        ProtoCleanupException? failure;
+        using (AdapterFailureProbe.BeginTeardownFailure(nameof(ProbeSubjects.TeardownProbe)))
+        {
+            failure = Assert.Throws<ProtoCleanupException>(
+                () => ProtoTestLifecycleHandler.Complete(scope, TestResultState.FromException(0m, body)));
+        }
+
+        // Assert: xUnit v3 already reports the body's failure next to this one, so it is not repeated.
+        Assert.False(failure.BodyPassed);
+        Assert.StartsWith("Cleanup also failed:", failure.Message);
+        Assert.Contains(AdapterFailureProbe.TeardownMessage, failure.Message);
+        Assert.DoesNotContain(body.Message, failure.Message);
+        var trace = AdapterLifecycle.FindTrace(ProtoTestAssembly.Host, method);
+        Assert.Equal(ProtoTraceOutcome.Failed, trace.Outcome);
+    }
+
     private sealed class ProbeSubjects
     {
         public static readonly System.Reflection.MethodInfo SetupProbeMethod = typeof(ProbeSubjects).GetMethod(nameof(SetupProbe))!;

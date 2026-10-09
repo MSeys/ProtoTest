@@ -72,6 +72,27 @@ public sealed class ProtoCleanupException : Exception
             bodyPassed: false);
     }
 
+    /// <summary>
+    /// A failure that carries only the cleanup, for a runner that already reports the body's own failure
+    /// next to it (xUnit v3 adds an after-test failure to the body's). The message names the first
+    /// cleanup failure and counts the rest; it does not repeat the body's.
+    /// </summary>
+    public static ProtoCleanupException AfterBodyFailure(IReadOnlyList<Exception> cleanupFailures)
+    {
+        ArgumentNullException.ThrowIfNull(cleanupFailures);
+        var failures = Copy(cleanupFailures.SelectMany(Flatten).ToArray());
+        if (failures.Length == 0)
+        {
+            throw new ArgumentException("At least one cleanup failure is required.", nameof(cleanupFailures));
+        }
+
+        return Create(
+            $"Cleanup also failed: {Describe(failures)}",
+            failures[0],
+            failures,
+            bodyPassed: false);
+    }
+
     private static ProtoCleanupException Create(
         string message,
         Exception? primary,

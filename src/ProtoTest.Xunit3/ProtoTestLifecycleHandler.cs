@@ -93,7 +93,16 @@ internal static class ProtoTestLifecycleHandler
         }
 
         scope.Result = MapResult(state);
-        ProtoTestAsync.RunSync(() => scope.DisposeAsync());
+        try
+        {
+            ProtoTestAsync.RunSync(() => scope.DisposeAsync());
+        }
+        catch (ProtoCleanupException exception) when (!exception.BodyPassed)
+        {
+            // xUnit v3 reports an After failure next to the body's own, so the body's message is
+            // already shown once; this one carries only the cleanup.
+            throw ProtoCleanupException.AfterBodyFailure(exception.CleanupFailures);
+        }
     }
 
     /// <summary>

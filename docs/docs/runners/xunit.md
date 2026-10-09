@@ -64,7 +64,7 @@ public class OrderTests
 A `[ProtoTestTheory]` behaves the same way, and each `[InlineData]` row is a test of its own.
 
 :::warning[Forgetting `[Collection]`]
-Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs, so `ProtoTestAssembly.Host` throws `InvalidOperationException` from inside the test. xUnit v2 surfaces that as a test-host crash, the recorded behavior: the run aborts and the other tests' results are lost, instead of one test failing. Treat the attribute as mandatory on every class that carries a ProtoTest attribute or reads `Proto.Context`.
+Without `[Collection(ProtoTestCollection.Name)]` the fixture never runs. The ProtoTest test fails with `InvalidOperationException`: `ProtoHost is not initialized. Ensure your collection fixture inherits from ProtoTestAssembly.` Every discovered test still gets a result, and the run fails. Treat the attribute as mandatory on every class that carries a ProtoTest attribute or reads `Proto.Context`.
 :::
 
 ## The context window
@@ -101,7 +101,7 @@ Adoption is per test, not per project. A plain `[Fact]` or `[Theory]` keeps runn
 
 - No native attachments. In-memory content is written under `%TEMP%\ProtoTest\attachments`, not into xUnit's output, and the path travels on the console.
 - No dynamic skip. The reason is decided before the test method is invoked, so it cannot depend on the body.
-- **Aborts the run.** Every test class must join the collection. The host is never initialized otherwise, and the resulting crash aborts the whole run.
+- **Fails the test.** Every test class must join the collection. The host is never initialized otherwise, and that ProtoTest test fails naming the missing collection fixture. The rest of the run still reports its results, and the run exits non-zero.
 - The context starts before class construction, so a test class constructor already sees `Proto.Context`. The same constructor runs before the context in xUnit v3.
 - A skipped test exists only in xUnit's output. ProtoTest records nothing for it.
 - Theory rows are recorded under xUnit's display name, unlike MSTest and TUnit, which compose `MethodName[args]`.

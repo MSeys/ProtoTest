@@ -25,7 +25,7 @@ Convert one class at a time. Plain tests keep running. The xUnit runbook below i
 - [ ] **5. Delete the per-class harness** the converted tests no longer need. Gate: no test shares a fixed row, tenant or file (see [Concurrency](../foundation/concurrency.md)).
 
 :::danger[Step 3 on v2: the collection attribute is mandatory]
-A converted v2 class without `[Collection(ProtoTestCollection.Name)]` that reaches `Proto.Context` crashes the test host (the recorded behavior) and aborts the whole run. Add it in the same change.
+A converted v2 class without `[Collection(ProtoTestCollection.Name)]` fails that ProtoTest test with `ProtoHost is not initialized`, naming the missing collection fixture. The other tests still report a result and the run fails. Add the attribute in the same change.
 :::
 
 :::warning[Step 4 on SDK 10 with v3: the MTP opt-in comes first]
@@ -109,7 +109,7 @@ What changed in both versions: the arrangement moves into the host, the port mov
 | --- | --- | --- |
 | The host | `ProtoTestFixture : ProtoTestAssembly`, registered with `[CollectionDefinition]` | `Setup : ProtoTestAssembly`, registered with `[assembly: AssemblyFixture(typeof(Setup))]` |
 | A test | `[ProtoTestFact]` / `[ProtoTestTheory]` replace `[Fact]` / `[Theory]` | the same, or keep `[Fact]` and add `[assembly: ProtoTestAutoWrap]` |
-| A converted class | `[Collection(ProtoTestCollection.Name)]` is mandatory. Without it the test-host crash aborts the run. | nothing extra, because the assembly fixture covers every class |
+| A converted class | `[Collection(ProtoTestCollection.Name)]` is mandatory. Without it that ProtoTest test fails and names the missing collection fixture. | nothing extra, because the assembly fixture covers every class |
 | The constructor | Already runs inside the context, so `Proto.Context` works there | Runs before the context. Move context reads into `IAsyncLifetime.InitializeAsync` or the test body. |
 | Attachments | Files land under `%TEMP%\ProtoTest\attachments`, the path prints to the console with `--logger "console;verbosity=detailed"` | `TestContext.Current.AddAttachment(...)`, so artifacts appear with the test in xUnit's output |
 
@@ -245,6 +245,6 @@ The executor, the hooks and the interception path are on [TUnit](./tunit.md).
 
 ## Limits
 
-- A v2 class without the collection attribute that reaches `Proto.Context` crashes the test host and aborts the whole run. Convert the class in one change.
+- A v2 class without the collection attribute fails that ProtoTest test and names the missing collection fixture. Convert the class in one change.
 - The host is one per test process, started by the collection or assembly hook. A second registration does not layer a second host.
 - Conversion does not fix shared state between tests. A class that writes to a fixed row, tenant or file still needs its own isolation, as [Concurrency](../foundation/concurrency.md) explains.

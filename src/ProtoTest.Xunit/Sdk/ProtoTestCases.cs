@@ -241,7 +241,8 @@ internal sealed class ProtoXunitTheoryTestCaseRunner(
 /// </summary>
 internal sealed class ProtoXunitTestRunner : XunitTestRunner
 {
-    private readonly ProtoTestPreparation _preparation;
+    private readonly ProtoTestPreparation? _preparation;
+    private readonly Exception? _preparationFailure;
 
     public ProtoXunitTestRunner(
         ITest test,
@@ -267,8 +268,18 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
             cancellationTokenSource)
     {
         // Preparing in the constructor resolves the attributes once and decides the skip before
-        // invocation; the runner for a row starts from the very same resolution.
-        _preparation = ProtoTestAdapter.Prepare(testMethod, ProtoTestAssembly.Host, Test.DisplayName);
+        // invocation; the runner for a row starts from the very same resolution. The resolution
+        // must not escape the constructor: xUnit calls CreateTestRunner from RunTestAsync, outside
+        // the invoker's aggregator, and a throw there never becomes a test result.
+        try
+        {
+            _preparation = ProtoTestAdapter.Prepare(testMethod, ProtoTestAssembly.Host, Test.DisplayName);
+        }
+        catch (Exception exception)
+        {
+            _preparationFailure = exception;
+            return;
+        }
 
         // xUnit v2 has no dynamic skip API and its non-virtual RunAsync decides pass/fail from the
         // invoker's aggregator, so a TestSkipped queued from InvokeTestMethodAsync would still be
@@ -280,12 +291,18 @@ internal sealed class ProtoXunitTestRunner : XunitTestRunner
 
     protected override async Task<decimal> InvokeTestMethodAsync(ExceptionAggregator aggregator)
     {
-        var host = ProtoTestAssembly.Host;
+        if (_preparation is null)
+        {
+            aggregator.Add(_preparationFailure
+                ?? new InvalidOperationException("ProtoTest preparation failed before the test could start."));
+            return 0m;
+        }
+
         ProtoTestScope scope;
         try
         {
             scope = await ProtoTestScope.StartAsync(
-                _preparation, host, Xunit2AttachmentPublisher.Instance, CancellationTokenSource.Token);
+                _preparation, ProtoTestAssembly.Host, Xunit2AttachmentPublisher.Instance, CancellationTokenSource.Token);
         }
         catch (Exception exception)
         {

@@ -40,6 +40,7 @@ IReadOnlyList<ProtoResourceSnapshot> Resources { get; }
 - Registration is **test-scoped only.** A resource whose `Scope` is not `Test` throws: *"Register it with AddResource on the host builder instead."*
 - A duplicate id throws, and registration after release has begun throws `ObjectDisposedException`.
 - Each resource is released at most once, in reverse registration order, after all hooks and attributes have run. `ReleaseResourceAsync` releases one early and returns `false` when the id is unknown or a release for it has already started. When the release this call runs fails, the resource is recorded as `ReleaseFailed` and the original exception is thrown. Dispose does not retry that release. The failure still counts in the test's cleanup outcome, the same way a release that fails during dispose does: a teardown finding, without a separate rule for whether the test or the run is red.
+- Dispose waits for a release that is already running, with no timeout, before it disposes the service scope. A release callback must not dispose its own context, and must not call `ReleaseResourceAsync` for the resource it is releasing. Both throw `InvalidOperationException` instead of waiting.
 - Framework-managed clients live on the client entity and appear in the report only if their release failed.
 
 ```csharp

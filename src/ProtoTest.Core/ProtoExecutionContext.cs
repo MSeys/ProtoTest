@@ -23,6 +23,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoClockRegistry? _clockRegistry;
     private readonly IReadOnlyCollection<string>? _additionalSensitiveNames;
     private readonly TaskCompletionSource _disposeCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private static readonly AsyncLocal<ReleaseScope?> CurrentRelease = new();
     private int _disposeStarted;
     private int _findingSequence;
     private int _clientReplacementSequence;
@@ -310,6 +311,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
+        var owned = ownership is ProtoClientOwnership.Context;
+        string? clientId;
         lock (_clientOwnersGate)
         {
             _clients.EnsureOpen();
@@ -322,27 +325,28 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
             }
 
             _clientOwners.Add(client, ownership);
-            var owned = ownership is ProtoClientOwnership.Context;
-            var clientId = ProtoClientTrace.Id(typeof(TClient), name);
+            clientId = ProtoClientTrace.Id(typeof(TClient), name);
             RegisterOwned(new ProtoResource(
                 clientId,
                 "client",
                 $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
                 context => ReleaseClientAsync(client, owned)));
-            Trace.SetEntityState(
-                ProtoTraceEntityKinds.Client,
-                clientId,
-                $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
-                new Dictionary<string, string?>
-                {
-                    ["client.name"] = name,
-                    ["client.type"] = typeof(TClient).FullName,
-                    ["instance.type"] = client.GetType().FullName,
-                    ["client.owned"] = owned ? "true" : "false"
-                },
-                scope: TestName,
-                change: "created");
         }
+
+        // Outside the lock: a synchronous trace listener that registers a client must be able to take it.
+        Trace.SetEntityState(
+            ProtoTraceEntityKinds.Client,
+            clientId,
+            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            new Dictionary<string, string?>
+            {
+                ["client.name"] = name,
+                ["client.type"] = typeof(TClient).FullName,
+                ["instance.type"] = client.GetType().FullName,
+                ["client.owned"] = owned ? "true" : "false"
+            },
+            scope: TestName,
+            change: "created");
     }
 
     /// <summary>Retrieves a required named client.</summary>
@@ -397,6 +401,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
+        var owned = ownership is ProtoClientOwnership.Context;
+        string? clientId;
         lock (_clientOwnersGate)
         {
             _clients.EnsureOpen();
@@ -413,8 +419,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
                 return;
             }
 
-            var owned = ownership is ProtoClientOwnership.Context;
-            var clientId = ProtoClientTrace.Id(typeof(TClient), name);
+            clientId = ProtoClientTrace.Id(typeof(TClient), name);
             if (_clientOwners.TryAdd(client, ownership))
             {
                 var generation = Interlocked.Increment(ref _clientReplacementSequence);
@@ -424,22 +429,22 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
                     $"Replaced client {typeof(TClient).Name} '{name}'",
                     context => ReleaseClientAsync(client, owned)));
             }
-
-            Trace.SetEntityState(
-                ProtoTraceEntityKinds.Client,
-                clientId,
-                $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
-                new Dictionary<string, string?>
-                {
-                    ["client.name"] = name,
-                    ["client.type"] = typeof(TClient).FullName,
-                    ["instance.type"] = client.GetType().FullName,
-                    ["client.owned"] = owned ? "true" : "false",
-                    ["client.replaced"] = "true"
-                },
-                scope: TestName,
-                change: "replaced");
         }
+
+        Trace.SetEntityState(
+            ProtoTraceEntityKinds.Client,
+            clientId,
+            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+            new Dictionary<string, string?>
+            {
+                ["client.name"] = name,
+                ["client.type"] = typeof(TClient).FullName,
+                ["instance.type"] = client.GetType().FullName,
+                ["client.owned"] = owned ? "true" : "false",
+                ["client.replaced"] = "true"
+            },
+            scope: TestName,
+            change: "replaced");
     }
 
     /// <summary>Registers a non-owning lookup alias for a client already registered under a scoped name.</summary>
@@ -522,8 +527,20 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// as <see cref="ProtoResourceState.ReleaseFailed"/> and then thrown; dispose does not retry it,
     /// but that failure still counts in the test's cleanup outcome.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The release callback for <paramref name="id"/> called this method for the same resource.
+    /// </exception>
     public ValueTask<bool> ReleaseResourceAsync(string id)
-        => _resources.ReleaseAsync(id, this, Trace, ProtoTracePhase.Execution);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        if (CurrentRelease.Value?.Includes(this, id) == true)
+        {
+            throw new InvalidOperationException(
+                $"A release callback cannot release its own resource '{id}'.");
+        }
+
+        return _resources.ReleaseAsync(id, this, Trace, ProtoTracePhase.Execution);
+    }
 
     /// <summary>
     /// Records a finding: something worth reporting that is deliberately not a test failure. Findings
@@ -610,10 +627,11 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
 
     /// <summary>
     /// Releases owned resources, disposes owned clients and the service scope. A second call waits for
-    /// the first and does not release a resource again. An early release still running is awaited
-    /// before the service scope is disposed. A release that already failed is not retried; that failure
-    /// is still included in the aggregated cleanup outcome.
+    /// the first and does not release a resource again. An early release still running is awaited,
+    /// with no timeout, before the service scope is disposed. A release that already failed is not
+    /// retried; that failure is still included in the aggregated cleanup outcome.
     /// </summary>
+    /// <exception cref="InvalidOperationException">A release callback disposed its own context.</exception>
     public ValueTask DisposeAsync() => DisposeAsync(ProtoTracePhase.Teardown);
 
     /// <summary>
@@ -622,6 +640,13 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     /// </summary>
     internal async ValueTask DisposeAsync(ProtoTracePhase phase)
     {
+        // Before the dispose gate: the callback is the thing the outer dispose is waiting for, so
+        // waiting here would deadlock. The callback's flow carries the scope; the caller's does not.
+        if (CurrentRelease.Value?.Includes(this) == true)
+        {
+            throw new InvalidOperationException("A release callback cannot dispose its own context.");
+        }
+
         if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
             await _disposeCompleted.Task;
@@ -678,6 +703,35 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
 
     private void RegisterOwned(IProtoResource resource) => _resources.Register(resource);
 
+    /// <summary>
+    /// Runs <paramref name="release"/> as a release of <paramref name="resourceId"/> on
+    /// <paramref name="context"/>. The callback and its awaits see the scope; the caller that is
+    /// waiting on the returned task does not, because the caller's flow is restored before this
+    /// method returns.
+    /// </summary>
+    internal static Task RunReleaseCallbackAsync(
+        ProtoExecutionContext? context,
+        string resourceId,
+        Func<Task> release)
+    {
+        ArgumentNullException.ThrowIfNull(release);
+        if (context is null)
+        {
+            return release();
+        }
+
+        var previous = CurrentRelease.Value;
+        CurrentRelease.Value = new ReleaseScope(context, resourceId, previous);
+        try
+        {
+            return release();
+        }
+        finally
+        {
+            CurrentRelease.Value = previous;
+        }
+    }
+
     private void EnsureCompatibleOwnership(object client, Type registeredAs, string name, ProtoClientOwnership ownership)
     {
         if (!_clientOwners.TryGetValue(client, out var existing) || existing == ownership)
@@ -714,5 +768,33 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         }
 
         await LifecycleExceptionHelper.DisposeAsyncOrSync(client);
+    }
+
+    /// <summary>The release callbacks running on this async flow, innermost last.</summary>
+    private sealed class ReleaseScope(ProtoExecutionContext context, string resourceId, ReleaseScope? previous)
+    {
+        public bool Includes(ProtoExecutionContext candidate, string? resourceId = null)
+        {
+            for (ReleaseScope? scope = this; scope is not null; scope = scope.Previous)
+            {
+                if (!ReferenceEquals(scope.Context, candidate))
+                {
+                    continue;
+                }
+
+                if (resourceId is null || string.Equals(scope.ResourceId, resourceId, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private ProtoExecutionContext Context { get; } = context;
+
+        private string ResourceId { get; } = resourceId;
+
+        private ReleaseScope? Previous { get; } = previous;
     }
 }

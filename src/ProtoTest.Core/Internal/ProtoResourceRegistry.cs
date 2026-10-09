@@ -207,7 +207,12 @@ internal sealed class ProtoResourceRegistry
         var started = Stopwatch.GetTimestamp();
         try
         {
-            await resource.ReleaseAsync(new ProtoResourceReleaseContext(test, trace, phase, CancellationToken.None));
+            // The scope is on the callback's flow only. Dispose and a second release of this same
+            // entry can then fail instead of waiting for the callback that is calling them.
+            await ProtoExecutionContext.RunReleaseCallbackAsync(
+                test,
+                resource.Id,
+                () => resource.ReleaseAsync(new ProtoResourceReleaseContext(test, trace, phase, CancellationToken.None)).AsTask());
             var elapsed = Stopwatch.GetElapsedTime(started);
             entry.MarkReleased(elapsed);
             operation?.Succeed();

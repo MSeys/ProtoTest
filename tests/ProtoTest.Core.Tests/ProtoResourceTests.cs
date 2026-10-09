@@ -395,6 +395,87 @@ public class ProtoResourceTests
         }
     }
 
+    [Test]
+    public async Task ReleaseCallback_ThatDisposesItsOwnContext_ShouldFailInsteadOfDeadlocking()
+    {
+        // The callback resumes after dispose has started waiting for it. Waiting for dispose from
+        // there would deadlock; the callback must be told no.
+        var context = CreateContext();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.RegisterResource("slow", "audit", "Disposes its context", async _ =>
+        {
+            entered.TrySetResult();
+            await gate.Task;
+            await context.DisposeAsync();
+        });
+
+        var pending = context.ReleaseResourceAsync("slow").AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var disposing = context.DisposeAsync().AsTask();
+        Assert.That(disposing.IsCompleted, Is.False, "dispose is waiting for the in-flight release");
+        gate.TrySetResult();
+
+        var releaseError = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await pending.WaitAsync(TimeSpan.FromSeconds(5)));
+        var disposeError = Assert.ThrowsAsync<AggregateException>(async () =>
+            await disposing.WaitAsync(TimeSpan.FromSeconds(5)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(releaseError!.Message, Is.EqualTo("A release callback cannot dispose its own context."));
+            Assert.That(disposeError!.InnerExceptions.Single(), Is.SameAs(releaseError));
+            Assert.That(context.Resources.Single().State, Is.EqualTo(ProtoResourceState.ReleaseFailed));
+        }
+    }
+
+    [Test]
+    public async Task ReleaseCallback_ThatReleasesItsOwnResource_ShouldFailInsteadOfDeadlocking()
+    {
+        var context = CreateContext();
+        var calls = 0;
+        context.RegisterResource("box", "audit", "Releases itself", async _ =>
+        {
+            Interlocked.Increment(ref calls);
+            await context.ReleaseResourceAsync("box");
+        });
+
+        var releaseError = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await context.ReleaseResourceAsync("box").AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        var disposeError = Assert.ThrowsAsync<AggregateException>(async () =>
+            await context.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(releaseError!.Message, Is.EqualTo("A release callback cannot release its own resource 'box'."));
+            Assert.That(disposeError!.InnerExceptions.Single(), Is.SameAs(releaseError));
+            Assert.That(calls, Is.EqualTo(1), "the callback ran once and was not released again");
+        }
+    }
+
+    [Test]
+    public async Task ReleaseCallback_MayReleaseADifferentResource()
+    {
+        var context = CreateContext();
+        var order = new List<string>();
+        context.RegisterResource("outer", "audit", "Releases the other resource", async _ =>
+        {
+            order.Add("outer");
+            Assert.That(await context.ReleaseResourceAsync("inner"), Is.True);
+            order.Add("outer-after");
+        });
+        context.RegisterResource("inner", "audit", "Released by the other callback", _ =>
+        {
+            order.Add("inner");
+            return ValueTask.CompletedTask;
+        });
+
+        Assert.That(await context.ReleaseResourceAsync("outer"), Is.True);
+        await context.DisposeAsync();
+
+        Assert.That(order, Is.EqualTo(new[] { "outer", "inner", "outer-after" }));
+    }
+
     private ProtoExecutionContext CreateContext()
         => new("TestMethod", _scope, "00001", TestMethods.Placeholder);
 

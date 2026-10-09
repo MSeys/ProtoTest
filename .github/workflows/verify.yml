@@ -74,7 +74,7 @@ jobs:
       # repository's Docker Hub account so those pulls are not counted against the anonymous limit
       # shared by every GitHub-hosted runner.
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: ./.github/actions/docker-hub-login
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -160,7 +160,7 @@ jobs:
           path: samples/ProtoTest.SampleApp/Ui/dist
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: ./.github/actions/docker-hub-login
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -207,7 +207,7 @@ jobs:
 
       # The Learning demo starts its own RabbitMQ container after the service above is already up.
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: ./.github/actions/docker-hub-login
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

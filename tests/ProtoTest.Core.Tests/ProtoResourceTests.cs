@@ -280,6 +280,121 @@ public class ProtoResourceTests
         }
     }
 
+    [Test]
+    public async Task ReleaseResourceAsync_WhenTheCallbackFails_ThrowsAndDisposeCountsThatFailure()
+    {
+        // Arrange: the failure is recorded, then thrown. Dispose does not run the callback again,
+        // but the same exception is still part of the cleanup aggregate.
+        var releases = 0;
+        var failure = new InvalidOperationException("release failed");
+        var context = CreateContext();
+        context.RegisterResource("broken", "audit", "Throws on release", _ =>
+        {
+            Interlocked.Increment(ref releases);
+            return ValueTask.FromException(failure);
+        });
+
+        // Act
+        var thrown = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await context.ReleaseResourceAsync("broken"));
+        var again = await context.ReleaseResourceAsync("broken");
+        var dispose = Assert.ThrowsAsync<AggregateException>(async () => await context.DisposeAsync());
+        var secondDispose = Assert.ThrowsAsync<AggregateException>(async () => await context.DisposeAsync());
+
+        // Assert
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(thrown, Is.SameAs(failure));
+            Assert.That(again, Is.False, "a release that already failed has started; it is not run again");
+            Assert.That(context.Resources.Single().State, Is.EqualTo(ProtoResourceState.ReleaseFailed));
+            Assert.That(context.Resources.Single().Error, Is.EqualTo("release failed"));
+            Assert.That(dispose!.InnerExceptions.Single(), Is.SameAs(failure));
+            Assert.That(secondDispose!.InnerExceptions.Single(), Is.SameAs(failure),
+                "a second dispose observes the same completion");
+            Assert.That(releases, Is.EqualTo(1));
+        }
+    }
+
+    [Test]
+    public async Task EarlyReleaseFailure_IsATeardownFindingAndDoesNotFailTheRun()
+    {
+        // The failure reaches cleanup the same way a release that fails during dispose does. The
+        // test outcome becomes Partial, which is the existing teardown policy, and the run stays
+        // green unless a gate is configured.
+        var builder = new ProtoHostBuilder();
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var context = await host.StartTestAsync("BrokenRelease", "00011", TestMethods.Placeholder);
+        context.RegisterResource("broken", "audit", "Throws on release",
+            _ => ValueTask.FromException(new InvalidOperationException("release failed")));
+
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await context.ReleaseResourceAsync("broken"));
+        var teardown = Assert.ThrowsAsync<AggregateException>(
+            async () => await host.CompleteTestAsync(ProtoTestResult.Passed));
+
+        var test = host.Trace.Snapshot().Tests.Single();
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(teardown!.InnerExceptions.Single().Message, Is.EqualTo("release failed"));
+            Assert.That(test.Outcome, Is.EqualTo(ProtoTraceOutcome.Partial));
+            Assert.That(test.Error, Is.Null, "the cleanup failure is not the test's own error");
+            Assert.That(
+                test.Record!.Findings,
+                Has.Some.Matches<ProtoTraceFindingRecord>(finding =>
+                    finding.Category == "Teardown" && finding.Message.Contains("Teardown failed")));
+        }
+
+        Assert.DoesNotThrowAsync(async () => await host.StopAsync());
+    }
+
+    [Test]
+    public async Task DisposeAsync_WaitsForAnInFlightReleaseBeforeDisposingTheScope()
+    {
+        // Arrange
+        using var root = new ServiceCollection().BuildServiceProvider();
+        var scope = new TrackingScope(root.CreateScope());
+        var context = new ProtoExecutionContext("TestMethod", scope, "00012", TestMethods.Placeholder);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var scopeDisposedDuringRelease = -1;
+        context.RegisterResource("slow", "audit", "Blocked release", async _ =>
+        {
+            entered.TrySetResult();
+            await gate.Task;
+            scopeDisposedDuringRelease = scope.DisposeCount;
+        });
+
+        // Act
+        var pending = context.ReleaseResourceAsync("slow").AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var first = context.DisposeAsync().AsTask();
+        var second = context.DisposeAsync().AsTask();
+        try
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(pending.IsCompleted, Is.False);
+                Assert.That(first.IsCompleted, Is.False, "dispose waits for the release that is already running");
+                Assert.That(second.IsCompleted, Is.False, "a second dispose waits for the same completion");
+            });
+        }
+        finally
+        {
+            gate.TrySetResult();
+        }
+
+        await first;
+        await second;
+        await pending;
+
+        // Assert
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(scopeDisposedDuringRelease, Is.Zero, "the scope outlives the release callback");
+            Assert.That(scope.DisposeCount, Is.EqualTo(1));
+        }
+    }
+
     private ProtoExecutionContext CreateContext()
         => new("TestMethod", _scope, "00001", TestMethods.Placeholder);
 
@@ -319,5 +434,18 @@ public class ProtoResourceTests
     private sealed class FailingClient : IDisposable
     {
         public void Dispose() => throw new InvalidOperationException("Client release failed.");
+    }
+
+    private sealed class TrackingScope(IServiceScope inner) : IServiceScope
+    {
+        public int DisposeCount { get; private set; }
+
+        public IServiceProvider ServiceProvider => inner.ServiceProvider;
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            inner.Dispose();
+        }
     }
 }

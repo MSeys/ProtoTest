@@ -20,6 +20,7 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoFindingStore? _findings;
     private readonly ProtoClockRegistry? _clockRegistry;
     private readonly IReadOnlyCollection<string>? _additionalSensitiveNames;
+    private readonly TaskCompletionSource _disposeCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int _disposeStarted;
     private int _findingSequence;
     private int _clientReplacementSequence;
@@ -476,8 +477,10 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         => RegisterResource(new ProtoResource(id, kind, description, release));
 
     /// <summary>
-    /// Releases one owned resource before teardown. Returns <see langword="false"/> when the resource
-    /// is unknown or was already released.
+    /// Releases one owned resource before teardown. Returns <see langword="false"/> when the id is
+    /// unknown or a release for it has already started. A release this call runs that fails is recorded
+    /// as <see cref="ProtoResourceState.ReleaseFailed"/> and then thrown; dispose does not retry it,
+    /// but that failure still counts in the test's cleanup outcome.
     /// </summary>
     public ValueTask<bool> ReleaseResourceAsync(string id)
         => _resources.ReleaseAsync(id, this, Trace, ProtoTracePhase.Execution);
@@ -566,22 +569,39 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         => RecordObservation(new ProtoObservation(targetName, kind, identifier, data, metadata));
 
     /// <summary>
-    /// Releases owned resources, disposes owned clients and the service scope. Disposal is idempotent
-    /// and attempts every resource.
+    /// Releases owned resources, disposes owned clients and the service scope. A second call waits for
+    /// the first and does not release a resource again. An early release still running is awaited
+    /// before the service scope is disposed. A release that already failed is not retried; that failure
+    /// is still included in the aggregated cleanup outcome.
     /// </summary>
     public ValueTask DisposeAsync() => DisposeAsync(ProtoTracePhase.Teardown);
 
     /// <summary>
-    /// Releases owned resources, disposes owned clients and the service scope. Disposal is idempotent
-    /// and attempts every resource.
+    /// Releases owned resources, disposes owned clients and the service scope. A second call waits for
+    /// the first and does not release a resource again.
     /// </summary>
     internal async ValueTask DisposeAsync(ProtoTracePhase phase)
     {
         if (Interlocked.Exchange(ref _disposeStarted, 1) != 0)
         {
+            await _disposeCompleted.Task;
             return;
         }
 
+        try
+        {
+            await DisposeCoreAsync(phase);
+            _disposeCompleted.TrySetResult();
+        }
+        catch (Exception exception)
+        {
+            _disposeCompleted.TrySetException(exception);
+            throw;
+        }
+    }
+
+    private async ValueTask DisposeCoreAsync(ProtoTracePhase phase)
+    {
         // The test is over: a request that still carries its id finds the run clock from here on. The
         // registry is host-scoped, so this only removes this host's entry.
         _clockRegistry?.Remove(Id.Value);

@@ -217,6 +217,6 @@ Services, owned resources, findings, observations and the trace writer live on [
 ## Limits
 
 - `RegisterResource` refuses run-scoped resources. `AddResource` on the builder is the run-scoped counterpart.
-- `context.DisposeAsync` attempts every release and aggregates failures. Calling it again does not release resources a second time.
+- `context.DisposeAsync` attempts every release and aggregates failures. A release that already failed is not retried; that failure is still part of the aggregate. An early release that is still running is awaited before the test's service scope is disposed. Calling dispose again waits for that same completion and does not release resources a second time.
 - A test skipped before setup creates no context. See [Skip conditions](./skip-conditions.md).
 - `Proto.Context` throws when the current async flow has no active test context. See [Concurrency](./concurrency.md) for the isolation rule both pages share.

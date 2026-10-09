@@ -1,6 +1,7 @@
 namespace ProtoTest.Core.Internal;
 
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 
 internal sealed class ProtoResourceRegistry
 {
@@ -81,13 +82,20 @@ internal sealed class ProtoResourceRegistry
         Entry? entry;
         lock (_gate)
         {
-            if (!_byId.TryGetValue(id, out entry) || !entry.TryBeginRelease())
+            if (!_byId.TryGetValue(id, out entry) || !entry.TryBeginRelease(out _))
             {
                 return false;
             }
         }
 
-        await ReleaseEntryAsync(entry, test, trace, phase);
+        // The failure is recorded before it is thrown, and left on the entry so the later central
+        // release can count it. A caller that did not start this release gets false instead.
+        var exception = await ReleaseEntryAsync(entry, test, trace, phase);
+        if (exception is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+        }
+
         return true;
     }
 
@@ -113,12 +121,29 @@ internal sealed class ProtoResourceRegistry
         var exceptions = new List<Exception>();
         foreach (var entry in entries)
         {
-            if (!entry.TryBeginRelease())
+            if (!entry.TryBeginRelease(out var inFlight))
             {
+                // Started is not completed: an early release may still be inside its callback, and
+                // that callback can still need the scope this release is about to drop. A failure
+                // already recorded is taken once, so a restart does not report it again.
+                if (inFlight is not null)
+                {
+                    await inFlight;
+                }
+
+                var earlier = entry.ConsumeFailure();
+                if (earlier is not null)
+                {
+                    exceptions.Add(earlier);
+                }
+
                 continue;
             }
 
             var exception = await ReleaseEntryAsync(entry, test, trace, phase);
+            // This call ran the callback, so the stored failure is already in `exception`. Taking it
+            // here means a restarted run does not report that same failure a second time.
+            _ = entry.ConsumeFailure();
             if (exception is not null)
             {
                 exceptions.Add(exception);
@@ -234,6 +259,10 @@ internal sealed class ProtoResourceRegistry
                 change: "failed");
             return exception;
         }
+        finally
+        {
+            entry.SignalComplete();
+        }
     }
 
     private sealed class Entry(IProtoResource resource)
@@ -242,6 +271,9 @@ internal sealed class ProtoResourceRegistry
         private ProtoResourceState _state = ProtoResourceState.Registered;
         private TimeSpan? _releaseDuration;
         private string? _error;
+        private Exception? _failure;
+        private Task? _release;
+        private TaskCompletionSource? _completed;
 
         public IProtoResource Resource { get; } = resource;
 
@@ -260,18 +292,55 @@ internal sealed class ProtoResourceRegistry
         /// Claims the one release this entry permits. The transition happens under the entry's lock, so
         /// two concurrent callers cannot both run the resource's release callback and a snapshot taken
         /// while the callback runs reports <see cref="ProtoResourceState.Releasing"/>.
+        /// <paramref name="inFlight"/> is that shared release when this caller did not start it:
+        /// started and completed are different, and a later dispose awaits completion.
         /// </summary>
-        public bool TryBeginRelease()
+        public bool TryBeginRelease(out Task? inFlight)
         {
             lock (_releaseGate)
             {
                 if (_state != ProtoResourceState.Registered)
                 {
+                    inFlight = _release;
                     return false;
                 }
 
                 _state = ProtoResourceState.Releasing;
+                var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _completed = completed;
+                _release = completed.Task;
+                inFlight = _release;
                 return true;
+            }
+        }
+
+        /// <summary>
+        /// Unblocks whoever is waiting for this release. The result stays a successful task; the
+        /// failure itself is stored on the entry so a waiter can continue with the resources after it.
+        /// </summary>
+        public void SignalComplete()
+        {
+            TaskCompletionSource? completed;
+            lock (_releaseGate)
+            {
+                completed = _completed;
+            }
+
+            completed?.TrySetResult();
+        }
+
+        /// <summary>
+        /// Takes the failure recorded for this release, once. The call that ran the callback leaves it
+        /// stored when it is an early release; the central release takes it so dispose counts it, and
+        /// a later restart does not report the same failure again.
+        /// </summary>
+        public Exception? ConsumeFailure()
+        {
+            lock (_releaseGate)
+            {
+                var failure = _failure;
+                _failure = null;
+                return failure;
             }
         }
 
@@ -281,6 +350,7 @@ internal sealed class ProtoResourceRegistry
             {
                 _state = ProtoResourceState.Released;
                 _releaseDuration = duration;
+                _failure = null;
             }
         }
 
@@ -301,6 +371,9 @@ internal sealed class ProtoResourceRegistry
                 _state = ProtoResourceState.Registered;
                 _releaseDuration = null;
                 _error = null;
+                _failure = null;
+                _release = null;
+                _completed = null;
             }
         }
 
@@ -311,6 +384,7 @@ internal sealed class ProtoResourceRegistry
                 _state = ProtoResourceState.ReleaseFailed;
                 _releaseDuration = duration;
                 _error = exception.Message;
+                _failure = exception;
             }
         }
 

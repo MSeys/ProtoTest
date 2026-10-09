@@ -13,6 +13,40 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.7
+
+<p className="changelog-date">9 October 2026</p>
+
+ProtoTest 1.1.7 fails a test whose cleanup fails, reports a missing xUnit collection fixture as a failed test instead of a green run, and makes releasing a test's resources and clients exact: a failed release is no longer hidden, disposal waits for a release in flight, and a client is disposed once.
+
+<div className="changelog-group changelog-group--breaking">
+
+### Breaking changes
+
+#### Core
+
+- A test whose body passed but whose cleanup failed (a teardown hook, a resource release, a client's disposal) is reported as failed, with a message that says the body passed and names the first cleanup failure. A test whose body failed keeps that failure first, with the cleanup failures after it. Every cleanup step is still attempted and recorded as a Teardown finding. `ProtoTest:CleanupFailures` set to `Report` (or `builder.ConfigureCleanup(...)`) keeps the previous behaviour: findings only, the test passes and its trace reads Partial. <span className="changelog-ref">[Lifecycle](/docs/foundation/lifecycle#a-test)</span>
+
+
+</div>
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+#### Runners and analyzers
+
+- XUnit v2: a missing collection fixture fails each ProtoTest test with a message that names `ProtoTestAssembly`, and the rest of the run reports, where the runner crashed before and `dotnet test` could end green with the test missing. <span className="changelog-ref">[xUnit v2](/docs/runners/xunit)</span>
+
+#### Core
+
+- Stopping the host while it starts waits for the start, then stops it and runs the after-run hooks once; a start that was stopped from outside throws instead of reporting success, and stopping the host from inside its own start throws instead of hanging. <span className="changelog-ref">[Lifecycle](/docs/foundation/lifecycle#the-run)</span>
+- `ReleaseResourceAsync` throws the release's own exception when the release fails, after recording it, where it returned `true` before; the test's cleanup outcome includes it. <span className="changelog-ref">[Execution context](/docs/foundation/execution-context-advanced)</span>
+- Disposing a test context waits for a release that is still running before it closes the test's services, and a second dispose waits for the first. A release callback that disposes its own context, or releases its own resource, throws instead of hanging. <span className="changelog-ref">[Execution context](/docs/foundation/execution-context-advanced)</span>
+- One client instance registered under several names or types is disposed once and traced as one client; registering the same instance under the same name again does nothing, and registering it with another ownership (`Context` and `Caller`) throws. <span className="changelog-ref">[Clients](/docs/foundation/clients)</span>
+
+</div>
+
 ## 1.1.6
 
 <p className="changelog-date">4 October 2026</p>

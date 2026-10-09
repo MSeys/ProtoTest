@@ -57,7 +57,7 @@ TClient Client<TClient>(string name = "Default") where TClient : class;
 TClient? TryClient<TClient>(string name = "Default") where TClient : class;
 ```
 
-Clients are keyed by **type and case-insensitive name**, so an `HttpClient` named `Api` and a web session named `Api` can coexist. Registering the same type and name twice throws, and registering after release has begun throws `ObjectDisposedException`. A failed `Client<T>` lookup records a `client.resolve` event before throwing. `TryClient` never traces.
+Clients are keyed by **type and case-insensitive name**, so an `HttpClient` named `Api` and a web session named `Api` can coexist. Registering a different instance under the same type and name throws. Registering the same instance under that key again is a no-op, including when only the name's case differs (`Api` and `api`). The owned resource id keeps the type and the name spelling from the registration that first took ownership, so that second spelling does not create another resource. The same instance under another name, or registered once as an interface and again as its concrete type, is an alias: one object has one release. Registering that instance again with a different ownership throws, and the message names both. Registering after release has begun throws `ObjectDisposedException`. A failed `Client<T>` lookup records a `client.resolve` event before throwing. `TryClient` never traces.
 
 ### When clients are created and released
 
@@ -73,7 +73,7 @@ Integrations such as REST and GraphQL set `Protocol`, so they can each register 
 
 If no initializer in a group succeeds, the test fails in setup with *"No registered initializer could create a client of type 'X' with name 'Y'."*
 
-If a client implements `IDisposable` or `IAsyncDisposable`, it is disposed when the test ends, in reverse order of registration. Client resources are framework-managed. A successful release is recorded as the client entity's `resource.state = released` rather than a `resource.release` operation. A **failed** release writes a `resource.release` event, so the failure is explainable.
+If a client implements `IDisposable` or `IAsyncDisposable`, it is disposed when the test ends, once, in reverse order of first ownership. An alias does not add a dispose. Replacing a name gives the incoming instance one release when it was not already registered, and the instance that lost its last name keeps the release from its first registration. Client resources are framework-managed. A successful release is recorded as the client entity's `resource.state = released` rather than a `resource.release` operation. A **failed** release writes a `resource.release` event, so the failure is explainable.
 
 A client that implements `IProtoClientCompletion` also gets `CompleteAsync()` after normal teardown hooks, before disposal and report publication. A bare-name alias does not cause completion to run twice.
 

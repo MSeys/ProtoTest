@@ -191,9 +191,9 @@ TClient Client<TClient>(string name = "Default") where TClient : class;
 TClient? TryClient<TClient>(string name = "Default") where TClient : class;
 ```
 
-Clients use their type and **case-insensitive** name as the lookup key. Registering the same type and name twice throws. Registering a client after release has begun throws `ObjectDisposedException`.
+Clients use their type and **case-insensitive** name as the lookup key. A different instance under the same type and name throws. The same instance under that key is a no-op, and the same instance under another name or type is an alias with one release. The same instance with a different ownership throws, and the exception names both. Registering a client after release has begun throws `ObjectDisposedException`.
 
-By default, the context disposes clients when the test ends, in reverse registration order. With `ProtoClientOwnership.Caller`, the caller owns disposal.
+By default, the context disposes each owned instance once when the test ends. With `ProtoClientOwnership.Caller`, the caller owns disposal. Replacing a name gives the incoming instance one release when it was not already registered, and the instance that lost its last name keeps the release from its first registration.
 
 A failing `Client<T>` lookup writes a `client.resolve` event before throwing. `TryClient` never traces. See [Clients](./clients.md) for writing your own.
 

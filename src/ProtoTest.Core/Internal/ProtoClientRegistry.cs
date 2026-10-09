@@ -14,7 +14,15 @@ internal sealed class ProtoClientRegistry
     /// <summary>Stops further registrations once the execution context starts releasing resources.</summary>
     public void Seal() => Interlocked.Exchange(ref _sealed, 1);
 
-    public void Register<TClient>(TClient client, string name) where TClient : class
+    /// <summary>Throws once <see cref="Seal"/> has run, before a caller mutates anything else.</summary>
+    public void EnsureOpen() => ObjectDisposedException.ThrowIf(Volatile.Read(ref _sealed) != 0, this);
+
+    /// <summary>
+    /// Registers the client under its type and name. Returns <see langword="false"/> when that same
+    /// instance is already stored under the key, so the caller does not record a second owner. Names
+    /// compare case-insensitively; the stored key keeps the first spelling.
+    /// </summary>
+    public bool Register<TClient>(TClient client, string name) where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
         var key = BuildKey(typeof(TClient), name);
@@ -27,7 +35,11 @@ internal sealed class ProtoClientRegistry
                 // A shared provider (the ASP.NET Core transport) can legitimately run once per protocol
                 // chain that names it; re-registering the same instance is a no-op, a different one is a
                 // configuration conflict.
-                if (ReferenceEquals(existing, client)) return;
+                if (ReferenceEquals(existing, client))
+                {
+                    return false;
+                }
+
                 throw new InvalidOperationException(
                     $"A client of type '{typeof(TClient).Name}' is already registered with name '{name}'; " +
                     "reuse the registered instance or register the new one under its own name.");
@@ -35,6 +47,7 @@ internal sealed class ProtoClientRegistry
 
             _clients[key] = client;
             _registrationOrder.Add(key);
+            return true;
         }
     }
 

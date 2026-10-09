@@ -14,6 +14,8 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     private readonly ProtoAttachmentCollection _attachments;
     private readonly ProtoContextStateStore _state = new();
     private readonly ProtoClientRegistry _clients = new();
+    private readonly ProtoLock _clientOwnersGate = new();
+    private readonly Dictionary<object, ProtoClientOwnership> _clientOwners = new(ReferenceEqualityComparer.Instance);
     private readonly ProtoResourceRegistry _resources = new();
     private readonly HashSet<string> _reportedResources = new(StringComparer.Ordinal);
     private readonly ProtoObservationDispatcher _observations;
@@ -291,9 +293,16 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
 
     /// <summary>
     /// Registers a named client for this test. A <see cref="ProtoClientOwnership.Context"/> client is
-    /// released in reverse registration order when the test completes; a
+    /// released once when the test completes, however many names point at it; a
     /// <see cref="ProtoClientOwnership.Caller"/> client is shared and its lifetime is managed elsewhere.
+    /// The same instance under the same type and name (the name is case-insensitive) is a no-op when
+    /// the ownership matches. Another name, or the same instance registered as another type, is an
+    /// alias and does not add a release.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// A different instance is already registered under the type and name, or this instance is already
+    /// registered with a different <see cref="ProtoClientOwnership"/>.
+    /// </exception>
     public void RegisterClient<TClient>(
         TClient client,
         string name = "Default",
@@ -301,27 +310,39 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
-        var owned = ownership is ProtoClientOwnership.Context;
-        _clients.Register(client, name);
-        var clientId = ProtoClientTrace.Id(typeof(TClient), name);
-        RegisterOwned(new ProtoResource(
-            clientId,
-            "client",
-            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
-            context => ReleaseClientAsync(client, owned)));
-        Trace.SetEntityState(
-            ProtoTraceEntityKinds.Client,
-            clientId,
-            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
-            new Dictionary<string, string?>
+        lock (_clientOwnersGate)
+        {
+            _clients.EnsureOpen();
+            EnsureCompatibleOwnership(client, typeof(TClient), name, ownership);
+            if (!_clients.Register(client, name) || _clientOwners.ContainsKey(client))
             {
-                ["client.name"] = name,
-                ["client.type"] = typeof(TClient).FullName,
-                ["instance.type"] = client.GetType().FullName,
-                ["client.owned"] = owned ? "true" : "false"
-            },
-            scope: TestName,
-            change: "created");
+                // Same key: nothing was added. Another key: the lookup is an alias of the instance
+                // that already owns the release.
+                return;
+            }
+
+            _clientOwners.Add(client, ownership);
+            var owned = ownership is ProtoClientOwnership.Context;
+            var clientId = ProtoClientTrace.Id(typeof(TClient), name);
+            RegisterOwned(new ProtoResource(
+                clientId,
+                "client",
+                $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+                context => ReleaseClientAsync(client, owned)));
+            Trace.SetEntityState(
+                ProtoTraceEntityKinds.Client,
+                clientId,
+                $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+                new Dictionary<string, string?>
+                {
+                    ["client.name"] = name,
+                    ["client.type"] = typeof(TClient).FullName,
+                    ["instance.type"] = client.GetType().FullName,
+                    ["client.owned"] = owned ? "true" : "false"
+                },
+                scope: TestName,
+                change: "created");
+        }
     }
 
     /// <summary>Retrieves a required named client.</summary>
@@ -358,13 +379,16 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     /// <summary>
-    /// Replaces a named client registered for this test and traces the replacement. The replaced
-    /// instance keeps its own teardown release, so every instance is disposed exactly once, and
-    /// re-registering the instance already in place is a no-op.
+    /// Replaces a named client registered for this test and traces the replacement. The instance that
+    /// lost its last name keeps the one release from when it was first registered. An instance another
+    /// name still references is not released again, and a replacement that is already registered does
+    /// not gain a second release. Replacing a name with the instance already registered there is a
+    /// no-op when the ownership matches.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Nothing is registered under <paramref name="name"/>: a replacement always follows a
-    /// registration, it never creates one.
+    /// Nothing is registered under <paramref name="name"/>, or <paramref name="client"/> is already
+    /// registered with a different <see cref="ProtoClientOwnership"/>. A replacement always follows a
+    /// registration; it never creates one.
     /// </exception>
     public void ReplaceClient<TClient>(
         TClient client,
@@ -373,33 +397,49 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
         where TClient : class
     {
         ArgumentNullException.ThrowIfNull(client);
-        var owned = ownership is ProtoClientOwnership.Context;
-        if (!_clients.Replace(client, name))
+        lock (_clientOwnersGate)
         {
-            return;
-        }
-
-        var clientId = ProtoClientTrace.Id(typeof(TClient), name);
-        var generation = Interlocked.Increment(ref _clientReplacementSequence);
-        RegisterOwned(new ProtoResource(
-            $"{clientId}#replaced-{generation}",
-            "client",
-            $"Replaced client {typeof(TClient).Name} '{name}'",
-            context => ReleaseClientAsync(client, owned)));
-        Trace.SetEntityState(
-            ProtoTraceEntityKinds.Client,
-            clientId,
-            $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
-            new Dictionary<string, string?>
+            _clients.EnsureOpen();
+            var current = _clients.TryGet<TClient>(name);
+            if (current is not null && ReferenceEquals(current, client))
             {
-                ["client.name"] = name,
-                ["client.type"] = typeof(TClient).FullName,
-                ["instance.type"] = client.GetType().FullName,
-                ["client.owned"] = owned ? "true" : "false",
-                ["client.replaced"] = "true"
-            },
-            scope: TestName,
-            change: "replaced");
+                EnsureCompatibleOwnership(client, typeof(TClient), name, ownership);
+                return;
+            }
+
+            EnsureCompatibleOwnership(client, typeof(TClient), name, ownership);
+            if (!_clients.Replace(client, name))
+            {
+                return;
+            }
+
+            var owned = ownership is ProtoClientOwnership.Context;
+            var clientId = ProtoClientTrace.Id(typeof(TClient), name);
+            if (_clientOwners.TryAdd(client, ownership))
+            {
+                var generation = Interlocked.Increment(ref _clientReplacementSequence);
+                RegisterOwned(new ProtoResource(
+                    $"{clientId}#replaced-{generation}",
+                    "client",
+                    $"Replaced client {typeof(TClient).Name} '{name}'",
+                    context => ReleaseClientAsync(client, owned)));
+            }
+
+            Trace.SetEntityState(
+                ProtoTraceEntityKinds.Client,
+                clientId,
+                $"{(owned ? "Client" : "Shared client")} {typeof(TClient).Name} '{name}'",
+                new Dictionary<string, string?>
+                {
+                    ["client.name"] = name,
+                    ["client.type"] = typeof(TClient).FullName,
+                    ["instance.type"] = client.GetType().FullName,
+                    ["client.owned"] = owned ? "true" : "false",
+                    ["client.replaced"] = "true"
+                },
+                scope: TestName,
+                change: "replaced");
+        }
     }
 
     /// <summary>Registers a non-owning lookup alias for a client already registered under a scoped name.</summary>
@@ -637,6 +677,18 @@ public sealed class ProtoExecutionContext : IAsyncDisposable
     }
 
     private void RegisterOwned(IProtoResource resource) => _resources.Register(resource);
+
+    private void EnsureCompatibleOwnership(object client, Type registeredAs, string name, ProtoClientOwnership ownership)
+    {
+        if (!_clientOwners.TryGetValue(client, out var existing) || existing == ownership)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Client '{registeredAs.Name}' named '{name}' is the same instance already registered with {existing} ownership; " +
+            $"cannot register it again with {ownership} ownership.");
+    }
 
     /// <summary>
     /// Publishes what this test owned, after release, so reports explain teardown. The report lists the

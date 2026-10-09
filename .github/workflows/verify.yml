@@ -70,6 +70,15 @@ jobs:
           name: sample-app-ui
           path: samples/ProtoTest.SampleApp/Ui/dist
 
+      # Testcontainers pulls rabbitmq, postgres and mosquitto during the suite. The login uses the
+      # repository's Docker Hub account so those pulls are not counted against the anonymous limit
+      # shared by every GitHub-hosted runner.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Restore, build, and test every runner
         shell: pwsh
         run: ./proto.ps1 test -Configuration Release
@@ -150,6 +159,12 @@ jobs:
           name: sample-app-ui
           path: samples/ProtoTest.SampleApp/Ui/dist
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       # The container path only runs where a container runtime exists, which is why it is its own job.
       - name: Run the Learning demo against a PostgreSQL container
         shell: pwsh
@@ -168,6 +183,10 @@ jobs:
     services:
       rabbitmq:
         image: rabbitmq:3
+        # The runner pulls a service before the first step, so the login below does not cover it.
+        credentials:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
         ports:
           - 5672:5672
 
@@ -185,6 +204,13 @@ jobs:
         with:
           name: sample-app-ui
           path: samples/ProtoTest.SampleApp/Ui/dist
+
+      # The Learning demo starts its own RabbitMQ container after the service above is already up.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # The broker path: the adapter's round trips and the Learning demo's event journey only run
       # here. The adapter tests use the job's own service; the sample still owns a container as

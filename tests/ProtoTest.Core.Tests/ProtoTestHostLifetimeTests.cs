@@ -110,15 +110,69 @@ public sealed class ProtoTestHostLifetimeTests
         Assert.That(stopping.IsCompleted, Is.False, "Stop returned while the start was still blocked");
 
         hook.Release();
-        await starting;
+        var stopped = Assert.ThrowsAsync<InvalidOperationException>(() => starting);
         await stopping;
 
         Assert.Multiple(() =>
         {
+            Assert.That(stopped!.Message, Is.EqualTo("The host was stopped while it was starting."));
             Assert.Throws<InvalidOperationException>(
                 () => _ = lifetime.Host,
                 "a stop that waited out the start does not leave a host published");
             Assert.That(hook.AfterRunCount, Is.EqualTo(1));
+        });
+
+        // The stop consumed that start. A later start is a new one.
+        await lifetime.StartAsync(ConfigureHost);
+        Assert.That(lifetime.Host, Is.Not.Null);
+        await lifetime.StopAsync();
+    }
+
+    [Test]
+    public async Task StopAsync_WhenTheStartFails_ShouldReturnWithoutAfterRunAndKeepTheStartException()
+    {
+        var lifetime = new ProtoTestHostLifetime();
+        var hook = new BlockingRunHook { FailAfterRelease = true };
+        var starting = lifetime.StartAsync(builder =>
+        {
+            ConfigureHost(builder);
+            builder.ConfigureServices(services => services.AddSingleton<IProtoRunHook>(hook));
+        });
+
+        await hook.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var stopping = lifetime.StopAsync();
+        Assert.That(stopping.IsCompleted, Is.False, "Stop returned while the failing start was still blocked");
+
+        hook.Release();
+        var startFailure = Assert.ThrowsAsync<InvalidOperationException>(() => starting);
+        await stopping;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(startFailure!.Message, Is.EqualTo("start failed"));
+            Assert.That(hook.AfterRunCount, Is.Zero, "a start that never finished does not run AfterRun");
+            Assert.Throws<InvalidOperationException>(() => _ = lifetime.Host);
+        });
+    }
+
+    [Test]
+    public async Task StopAsync_FromInsideStart_ShouldFailFastInsteadOfDeadlocking()
+    {
+        var lifetime = new ProtoTestHostLifetime();
+        var starting = lifetime.StartAsync(builder =>
+        {
+            ConfigureHost(builder);
+            builder.ConfigureServices(services =>
+                services.AddSingleton<IProtoRunHook>(new StopDuringBeforeRunHook(lifetime)));
+        });
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await starting.WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("cannot be stopped from inside its own start"));
+            Assert.Throws<InvalidOperationException>(() => _ = lifetime.Host);
         });
     }
 
@@ -168,12 +222,18 @@ public sealed class ProtoTestHostLifetimeTests
 
         public int AfterRunCount => Volatile.Read(ref _afterRunCount);
 
+        public bool FailAfterRelease { get; init; }
+
         public void Release() => _release.TrySetResult();
 
         public async Task BeforeRunAsync(CancellationToken cancellationToken = default)
         {
             Entered.TrySetResult();
             await _release.Task.WaitAsync(cancellationToken);
+            if (FailAfterRelease)
+            {
+                throw new InvalidOperationException("start failed");
+            }
         }
 
         public Task AfterRunAsync(CancellationToken cancellationToken = default)
@@ -181,5 +241,13 @@ public sealed class ProtoTestHostLifetimeTests
             Interlocked.Increment(ref _afterRunCount);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class StopDuringBeforeRunHook(ProtoTestHostLifetime lifetime) : IProtoRunHook
+    {
+        public Task BeforeRunAsync(CancellationToken cancellationToken = default)
+            => lifetime.StopAsync();
+
+        public Task AfterRunAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

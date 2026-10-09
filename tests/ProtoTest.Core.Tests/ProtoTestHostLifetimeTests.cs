@@ -91,6 +91,37 @@ public sealed class ProtoTestHostLifetimeTests
         await lifetime.StopAsync();
     }
 
+    [Test]
+    public async Task StopAsync_DuringStart_ShouldWaitThenStopAndRunAfterRunOnce()
+    {
+        // A stop that arrives while BeforeRun is still awaiting waits for that start, then
+        // stops the host. AfterRun runs once and the lifetime exposes no host.
+        var lifetime = new ProtoTestHostLifetime();
+        var hook = new BlockingRunHook();
+        var starting = lifetime.StartAsync(builder =>
+        {
+            ConfigureHost(builder);
+            builder.ConfigureServices(services => services.AddSingleton<IProtoRunHook>(hook));
+        });
+
+        await hook.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var stopping = lifetime.StopAsync();
+        Assert.That(stopping.IsCompleted, Is.False, "Stop returned while the start was still blocked");
+
+        hook.Release();
+        await starting;
+        await stopping;
+
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<InvalidOperationException>(
+                () => _ = lifetime.Host,
+                "a stop that waited out the start does not leave a host published");
+            Assert.That(hook.AfterRunCount, Is.EqualTo(1));
+        });
+    }
+
     private static void ConfigureHost(IProtoHostBuilder builder)
         => builder.ConfigureTracing(options => options.Enabled = false);
 
@@ -126,5 +157,29 @@ public sealed class ProtoTestHostLifetimeTests
         }
 
         public Task AfterRunAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class BlockingRunHook : IProtoRunHook
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _afterRunCount;
+
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int AfterRunCount => Volatile.Read(ref _afterRunCount);
+
+        public void Release() => _release.TrySetResult();
+
+        public async Task BeforeRunAsync(CancellationToken cancellationToken = default)
+        {
+            Entered.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+        }
+
+        public Task AfterRunAsync(CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _afterRunCount);
+            return Task.CompletedTask;
+        }
     }
 }

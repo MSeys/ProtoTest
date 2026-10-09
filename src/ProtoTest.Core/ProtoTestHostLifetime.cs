@@ -91,9 +91,33 @@ public sealed class ProtoTestHostLifetime
         return host;
     }
 
-    /// <summary>Stops and disposes the host, clearing it so later access reports "not initialized".</summary>
+    /// <summary>
+    /// Stops and disposes the host, clearing it so later access reports "not initialized".
+    /// A stop during an in-flight start waits for that start to finish, then stops the host
+    /// when one was published. The start is not cancelled: <see cref="StartAsync"/> has no
+    /// cancellation token. This method does not return while the start is still in flight,
+    /// and it does not leave a host published afterwards.
+    /// </summary>
     public async Task StopAsync()
     {
+        Task<ProtoHost>? starting;
+        lock (_gate)
+        {
+            starting = _starting;
+        }
+
+        if (starting is not null)
+        {
+            try
+            {
+                await starting.ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // A failed start publishes nothing and has already released what it started.
+            }
+        }
+
         ProtoHost? host;
         lock (_gate)
         {

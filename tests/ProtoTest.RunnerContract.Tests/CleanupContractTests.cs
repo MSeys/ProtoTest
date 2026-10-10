@@ -98,9 +98,7 @@ public sealed class CleanupContractTests
     {
         { Body: "fail" } => "failed",
         // NUnit reports a cancelled test as a plain failure and exposes no exception type to classify.
-        // MSTest hands the adapter its own wrapper around the thrown exception, so the shared classifier
-        // never sees the cancellation: an open adapter gap this row pins until the adapter unwraps it.
-        { Body: "cancel" } => runner is Runner.NUnit or Runner.MSTest ? "failed" : "cancelled",
+        { Body: "cancel" } => runner is Runner.NUnit ? "failed" : "cancelled",
         { CleanupFails: true, Mode: "Fail" } => "failed",
         { Body: "skip" } => "skipped",
         { CleanupFails: true } => "partial",

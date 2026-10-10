@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="MSTest/RunnerContract.MSTest.csproj" />
+  <Project Path="NUnit/RunnerContract.NUnit.csproj" />
+  <Project Path="TUnit/RunnerContract.TUnit.csproj" />
+  <Project Path="Xunit/RunnerContract.Xunit.csproj" />
+  <Project Path="Xunit3/RunnerContract.Xunit3.csproj" />
+</Solution>

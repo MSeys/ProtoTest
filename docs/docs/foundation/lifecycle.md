@@ -134,6 +134,8 @@ builder.ConfigureCleanup(options => options.CleanupFailures = ProtoCleanupFailur
 
 Configuration binds the same choice from `ProtoTest:CleanupFailures` (`Fail` or `Report`) and wins over the code value. `CompleteTestAsync` still rethrows one cleanup failure as-is and aggregates several. The runner adapters complete through `ProtoTestScope`, which applies this rule, so the failure belongs to the test that leaked rather than to the run as a whole.
 
+A test that skips itself **after its context starts** still owns its resources. With `CleanupFailures = Fail`, a failing release makes that test fail, even though its body was skipped. An unknown body outcome follows the same rule. The runner error says that the body was skipped or unknown; it does not claim the body passed. The trace records the cleanup failure as the test's failure too. With `Report`, a skipped or unknown outcome stays unchanged and the cleanup error remains in the findings and teardown entries. A skip evaluated before the context starts owns no resources and needs no cleanup.
+
 ### When setup fails
 
 If a hook or attribute throws during setup, ProtoTest **rolls back**. Only the components that *completed* their `BeforeTestAsync` get their `AfterTestAsync`, in reverse. The one that threw does not.

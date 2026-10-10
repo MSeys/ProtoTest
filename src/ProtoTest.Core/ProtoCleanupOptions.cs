@@ -9,7 +9,7 @@ public enum ProtoCleanupFailureMode
     /// <summary>
     /// The test fails. A body that passed is reported as failed, with a message that says so and names
     /// the cleanup failure. A body that failed keeps that failure; the cleanup failures are attached to
-    /// it. This is the default.
+    /// it. A skipped or unknown body also becomes failed when cleanup fails. This is the default.
     /// </summary>
     Fail,
 

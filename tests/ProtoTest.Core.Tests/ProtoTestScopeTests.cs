@@ -7,6 +7,69 @@ using ProtoTest.Core;
 [TestFixture]
 public sealed class ProtoTestScopeTests
 {
+    [TestCase(ProtoTraceOutcome.Skipped, "was skipped")]
+    [TestCase(ProtoTraceOutcome.Unknown, "outcome was unknown")]
+    public async Task DisposeAsync_WhenCleanupFailsWithoutABodyResult_ShouldFailRunnerAndTrace(
+        ProtoTraceOutcome outcome, string bodyMessage)
+    {
+        await using var host = new ProtoHostBuilder().Build();
+        await host.StartAsync();
+        var scope = await ProtoTestScope.StartAsync(ProtoTestAdapter.Prepare(TestMethods.Placeholder, host), host);
+        var released = new List<string>();
+        scope.Context.RegisterResource("good", "probe", "continued cleanup", _ =>
+        {
+            released.Add("good");
+            return ValueTask.CompletedTask;
+        });
+        scope.Context.RegisterResource("bad", "probe", "cleanup failure", _ =>
+        {
+            released.Add("bad");
+            throw new InvalidOperationException("release failed");
+        });
+        scope.Result = new ProtoTestResult(outcome);
+
+        var failure = Assert.ThrowsAsync<ProtoCleanupException>(async () => await scope.DisposeAsync());
+        var trace = host.Trace.Snapshot().Tests.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(released, Is.EqualTo(new[] { "bad", "good" }));
+            Assert.That(failure!.BodyPassed, Is.False);
+            Assert.That(failure.Message, Does.Contain(bodyMessage).And.Contain("release failed"));
+            Assert.That(failure.CleanupFailures, Has.Count.EqualTo(1));
+            Assert.That(trace.Outcome, Is.EqualTo(ProtoTraceOutcome.Failed));
+            Assert.That(trace.Error!.Message, Is.EqualTo(failure.Message));
+        });
+    }
+
+    [TestCase(ProtoTraceOutcome.Skipped, false)]
+    [TestCase(ProtoTraceOutcome.Unknown, false)]
+    [TestCase(ProtoTraceOutcome.Skipped, true)]
+    [TestCase(ProtoTraceOutcome.Unknown, true)]
+    public async Task DisposeAsync_WhenCleanupIsSuccessfulOrReportOnly_ShouldKeepTheBodyOutcome(
+        ProtoTraceOutcome outcome, bool reportFailure)
+    {
+        var builder = new ProtoHostBuilder();
+        if (reportFailure)
+        {
+            builder.ConfigureCleanup(options => options.CleanupFailures = ProtoCleanupFailureMode.Report);
+            builder.AddTestHook<FailingTeardownHook>();
+        }
+        await using var host = builder.Build();
+        await host.StartAsync();
+        var scope = await ProtoTestScope.StartAsync(ProtoTestAdapter.Prepare(TestMethods.Placeholder, host), host);
+        scope.Result = new ProtoTestResult(outcome);
+
+        await scope.DisposeAsync();
+
+        var trace = host.Trace.Snapshot().Tests.Single();
+        Assert.That(trace.Outcome, Is.EqualTo(outcome));
+        if (reportFailure)
+        {
+            Assert.That(trace.Entries.Single(entry => entry.Kind == "test.teardown").Outcome,
+                Is.EqualTo(ProtoTraceOutcome.Failed));
+        }
+    }
+
     [Test]
     public async Task DisposeAsync_WhenTeardownFails_ShouldFailTheTestAndNameTheCleanup()
     {

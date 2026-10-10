@@ -93,6 +93,30 @@ public sealed class ProtoCleanupException : Exception
             bodyPassed: false);
     }
 
+    /// <summary>Applies the same cleanup policy to the runner exception and the recorded outcome.</summary>
+    internal static ProtoCleanupException ForResult(ProtoTestResult result, IReadOnlyList<Exception> cleanupFailures)
+    {
+        if (result.Outcome is ProtoTraceOutcome.Succeeded or ProtoTraceOutcome.Partial)
+        {
+            return ForPassedBody(cleanupFailures);
+        }
+
+        if (result.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Cancelled)
+        {
+            return ForBodyFailure(result, new AggregateException(cleanupFailures));
+        }
+
+        var failures = Copy(cleanupFailures.SelectMany(Flatten).ToArray());
+        var body = result.Outcome == ProtoTraceOutcome.Skipped
+            ? "The test body was skipped"
+            : "The test body outcome was unknown";
+        return Create(
+            $"{body}, but cleanup failed: {Describe(failures)}",
+            failures[0],
+            failures,
+            bodyPassed: false);
+    }
+
     private static ProtoCleanupException Create(
         string message,
         Exception? primary,

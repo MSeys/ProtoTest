@@ -4,7 +4,8 @@ namespace ProtoTest.Core;
 /// One test's lifecycle as a scope: start it from a prepared test, run the framework's body, then let
 /// the scope complete the lifecycle. Teardown failures are recorded as findings by the lifecycle. By
 /// default the scope then fails the test: a body that passed is reported as failed, and a body that
-/// failed keeps that failure with the cleanup attached. <see cref="ProtoCleanupFailureMode.Report"/>
+/// failed keeps that failure with the cleanup attached. A skipped or unknown body also fails when
+/// cleanup fails. <see cref="ProtoCleanupFailureMode.Report"/>
 /// records the finding and leaves the reported result alone, so every adapter shares one policy.
 /// </summary>
 public sealed class ProtoTestScope : IAsyncDisposable
@@ -122,15 +123,7 @@ public sealed class ProtoTestScope : IAsyncDisposable
                 return;
             }
 
-            if (Result.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Cancelled)
-            {
-                throw ProtoCleanupException.ForBodyFailure(Result, exception);
-            }
-
-            if (Result.Outcome is ProtoTraceOutcome.Succeeded or ProtoTraceOutcome.Partial)
-            {
-                throw ProtoCleanupException.ForPassedBody(exception);
-            }
+            throw ProtoCleanupException.ForResult(Result, [exception]);
         }
     }
 }

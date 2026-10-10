@@ -13,6 +13,24 @@ using Xunit.v3;
 /// </summary>
 public sealed class ProbeFailureTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SkippedOrUnknownBodyWithCleanupFailure_ShouldKeepTheCleanupExplanation(bool unknown)
+    {
+        var scope = ProtoTestLifecycleHandler.Before(ProbeSubjects.TeardownProbeMethod, test: null);
+        using (AdapterFailureProbe.BeginTeardownFailure(nameof(ProbeSubjects.TeardownProbe)))
+        {
+            var failure = Assert.Throws<ProtoCleanupException>(() => ProtoTestLifecycleHandler.Complete(
+                scope, unknown ? null : TestResultState.ForSkipped(0m)));
+            Assert.False(failure.BodyPassed);
+            Assert.StartsWith(unknown ? "The test body outcome was unknown" : "The test body was skipped", failure.Message);
+            Assert.Contains(AdapterFailureProbe.TeardownMessage, failure.Message);
+        }
+        var trace = AdapterLifecycle.FindTrace(ProtoTestAssembly.Host, ProbeSubjects.TeardownProbeMethod);
+        Assert.Equal(ProtoTraceOutcome.Failed, trace.Outcome);
+    }
+
     [Fact]
     public void SetupFailure_ShouldSurfaceTheOriginalErrorAndRecordOneFailedTrace()
     {

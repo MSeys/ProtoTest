@@ -372,8 +372,8 @@ internal sealed class ProtoTestLifecycle
         if (exceptions.Count > exceptionCountBeforeTeardown)
         {
             // The teardown exception is evidence on the teardown operation and a finding. It does not
-            // replace a body failure: that result is what CompleteTest records, unless the body passed
-            // and cleanup failures fail the test, which ResultAfterCleanup applies below.
+            // replace a body failure. Other outcomes become failed under the Fail policy, including
+            // a runtime skip or missing body result, which ResultAfterCleanup applies below.
             lifecycleOperation.Fail(exceptions[^1]);
             foreach (var failure in exceptions.Skip(exceptionCountBeforeTeardown))
             {
@@ -410,11 +410,11 @@ internal sealed class ProtoTestLifecycle
     {
         if (teardownFailures.Count == 0
             || cleanupFailures != ProtoCleanupFailureMode.Fail
-            || result.Outcome is not (ProtoTraceOutcome.Succeeded or ProtoTraceOutcome.Partial))
+            || result.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Cancelled)
         {
             return result;
         }
 
-        return ProtoTestResult.Failed(ProtoCleanupException.ForPassedBody(teardownFailures));
+        return ProtoTestResult.Failed(ProtoCleanupException.ForResult(result, teardownFailures));
     }
 }

@@ -97,7 +97,8 @@ internal static class ProtoTestLifecycleHandler
         {
             ProtoTestAsync.RunSync(() => scope.DisposeAsync());
         }
-        catch (ProtoCleanupException exception) when (!exception.BodyPassed)
+        catch (ProtoCleanupException exception) when (
+            scope.Result.Outcome is ProtoTraceOutcome.Failed or ProtoTraceOutcome.Cancelled)
         {
             // xUnit v3 reports an After failure next to the body's own, so the body's message is
             // already shown once; this one carries only the cleanup.

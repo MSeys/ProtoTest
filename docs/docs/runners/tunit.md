@@ -97,6 +97,10 @@ public class OrderTests
 |[Before(Assembly) / After(Assembly) (host)]|  [[executor wraps body]]
 ```
 
+Native TUnit `[Before(Test)]`, `[After(Test)]` and test-class disposal are outside this window. Use ProtoTest hooks or attributes for setup and cleanup that need `Proto.Context`. The trace outcome describes the ProtoTest scope: a passing body and successful ProtoTest cleanup can leave it `Succeeded` even when a later native TUnit hook fails the runner. Use the runner's final result and exit code for the overall test verdict; do not infer that verdict from the body-scope trace alone.
+
+An exception from a resource registered with ProtoTest follows `CleanupFailures`, including when the body calls `Skip.Test`: `Fail` makes the test fail; `Report` keeps it skipped. This policy does not intercept errors in native TUnit hooks or disposal outside the scope.
+
 ## What the adapter changes
 
 | Item | What the adapter does |

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProtoTest.Traces\ProtoTest.Traces.csproj" />
+  </ItemGroup>
+  <!--
+    The adapters the fixture suites under fixtures/runner-contract run on: built before this project and
+    named here so a change to one of them reaches this project, without compiling against them.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProtoTest.MSTest\ProtoTest.MSTest.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" ExcludeAssets="all" />
+    <ProjectReference Include="..\..\src\ProtoTest.NUnit\ProtoTest.NUnit.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" ExcludeAssets="all" />
+    <ProjectReference Include="..\..\src\ProtoTest.TUnit\ProtoTest.TUnit.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" ExcludeAssets="all" />
+    <ProjectReference Include="..\..\src\ProtoTest.Xunit\ProtoTest.Xunit.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" ExcludeAssets="all" />
+    <ProjectReference Include="..\..\src\ProtoTest.Xunit3\ProtoTest.Xunit3.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" ExcludeAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProtoTest.TestSupport\ProtoTest.TestSupport.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\NUnitParallelization.cs" Link="NUnitParallelization.cs" />
+  </ItemGroup>
+</Project>

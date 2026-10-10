@@ -13,6 +13,20 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.9
+
+<p className="changelog-date">10 October 2026</p>
+
+ProtoTest 1.1.9 records a cancelled MSTest test as cancelled, as the other runners do, and checks every runner's outcomes against a real run of that runner.
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+- MSTest: Record a test whose body was cancelled as cancelled, not failed: the adapter now classifies the exception the test method threw instead of MSTest's wrapper around it. <span className="changelog-ref">[MSTest](/docs/runners/mstest)</span>
+
+</div>
+
 ## 1.1.8
 
 <p className="changelog-date">10 October 2026</p>

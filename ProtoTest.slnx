@@ -56,6 +56,7 @@
     <Project Path="tests/ProtoTest.Messaging.MassTransit.Tests/ProtoTest.Messaging.MassTransit.Tests.csproj" />
     <Project Path="tests/ProtoTest.Mcp.Tests/ProtoTest.Mcp.Tests.csproj" />
     <Project Path="tests/ProtoTest.Sheets.Tests/ProtoTest.Sheets.Tests.csproj" />
+    <Project Path="tests/ProtoTest.RunnerContract.Tests/ProtoTest.RunnerContract.Tests.csproj" />
     <Project Path="tests/ProtoTest.Traces.Tests/ProtoTest.Traces.Tests.csproj" />
     <Project Path="tests/ProtoTest.Verification.Tests/ProtoTest.Verification.Tests.csproj" />
   </Folder>

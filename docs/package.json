@@ -6,7 +6,7 @@
     "docusaurus": "docusaurus",
     "generate:changelog": "node scripts/generate-changelog.mjs",
     "start": "npm run generate:changelog && docusaurus start",
-    "build": "npm run generate:changelog && npm run lint:css && npm run lint:ts && npm run test:plugins && npm run test:catalog && docusaurus build",
+    "build": "npm run generate:changelog && npm run lint:css && npm run lint:ts && npm run test:plugins && npm run test:catalog && docusaurus build && node scripts/check-built-links.mjs",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",

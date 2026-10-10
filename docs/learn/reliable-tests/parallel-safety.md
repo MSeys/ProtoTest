@@ -1,15 +1,15 @@
 ---
 id: parallel-safety
-title: Parallel safety
+title: Run .NET integration tests in parallel safely
 sidebar_label: Parallel safety
 sidebar_position: 3
-description: "Find the shared name that makes tests break each other in parallel, and see how per-test tenants and per-test state keep them apart."
+description: "Find shared state that breaks .NET integration tests in parallel, then isolate test data with per-test tenants and owned cleanup."
 ---
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
 
-# Parallel safety
+# Run .NET integration tests in parallel safely
 
 <Lesson
   track="Reliable tests"

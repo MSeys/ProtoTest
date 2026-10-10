@@ -1,9 +1,9 @@
 ---
 id: diagnose-a-flaky-test
-title: Diagnose a flaky test by comparing two runs
+title: Diagnose flaky .NET integration tests with run traces
 sidebar_label: Diagnose a flaky test
 sidebar_position: 4
-description: "Line up a passing and a failing run of the same test, find the first value that differs, and name what changed it."
+description: "Compare passing and failing .NET integration test traces, find the first differing value, and reproduce a timing failure before fixing it."
 ---
 
 import Lesson from '@site/src/components/Lesson';
@@ -12,7 +12,7 @@ import Link from '@docusaurus/Link';
 import RunCompare from '@site/src/components/RunCompare';
 import RaceDiagram from '@site/src/components/RaceDiagram';
 
-# Diagnose a flaky test by comparing two runs
+# Diagnose flaky .NET integration tests with run traces
 
 <Lesson
   track="Understand failures"

@@ -1,15 +1,15 @@
 ---
 id: readiness-instead-of-sleeps
-title: Wait for readiness, not for time
+title: Replace sleeps with readiness checks in .NET integration tests
 sidebar_label: Wait for readiness, not for time
 sidebar_position: 2
-description: "Replace a sleep before the first request with a readiness probe, and read the wait in the run layer of a trace."
+description: "Replace fixed sleeps in .NET integration tests with an HTTP readiness probe, and inspect each wait in a ProtoTest trace."
 ---
 
 import Lesson from '@site/src/components/Lesson';
 import Checkpoint from '@site/src/components/Checkpoint';
 
-# Wait for readiness, not for time
+# Replace sleeps with readiness checks in .NET integration tests
 
 <Lesson
   track="Reliable tests"

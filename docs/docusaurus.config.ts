@@ -80,7 +80,7 @@ export default async function createConfig(): Promise<Config> {
           feedOptions: {type: ['rss', 'atom'], xslt: false},
         },
         sitemap: {
-          ignorePatterns: ['/search'],
+          ignorePatterns: ['/search', '/search/'],
           // The git date of each page, so a search engine sees which pages changed.
           lastmod: 'date',
         },

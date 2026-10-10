@@ -1,9 +1,9 @@
 ---
 id: write-your-first-test
-title: Write your first test
+title: Write your first .NET API integration test with ProtoTest
 sidebar_label: Write your first test
 sidebar_position: 2
-description: "Add one test to the Northstar.ProtoTest sample suite, run it alone, and see it pass."
+description: "Add a C# API integration test to the prepared ProtoTest sample, give it isolated data, check the response, and run it with dotnet test."
 ---
 
 import Lesson from '@site/src/components/Lesson';
@@ -11,7 +11,7 @@ import Checkpoint from '@site/src/components/Checkpoint';
 import AnnotatedCode from '@site/src/components/AnnotatedCode';
 import Link from '@docusaurus/Link';
 
-# Write your first test
+# Write your first .NET API integration test with ProtoTest
 
 <Lesson
   track="Start"
@@ -29,7 +29,10 @@ import Link from '@docusaurus/Link';
 
 ## The problem
 
-You have run the sample suite. Now add a test that creates a project and checks the response: one request, two checks, one filtered run.
+This lesson uses the prepared Northstar.ProtoTest sample. If you arrived here first,
+[clone and run the sample suite](./install-and-run.md) before adding the test below.
+
+Now add a test that creates a project and checks the response: one request, two checks, one filtered run.
 
 The sample already configures the application and its clients, so you write only the test.
 

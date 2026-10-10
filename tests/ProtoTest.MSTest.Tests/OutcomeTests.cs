@@ -63,6 +63,20 @@ public sealed class OutcomeTests
     }
 
     [TestMethod]
+    public void CancelledRowInMSTestsWrapper_ShouldRecordCancelledOutcome()
+    {
+        // MSTest hands the adapter what the test method threw inside its own TestFailedException, an internal
+        // type; the adapter recognizes it by name, which the runner contract suite checks against the real runner.
+        var result = ProtoTestAttribute.ToProtoTestResult(new TestResult
+        {
+            Outcome = UnitTestOutcome.Failed,
+            TestFailureException = new TestFailedException(new OperationCanceledException("deliberate cancellation"))
+        });
+
+        Assert.AreEqual(ProtoTraceOutcome.Cancelled, result.Outcome);
+    }
+
+    [TestMethod]
     public void TimedOutRow_ShouldRecordCancelledOutcomeWithQualifiedErrorType()
     {
         var result = ProtoTestAttribute.ToProtoTestResult(new TestResult { Outcome = UnitTestOutcome.Timeout });
@@ -126,4 +140,6 @@ public sealed class OutcomeTests
         public void RequiresCapability() => throw new InvalidOperationException("A skipped test must not run its body.");
     }
 #pragma warning restore MSTEST0030, MSTEST0032
+
+    private sealed class TestFailedException(Exception thrown) : Exception("Test method threw an exception.", thrown);
 }

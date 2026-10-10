@@ -7,6 +7,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+### Fixes
+
+- MSTest: Record a test whose body was cancelled as cancelled, not failed: the adapter now classifies the exception the test method threw instead of MSTest's wrapper around it. [MSTest](https://prototest.dev/docs/runners/mstest)
+
 ## [1.1.8] - 2026-10-10
 
 ProtoTest 1.1.8 makes a cleanup failure fail the test even when its body was skipped or its outcome was unknown. The runner and trace agree, and cleanup still attempts every registered resource.

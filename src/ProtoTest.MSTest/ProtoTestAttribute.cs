@@ -134,6 +134,11 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
     /// data row, so there is no multi-row aggregation to do. A failure with an exception goes through
     /// the shared classifier, so a cancelled body maps the same way here as in every other adapter.
     /// </summary>
+    // MSTest reports what the test method threw inside its own TestFailedException; the method's exception is the
+    // inner one. Classifying the wrapper would call a cancelled body failed.
+    internal static Exception Unwrap(Exception exception)
+        => exception.GetType().Name == "TestFailedException" && exception.InnerException is { } thrown ? thrown : exception;
+
     internal static ProtoTestResult ToProtoTestResult(TestResult? result)
     {
         if (result is null) return ProtoTestResult.Unknown;
@@ -144,7 +149,7 @@ public class ProtoTestAttribute([CallerFilePath] string callerFilePath = "", [Ca
             // MSTest reports a test it cannot run as skipped by default; match the runner.
             UnitTestOutcome.NotRunnable => ProtoTestResult.Skipped,
             UnitTestOutcome.Failed or UnitTestOutcome.Error when result.TestFailureException is not null =>
-                ProtoTestResult.FromException(result.TestFailureException),
+                ProtoTestResult.FromException(Unwrap(result.TestFailureException)),
             UnitTestOutcome.Failed or UnitTestOutcome.Error => ProtoTestResult.Failed(
                 FrameworkName, result.Outcome.ToString(), $"{FrameworkName} completed with outcome {result.Outcome}."),
             // A timeout or abort means the test never finished; recording it as cancelled keeps it

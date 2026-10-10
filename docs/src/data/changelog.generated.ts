@@ -9,6 +9,12 @@ export interface ChangelogRelease {
 
 export const releases: ChangelogRelease[] = [
   {
+    "version": "1.1.9",
+    "date": "2026-10-10",
+    "summary": "ProtoTest 1.1.9 records a cancelled MSTest test as cancelled, as the other runners do, and checks every runner's outcomes against a real run of that runner.",
+    "body": "ProtoTest 1.1.9 records a cancelled MSTest test as cancelled, as the other runners do, and checks every runner's outcomes against a real run of that runner.\n\n### Fixes\n\n- MSTest: Record a test whose body was cancelled as cancelled, not failed: the adapter now classifies the exception the test method threw instead of MSTest's wrapper around it. [MSTest](https://prototest.dev/docs/runners/mstest)"
+  },
+  {
     "version": "1.1.8",
     "date": "2026-10-10",
     "summary": "ProtoTest 1.1.8 makes a cleanup failure fail the test even when its body was skipped or its outcome was unknown. The runner and trace agree, and cleanup still attempts every registered resource.",

@@ -138,8 +138,8 @@ export default async function createConfig(): Promise<Config> {
 
   themeConfig: {
     announcementBar: {
-      id: 'release-1.1.8',
-      content: 'ProtoTest 1.1.8: cleanup failures also fail skipped tests. <a href="/changelog/">Release notes</a>',
+      id: 'release-1.1.9',
+      content: 'ProtoTest 1.1.9: a cancelled MSTest test is recorded as cancelled. <a href="/changelog/">Release notes</a>',
       isCloseable: true,
     },
     image: 'img/brand/prototest-social.png',

@@ -7,6 +7,10 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+## [1.1.9] - 2026-10-10
+
+ProtoTest 1.1.9 records a cancelled MSTest test as cancelled, as the other runners do, and checks every runner's outcomes against a real run of that runner.
+
 ### Fixes
 
 - MSTest: Record a test whose body was cancelled as cancelled, not failed: the adapter now classifies the exception the test method threw instead of MSTest's wrapper around it. [MSTest](https://prototest.dev/docs/runners/mstest)

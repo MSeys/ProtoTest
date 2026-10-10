@@ -1,0 +1,19 @@
+<Project>
+  <!--
+    A test fixture, not product code: chains to the repository props for central package versions and
+    the shared analyzers. Each runner's project compiles the one shared RunnerContract.cs with its
+    runner's symbol defined.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ContinuousIntegrationBuild>false</ContinuousIntegrationBuild>
+    <RootNamespace>RunnerContract</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)RunnerContract.cs" Link="RunnerContract.cs" />
+  </ItemGroup>
+</Project>

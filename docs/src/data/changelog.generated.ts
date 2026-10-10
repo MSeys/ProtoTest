@@ -9,6 +9,12 @@ export interface ChangelogRelease {
 
 export const releases: ChangelogRelease[] = [
   {
+    "version": "1.1.8",
+    "date": "2026-10-10",
+    "summary": "ProtoTest 1.1.8 makes a cleanup failure fail the test even when its body was skipped or its outcome was unknown. The runner and trace agree, and cleanup still attempts every registered resource.",
+    "body": "ProtoTest 1.1.8 makes a cleanup failure fail the test even when its body was skipped or its outcome was unknown. The runner and trace agree, and cleanup still attempts every registered resource.\n\n### Fixes\n\n- Core: Fail cleanup after a runtime skip or an unknown body outcome. The message names the original body state and the cleanup error; `CleanupFailures = Report` keeps the original outcome. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle#a-test)\n- Runners: Preserve the skipped or unknown body explanation in xUnit v3 cleanup failures. Document the TUnit body-scope boundary for native hooks and the final runner verdict. [TUnit](https://prototest.dev/docs/runners/tunit#the-context-window)"
+  },
+  {
     "version": "1.1.7",
     "date": "2026-10-09",
     "summary": "ProtoTest 1.1.7 fails a test whose cleanup fails, reports a missing xUnit collection fixture as a failed test instead of a green run, and makes releasing a test's resources and clients exact: a failed release is no longer hidden, disposal w...",

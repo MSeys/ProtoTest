@@ -13,6 +13,21 @@ Every ProtoTest package shares one version number, so this page lists releases, 
 
 Work in progress is tracked in the repository [CHANGELOG.md](https://github.com/MSeys/ProtoTest/blob/main/CHANGELOG.md).
 
+## 1.1.8
+
+<p className="changelog-date">10 October 2026</p>
+
+ProtoTest 1.1.8 makes a cleanup failure fail the test even when its body was skipped or its outcome was unknown. The runner and trace agree, and cleanup still attempts every registered resource.
+
+<div className="changelog-group changelog-group--fixes">
+
+### Fixes
+
+- Core: Fail cleanup after a runtime skip or an unknown body outcome. The message names the original body state and the cleanup error; `CleanupFailures = Report` keeps the original outcome. <span className="changelog-ref">[Lifecycle](/docs/foundation/lifecycle#a-test)</span>
+- Runners: Preserve the skipped or unknown body explanation in xUnit v3 cleanup failures. Document the TUnit body-scope boundary for native hooks and the final runner verdict. <span className="changelog-ref">[TUnit](/docs/runners/tunit#the-context-window)</span>
+
+</div>
+
 ## 1.1.7
 
 <p className="changelog-date">9 October 2026</p>

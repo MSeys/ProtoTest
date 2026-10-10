@@ -7,6 +7,15 @@ All ProtoTest packages share one version; breaking API changes are called out be
 
 ## [Unreleased]
 
+## [1.1.8] - 2026-10-10
+
+ProtoTest 1.1.8 makes a cleanup failure fail the test even when its body was skipped or its outcome was unknown. The runner and trace agree, and cleanup still attempts every registered resource.
+
+### Fixes
+
+- Core: Fail cleanup after a runtime skip or an unknown body outcome. The message names the original body state and the cleanup error; `CleanupFailures = Report` keeps the original outcome. [Lifecycle](https://prototest.dev/docs/foundation/lifecycle#a-test)
+- Runners: Preserve the skipped or unknown body explanation in xUnit v3 cleanup failures. Document the TUnit body-scope boundary for native hooks and the final runner verdict. [TUnit](https://prototest.dev/docs/runners/tunit#the-context-window)
+
 ## [1.1.7] - 2026-10-09
 
 ProtoTest 1.1.7 fails a test whose cleanup fails, reports a missing xUnit collection fixture as a failed test instead of a green run, and makes releasing a test's resources and clients exact: a failed release is no longer hidden, disposal waits for a release in flight, and a client is disposed once.
